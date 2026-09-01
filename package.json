@@ -1,0 +1,28 @@
+{
+  "name": "ai-content-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automated AI Video Management & Editing Monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@ai-content-manager/web",
+    "dev:web": "npm run dev --workspace=@ai-content-manager/web",
+    "dev:api": "powershell -Command \"cd apps/api; .venv/Scripts/python -m uvicorn main:app --reload --port 8000\"",
+    "dev:worker": "powershell -Command \"cd apps/worker; ..\\api\\.venv\\Scripts\\celery -A celery_app.celery_app worker --loglevel=info --concurrency=1 -E\"",
+    "build": "npm run build --workspace=@ai-content-manager/web",
+    "lint": "npm run lint --workspace=@ai-content-manager/web"
+  },
+  "keywords": [
+    "ai",
+    "video-editor",
+    "fastapi",
+    "nextjs",
+    "celery",
+    "redis"
+  ],
+  "author": "",
+  "license": "MIT"
+}

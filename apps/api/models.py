@@ -1,0 +1,174 @@
+from datetime import datetime, timezone
+import enum
+from typing import Any, Dict, List, Optional
+import uuid
+from sqlmodel import Column, DateTime, Enum, Field, Relationship, SQLModel, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
+
+
+def get_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class SocialPlatform(str, enum.Enum):
+    YOUTUBE = "youtube"
+    INSTAGRAM = "instagram"
+    LINKEDIN = "linkedin"
+
+
+class VideoType(str, enum.Enum):
+    TALKING_HEAD = "talking_head"
+    FACELESS_SHORT = "faceless_short"
+
+
+class VideoJobStatus(str, enum.Enum):
+    QUEUED = "QUEUED"
+    DOWNLOADING = "DOWNLOADING"
+    TRANSCRIBING = "TRANSCRIBING"
+    AI_DIRECTING = "AI_DIRECTING"
+    RENDERING = "RENDERING"
+    PUBLISHING = "PUBLISHING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+# ---------------------------------------------------------------------------
+# Database Models (Tables)
+# ---------------------------------------------------------------------------
+
+class User(SQLModel, table=True):
+    __tablename__ = "users"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    clerk_id: str = Field(
+        sa_column=Column(String(255), unique=True, index=True, nullable=False),
+        description="Clerk User ID for external auth mapping",
+    )
+    email: str = Field(
+        sa_column=Column(String(255), index=True, nullable=False),
+        description="Primary email address",
+    )
+    created_at: datetime = Field(
+        default_factory=get_utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+        description="Timestamp when the user account was registered",
+    )
+
+    # Relationships
+    social_accounts: List["SocialAccount"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    video_jobs: List["VideoJob"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
+
+class SocialAccount(SQLModel, table=True):
+    __tablename__ = "social_accounts"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    user_id: uuid.UUID = Field(
+        foreign_key="users.id",
+        index=True,
+        nullable=False,
+    )
+    platform: SocialPlatform = Field(
+        sa_column=Column(Enum(SocialPlatform), nullable=False),
+        description="Social platform type (youtube, instagram, linkedin)",
+    )
+    access_token: str = Field(
+        sa_column=Column(Text, nullable=False),
+        description="OAuth2 Access Token",
+    )
+    refresh_token: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="OAuth2 Refresh Token for long-lived access",
+    )
+    token_expires_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+        description="Timestamp when the access token expires",
+    )
+    platform_account_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String(255), nullable=True),
+        description="External account / channel identifier on the platform",
+    )
+
+    # Relationships
+    user: Optional[User] = Relationship(back_populates="social_accounts")
+
+
+class VideoJob(SQLModel, table=True):
+    __tablename__ = "video_jobs"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    user_id: uuid.UUID = Field(
+        foreign_key="users.id",
+        index=True,
+        nullable=False,
+    )
+    title: str = Field(
+        sa_column=Column(String(255), nullable=False),
+        description="Job title or video project name",
+    )
+    source_url: str = Field(
+        sa_column=Column(Text, nullable=False),
+        description="S3 / Cloudflare R2 raw video source URL",
+    )
+    rendered_url: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Public S3 / Cloudflare R2 URL for final edited video export",
+    )
+    video_type: VideoType = Field(
+        default=VideoType.TALKING_HEAD,
+        sa_column=Column(Enum(VideoType), nullable=False),
+        description="Talking head cutting vs faceless short generation",
+    )
+    status: VideoJobStatus = Field(
+        default=VideoJobStatus.QUEUED,
+        sa_column=Column(Enum(VideoJobStatus), index=True, nullable=False),
+        description="Current processing pipeline state",
+    )
+    edit_decision_list: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="JSON structured Edit Decision List generated by LLM (Gemini/OpenRouter)",
+    )
+    error_log: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Error stacktrace or diagnostic logs if job failed",
+    )
+    created_at: datetime = Field(
+        default_factory=get_utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+        description="Creation timestamp",
+    )
+    updated_at: datetime = Field(
+        default_factory=get_utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+        description="Last state update timestamp",
+    )
+
+    # Relationships
+    user: Optional[User] = Relationship(back_populates="video_jobs")
