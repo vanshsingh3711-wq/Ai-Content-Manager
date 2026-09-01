@@ -52,13 +52,12 @@ def transcribe_and_compress(
 
     model = get_whisper_model(model_size=model_size)
 
-    # Execute word-level transcription with Voice Activity Detection (VAD) filter
+    # Execute word-level transcription (VAD disabled so it doesn't accidentally skip speech)
     segments, info = model.transcribe(
         audio_path,
         word_timestamps=True,
         beam_size=5,
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=500),
+        vad_filter=False,
         initial_prompt=initial_prompt,
     )
 

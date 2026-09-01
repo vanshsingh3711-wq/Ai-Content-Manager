@@ -130,10 +130,23 @@ def _build_segment_timeline(
 
     # Build timeline with gaps filled
     timeline = []
+    last_end = 0.0
+
     for i, chunk in enumerate(chunks):
+        # 1. Fill gap before this chunk (if any)
+        if chunk["start"] > last_end:
+            timeline.append({
+                "start": last_end,
+                "end": chunk["start"],
+                "chunk_id": f"GAP_{i}",
+                "actions": [],
+                "is_cut": False,  # Keep gaps so we don't lose non-speech video
+                "text": "",
+            })
+
+        # 2. Add the actual speech chunk
         is_cut = chunk["id"] in cut_ids
         actions = actions_by_chunk.get(chunk["id"], [])
-
         timeline.append({
             "start": chunk["start"],
             "end": chunk["end"],
@@ -141,6 +154,19 @@ def _build_segment_timeline(
             "actions": actions,
             "is_cut": is_cut,
             "text": chunk["text"],
+        })
+        
+        last_end = chunk["end"]
+
+    # 3. Fill final gap to the end of the video
+    if last_end < total_duration:
+        timeline.append({
+            "start": last_end,
+            "end": total_duration,
+            "chunk_id": "GAP_FINAL",
+            "actions": [],
+            "is_cut": False,
+            "text": "",
         })
 
     return timeline
