@@ -20,13 +20,19 @@ class EditList(BaseModel):
 
 
 SYSTEM_PROMPT = """You are an expert viral video editor and content strategist specializing in high-retention short-form and long-form video editing.
-Your task is to analyze a bracketed transcript with chunk IDs and produce a high-impact Edit Decision List.
+Your task is to analyze a Unified Analysis JSON containing transcript, scene cuts, subject positions, and safe spaces. You will produce a high-impact Edit Decision List.
 
 Guidelines for editing decisions:
 1. 'cut': Remove accidental fumbles, false starts, and stuttering. If a sentence is repeated due to a mistake (fumbling), cut the failed attempt. However, if a sentence is repeated INTENTIONALLY for dramatic effect or emphasis without any fumbling, DO NOT cut it.
-2. 'b_roll': Identify visual, exciting, or explanatory sentences and provide specific, high-quality search queries for B-roll footage from Pexels (e.g. 'futuristic artificial intelligence robot', 'stock market chart graph', 'happy programmer typing').
+   - VISUAL RULE: Do not add an artificial cut that perfectly aligns with an existing original scene boundary (from visual_analysis).
+2. 'b_roll': Identify visual, exciting, or explanatory sentences and provide specific, high-quality search queries for B-roll footage from Pexels (e.g. 'futuristic artificial intelligence robot').
+   - VISUAL RULE: If the visual context already shows the object you are talking about, do NOT insert redundant B-roll.
 3. 'zoom_in': Add dynamic zoom-ins to punch lines, surprising statistics, and key takeaways to reset viewer attention every 3-5 seconds.
+   - VISUAL RULE: Avoid zooming if the subject is already occupying the entire frame.
 4. 'sfx': Add subtle sound effects ('whoosh', 'pop', 'camera_shutter', 'cash_register') during transition points and hook reveals.
+
+COMPOSITION & SAFE SPACE RULE:
+If you are implicitly deciding where overlays or text should go (or if you generate overlays in the future), you MUST respect the `safe_regions` provided in the composition segments. Do not place overlays on top of the primary subject.
 
 CRITICAL REQUIREMENT:
 - ALWAYS reference the exact chunk IDs (e.g., ID_01, ID_02) provided in the transcript as the `trigger_id`.
@@ -34,7 +40,7 @@ CRITICAL REQUIREMENT:
 """
 
 
-def generate_edit_decisions(bracketed_transcript: str) -> EditList:
+def generate_edit_decisions(unified_analysis_json: str) -> EditList:
     """
     Calls Gemini Flash using the Google GenAI SDK to generate a structured Edit Decision List.
     Tries modern available flash models with fallback.
@@ -43,7 +49,13 @@ def generate_edit_decisions(bracketed_transcript: str) -> EditList:
 
     if not api_key:
         print("[*] No GEMINI_API_KEY provided. Generating heuristic edit decision list.")
-        return generate_mock_edit_decisions(bracketed_transcript)
+        # Fallback expects the raw transcript, so we try to extract it from the JSON
+        try:
+            data = json.loads(unified_analysis_json)
+            transcript = data.get("transcript", unified_analysis_json)
+        except:
+            transcript = unified_analysis_json
+        return generate_mock_edit_decisions(transcript)
 
     candidate_models = [
         "gemini-3.6-flash",
@@ -54,11 +66,11 @@ def generate_edit_decisions(bracketed_transcript: str) -> EditList:
     ]
     client = genai.Client(api_key=api_key)
 
-    prompt = f"""Here is the bracketed video transcript with chunk IDs:
+    prompt = f"""Here is the Unified Video Analysis data containing the transcript and visual context:
 
-{bracketed_transcript}
+{unified_analysis_json}
 
-Analyze this transcript and produce the viral Edit Decision List with cuts, B-roll overlays, zooms, and sound effects."""
+Analyze this unified context and produce the viral Edit Decision List with cuts, B-roll overlays, zooms, and sound effects."""
 
     for model_name in candidate_models:
         try:
@@ -85,7 +97,12 @@ Analyze this transcript and produce the viral Edit Decision List with cuts, B-ro
             continue
 
     print("[!] All Gemini model attempts failed. Falling back to heuristic edit list.")
-    return generate_mock_edit_decisions(bracketed_transcript)
+    try:
+        data = json.loads(unified_analysis_json)
+        transcript = data.get("transcript", unified_analysis_json)
+    except:
+        transcript = unified_analysis_json
+    return generate_mock_edit_decisions(transcript)
 
 
 def generate_mock_edit_decisions(bracketed_transcript: str) -> EditList:

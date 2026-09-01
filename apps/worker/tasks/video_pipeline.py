@@ -20,6 +20,7 @@ from services.asset_manager import fetch_broll_assets
 from services.subtitle_generator import generate_ass_subtitles
 from services.compositor import render_video_pipeline
 from services.publisher import upload_rendered_video_to_storage, publish_to_youtube_shorts
+from services.visual_analysis import analyze_visual_context, UnifiedAnalysis
 from worker_logger import log_header, log_step, log_step_end, log_info, log_success, log_warning, log_error, log_summary
 
 settings = get_worker_settings()
@@ -155,12 +156,36 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             model_size="small",
         )
         log_step_end("SPEECH-TO-TEXT", time.time() - step2_start)
+        
+        # -------------------------------------------------------------
+        # Step 2.5: VISUAL ANALYSIS (Intelligent Context Extraction)
+        # -------------------------------------------------------------
+        step_vis_start = time.time()
+        log_step(3, 7, "VISUAL INTELLIGENCE LAYER", "Extracting scenes, subjects, and safe regions")
+        
+        from services.compositor import _probe_duration
+        ffmpeg_bin = os.environ.get("FFMPEG_BINARY", "ffmpeg")
+        total_duration = _probe_duration(ffmpeg_bin, raw_video_path)
+        
+        visual_timeline = analyze_visual_context(
+            video_path=raw_video_path,
+            video_id=job_id,
+            video_duration=total_duration,
+            temp_dir=temp_job_dir
+        )
+        
+        unified_analysis = UnifiedAnalysis(
+            transcript=bracketed_transcript,
+            audio_analysis={"silences": []}, # We handle silence naturally now
+            visual_analysis=visual_timeline
+        )
+        log_step_end("VISUAL ANALYSIS", time.time() - step_vis_start)
 
         # -------------------------------------------------------------
         # Step 3: AI_DIRECTING (Phase 4 - Gemini 3.6 Flash)
         # -------------------------------------------------------------
         step3_start = time.time()
-        log_step(3, 6, "AI DIRECTOR REASONING", "Google Gemini 3.6 Flash structured EDL synthesis")
+        log_step(4, 7, "AI DIRECTOR REASONING", "Google Gemini 3.6 Flash structured EDL synthesis")
         job.status = VideoJobStatus.AI_DIRECTING
         job.updated_at = get_utc_now()
         session.add(job)
@@ -168,9 +193,9 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         session.refresh(job)
 
         # Query LLM to generate strict Pydantic JSON edit decisions
-        edit_decision_list = generate_edit_decisions(bracketed_transcript)
+        edit_decision_list = generate_edit_decisions(unified_analysis.model_dump_json())
         edits_json_str = json.dumps({
-            "bracketed_transcript": bracketed_transcript,
+            "unified_analysis": unified_analysis.model_dump(),
             "edits": [e.model_dump() for e in edit_decision_list.edits],
             "timestamp_map": timestamp_map,
         }, indent=2)
