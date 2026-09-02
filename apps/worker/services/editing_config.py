@@ -17,8 +17,8 @@ class EditingConfig:
     MAX_BROLL_COUNT: int = 3
 
     # Maximum total B-roll duration as a fraction of final video duration
-    # 0.20 = B-roll can occupy at most 20% of the final video
-    MAX_BROLL_DURATION_RATIO: float = 0.20
+    # 0.40 = B-roll can occupy at most 40% of the final video
+    MAX_BROLL_DURATION_RATIO: float = 0.40
 
     # Minimum duration for a single B-roll clip (seconds)
     MIN_BROLL_DURATION_SEC: float = 2.5

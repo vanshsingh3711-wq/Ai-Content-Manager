@@ -52,6 +52,7 @@ media_temp/
 *.avi
 *.mkv
 *.mp3
+*.ass
 
 # Editor & OS
 .DS_Store

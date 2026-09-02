@@ -14,6 +14,7 @@ AUDIO OWNERSHIP RULE:
 """
 
 import os
+import shutil
 import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple
@@ -43,11 +44,43 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     return result
 
 
+def _get_ffprobe_bin(ffmpeg_bin: str) -> str:
+    """Derive the ffprobe binary path from the ffmpeg binary path.
+
+    Resolution order:
+    1. Sibling file next to the ffmpeg binary (basename replacement only).
+    2. static_ffmpeg package (if installed and binaries pre-fetched).
+    3. System PATH lookup.
+    4. Bare 'ffprobe' (will fail at call-site, triggering ffmpeg -i fallback).
+    """
+    # 1. Sibling of the ffmpeg binary
+    directory = os.path.dirname(ffmpeg_bin)
+    basename = os.path.basename(ffmpeg_bin)
+    probe_basename = basename.replace("ffmpeg", "ffprobe")
+    candidate = os.path.join(directory, probe_basename) if directory else probe_basename
+    if os.path.isfile(candidate):
+        return candidate
+    # 2. Try static_ffmpeg package
+    try:
+        import static_ffmpeg.run as _sfr
+        _probe_candidate = os.path.join(
+            _sfr.get_platform_dir(),
+            "ffprobe.exe" if os.name == "nt" else "ffprobe",
+        )
+        if os.path.isfile(_probe_candidate):
+            return _probe_candidate
+    except Exception:
+        pass
+    # 3. System PATH
+    system_probe = shutil.which("ffprobe")
+    if system_probe:
+        return system_probe
+    return "ffprobe"
+
+
 def _probe_duration(ffmpeg_bin: str, filepath: str) -> float:
     """Get duration of a media file in seconds using ffprobe."""
-    ffprobe_bin = ffmpeg_bin.replace("ffmpeg", "ffprobe")
-    if not os.path.exists(ffprobe_bin):
-        ffprobe_bin = "ffprobe"
+    ffprobe_bin = _get_ffprobe_bin(ffmpeg_bin)
     try:
         result = subprocess.run(
             [ffprobe_bin, "-v", "error", "-show_entries", "format=duration",
@@ -77,9 +110,7 @@ def _probe_streams(ffmpeg_bin: str, filepath: str) -> Dict[str, Any]:
     Probe a media file for stream information.
     Returns dict with 'has_video', 'has_audio', 'video_duration', 'audio_duration'.
     """
-    ffprobe_bin = ffmpeg_bin.replace("ffmpeg", "ffprobe")
-    if not os.path.exists(ffprobe_bin):
-        ffprobe_bin = "ffprobe"
+    ffprobe_bin = _get_ffprobe_bin(ffmpeg_bin)
 
     info = {"has_video": False, "has_audio": False, "video_duration": 0.0, "audio_duration": 0.0, "fps": 30.0}
 
@@ -464,19 +495,21 @@ def render_video_pipeline(
             cmd = [
                 ffmpeg_bin, "-y",
                 # Input 0: Original video (provides AUDIO)
-                "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}", "-i", raw_video_path,
+                "-i", raw_video_path,
                 # Input 1: B-roll (provides VIDEO ONLY — audio discarded)
-                "-ss", "0", "-t", f"{duration:.3f}", "-i", broll_path,
+                "-an", "-i", broll_path,
                 "-filter_complex",
                 # Use B-roll video, scaled to portrait format and normalized to source FPS
+                # Offset B-roll PTS so it starts correctly when we apply output -ss
                 f"[1:v]fps={source_fps},scale=1080:1920:force_original_aspect_ratio=increase,"
-                f"crop=1080:1920,setpts=PTS-STARTPTS[broll];"
+                f"crop=1080:1920,setpts=PTS-STARTPTS+{start_t}/TB[broll];"
                 f"[broll]format=yuv420p[vout]",
                 # EXPLICIT STREAM MAPPING:
                 # Video: B-roll visual ([vout])
                 # Audio: Original video audio (0:a) — MANDATORY, not optional
                 "-map", "[vout]",
                 "-map", "0:a",
+                "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
                 "-r", str(source_fps),
                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                 "-c:a", "aac", "-b:a", "192k",
@@ -488,7 +521,8 @@ def render_video_pipeline(
         else:
             cmd = [
                 ffmpeg_bin, "-y",
-                "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}", "-i", raw_video_path,
+                "-i", raw_video_path,
+                "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
                 "-vf", vf_chain,
                 "-r", str(source_fps),
                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
@@ -521,7 +555,8 @@ def render_video_pipeline(
                 _log("RETRY", f"Retrying {seg['chunk_id']} without B-roll overlay...")
                 fallback_cmd = [
                     ffmpeg_bin, "-y",
-                    "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}", "-i", raw_video_path,
+                    "-i", raw_video_path,
+                    "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
                     "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
                     "-r", str(source_fps),
                     "-c:v", "libx264", "-preset", "fast", "-crf", "23",

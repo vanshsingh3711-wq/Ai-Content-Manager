@@ -280,6 +280,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         generate_ass_subtitles(
             timestamp_map=timestamp_map,
             output_ass_path=subtitle_ass_path,
+            edits=validated_edits,
             font_size=50,
             primary_color="&H00FFFFFF",     # White
             highlight_color="&H0000FFFF",   # TikTok Yellow

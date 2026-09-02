@@ -30,12 +30,35 @@ def generate_ass_subtitles(
     edits = edits or []
     os.makedirs(os.path.dirname(os.path.abspath(output_ass_path)), exist_ok=True)
 
-    # 1. Identify chunks marked for cut
-    cut_ids: Set[str] = {
-        e.get("trigger_id")
-        for e in edits
-        if e.get("action") == "cut"
-    }
+    # 1. Identify cut intervals
+    cut_intervals: List[Tuple[float, float]] = []
+    for e in edits:
+        if e.get("action") == "cut":
+            start = e.get("start")
+            end = e.get("end")
+            if start is not None and end is not None:
+                cut_intervals.append((float(start), float(end)))
+            elif e.get("trigger_id") and e.get("trigger_id") in timestamp_map:
+                chunk = timestamp_map[e["trigger_id"]]
+                cut_intervals.append((float(chunk.get("start", 0.0)), float(chunk.get("end", 0.0))))
+
+    def _map_time(t: float) -> float:
+        shift = 0.0
+        for c_start, c_end in sorted(cut_intervals):
+            if t <= c_start:
+                break
+            elif c_start < t < c_end:
+                shift += (t - c_start)
+                break
+            else:
+                shift += (c_end - c_start)
+        return max(0.0, t - shift)
+
+    def _is_inside_cut(s: float, e: float) -> bool:
+        for c_start, c_end in cut_intervals:
+            if s >= c_start - 0.05 and e <= c_end + 0.05:
+                return True
+        return False
 
     # 2. Build .ass Header and Styles
     header = """[Script Info]
@@ -59,18 +82,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     # 3. Generate word-by-word highlighted lines for each uncut chunk
     for chunk_id, chunk_data in timestamp_map.items():
-        if chunk_id in cut_ids:
+        chunk_start = chunk_data.get("start", 0.0)
+        chunk_end = chunk_data.get("end", 0.0)
+
+        if _is_inside_cut(chunk_start, chunk_end):
             continue
 
-        words = chunk_data.get("words", [])
+        raw_words = chunk_data.get("words", [])
+        # Filter valid non-empty words
+        words = [w for w in raw_words if w.get("word", "").strip() and not _is_inside_cut(w["start"], w["end"])]
+
         if not words:
             # Fallback if no word level breakdown
-            start_str = format_ass_time(chunk_data.get("start", 0.0))
-            end_str = format_ass_time(chunk_data.get("end", 1.0))
-            text = chunk_data.get("text", "")
-            dialogue_lines.append(
-                f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{text.upper()}"
-            )
+            text = chunk_data.get("text", "").strip()
+            if text:
+                start_str = format_ass_time(_map_time(chunk_start))
+                end_str = format_ass_time(_map_time(chunk_end))
+                dialogue_lines.append(
+                    f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{text.upper()}"
+                )
             continue
 
         # For every word, create a subtitle event highlighting that word in neon yellow
@@ -85,7 +115,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             else:
                 # Last word in chunk: use its actual end time, but ensure a minimum readable duration
                 word_end = chunk_data.get("end", active_word_info["end"])
-                # Give it at least a 0.2s linger so it doesn't vanish instantly if spoken fast
                 if word_end - word_start < 0.2:
                     word_end = word_start + 0.2
             
@@ -93,12 +122,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if word_end <= word_start:
                 word_end = word_start + 0.15
 
-            start_str = format_ass_time(word_start)
-            end_str = format_ass_time(word_end)
+            mapped_start = _map_time(word_start)
+            mapped_end = _map_time(word_end)
+
+            if mapped_end <= mapped_start:
+                mapped_end = mapped_start + 0.15
+
+            start_str = format_ass_time(mapped_start)
+            end_str = format_ass_time(mapped_end)
 
             formatted_words = []
             for idx, w in enumerate(words):
-                clean_word = w["word"].upper()
+                clean_word = w["word"].strip().upper()
+                if not clean_word:
+                    continue
                 if idx == active_idx:
                     # Highlight color: Vibrant Yellow (&H0000FFFF in BGR = &H00FFFF&)
                     formatted_words.append(r"{\c&H00FFFF&}" + clean_word + r"{\c&HFFFFFF&}")
