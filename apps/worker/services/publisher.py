@@ -2,12 +2,25 @@ import os
 import shutil
 import boto3
 import requests
+import time
 from botocore.exceptions import ClientError
 from typing import Any, Dict, Optional
 from config import get_worker_settings
 
 settings = get_worker_settings()
 MEDIA_TEMP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "media_temp"))
+
+def _wait_for_internet_retry(func):
+    def wrapper(*args, **kwargs):
+        attempt = 1
+        while True:
+            try:
+                return func(*args, **kwargs)
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                print(f"[!] Network connection lost. Waiting 10s for internet to return (Attempt {attempt})...")
+                time.sleep(10)
+                attempt += 1
+    return wrapper
 
 
 def get_s3_client():
@@ -27,6 +40,7 @@ def get_s3_client():
     )
 
 
+@_wait_for_internet_retry
 def upload_rendered_video_to_storage(
     local_mp4_path: str,
     job_id: str,
@@ -43,23 +57,20 @@ def upload_rendered_video_to_storage(
     file_key = f"rendered-exports/{user_id}/{job_id}_final.mp4"
 
     if s3_client:
-        try:
-            print(f"[*] Uploading rendered video to R2/S3: s3://{bucket_name}/{file_key}...")
-            s3_client.upload_file(
-                local_mp4_path,
-                bucket_name,
-                file_key,
-                ExtraArgs={"ContentType": "video/mp4"},
-            )
-            
-            if settings.R2_ENDPOINT_URL:
-                public_url = f"{settings.R2_ENDPOINT_URL.rstrip('/')}/{bucket_name}/{file_key}"
-            else:
-                public_url = f"https://{bucket_name}.s3.amazonaws.com/{file_key}"
-            print(f"[OK] Video uploaded successfully: {public_url}")
-            return public_url
-        except Exception as e:
-            print(f"[!] S3 upload failed: {e}. Falling back to local storage.")
+        print(f"[*] Uploading rendered video to R2/S3: s3://{bucket_name}/{file_key}...")
+        s3_client.upload_file(
+            local_mp4_path,
+            bucket_name,
+            file_key,
+            ExtraArgs={"ContentType": "video/mp4"},
+        )
+        
+        if settings.R2_ENDPOINT_URL:
+            public_url = f"{settings.R2_ENDPOINT_URL.rstrip('/')}/{bucket_name}/{file_key}"
+        else:
+            public_url = f"https://{bucket_name}.s3.amazonaws.com/{file_key}"
+        print(f"[OK] Video uploaded successfully: {public_url}")
+        return public_url
 
     # Local development storage: Persist copy to media_temp for streaming via localhost:8000
     persistent_local_dest = os.path.join(MEDIA_TEMP_DIR, file_key.replace("/", os.sep))
@@ -70,6 +81,7 @@ def upload_rendered_video_to_storage(
     return f"http://localhost:8000/api/v1/storage/download?key={file_key}"
 
 
+@_wait_for_internet_retry
 def publish_to_youtube_shorts(
     video_path: str,
     title: str,
@@ -89,44 +101,44 @@ def publish_to_youtube_shorts(
             "title": title,
         }
 
-    try:
-        init_url = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status"
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json; charset=UTF-8",
-        }
-        metadata = {
-            "snippet": {
-                "title": f"{title[:90]} #Shorts",
-                "description": description,
-                "categoryId": "22",
-                "tags": ["shorts", "ai", "viral", "video"],
-            },
-            "status": {
-                "privacyStatus": "public",
-                "selfDeclaredMadeForKids": False,
-            },
-        }
-        init_res = requests.post(init_url, json=metadata, headers=headers, timeout=15)
-        if init_res.status_code == 200:
-            upload_url = init_res.headers.get("Location")
-            if upload_url and os.path.exists(video_path):
-                with open(video_path, "rb") as f:
-                    upload_res = requests.put(upload_url, data=f, headers={"Content-Type": "video/mp4"}, timeout=120)
-                    if upload_res.status_code in [200, 201]:
-                        yt_data = upload_res.json()
-                        return {
-                            "platform": "youtube",
-                            "status": "published",
-                            "video_id": yt_data.get("id"),
-                            "url": f"https://youtube.com/shorts/{yt_data.get('id')}",
-                        }
+    init_url = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; charset=UTF-8",
+    }
+    metadata = {
+        "snippet": {
+            "title": f"{title[:90]} #Shorts",
+            "description": description,
+            "categoryId": "22",
+            "tags": ["shorts", "ai", "viral", "video"],
+        },
+        "status": {
+            "privacyStatus": "public",
+            "selfDeclaredMadeForKids": False,
+        },
+    }
+    init_res = requests.post(init_url, json=metadata, headers=headers, timeout=15)
+    init_res.raise_for_status()
+    if init_res.status_code == 200:
+        upload_url = init_res.headers.get("Location")
+        if upload_url and os.path.exists(video_path):
+            with open(video_path, "rb") as f:
+                upload_res = requests.put(upload_url, data=f, headers={"Content-Type": "video/mp4"}, timeout=120)
+                upload_res.raise_for_status()
+                if upload_res.status_code in [200, 201]:
+                    yt_data = upload_res.json()
+                    return {
+                        "platform": "youtube",
+                        "status": "published",
+                        "video_id": yt_data.get("id"),
+                        "url": f"https://youtube.com/shorts/{yt_data.get('id')}",
+                    }
 
-        return {"platform": "youtube", "status": "failed", "error": init_res.text}
-    except Exception as e:
-        return {"platform": "youtube", "status": "error", "message": str(e)}
+    raise RuntimeError(f"YouTube Shorts upload failed. {init_res.text}")
 
 
+@_wait_for_internet_retry
 def publish_to_instagram_reels(
     video_url: str,
     caption: str,
@@ -145,29 +157,28 @@ def publish_to_instagram_reels(
             "media_id": f"ig_sim_{os.urandom(4).hex()}",
         }
 
-    try:
-        container_url = f"https://graph.facebook.com/v19.0/{instagram_account_id}/media"
-        params = {
-            "media_type": "REELS",
-            "video_url": video_url,
-            "caption": caption,
-            "access_token": access_token,
+    container_url = f"https://graph.facebook.com/v19.0/{instagram_account_id}/media"
+    params = {
+        "media_type": "REELS",
+        "video_url": video_url,
+        "caption": caption,
+        "access_token": access_token,
+    }
+    res1 = requests.post(container_url, data=params, timeout=20)
+    res1.raise_for_status()
+    if res1.status_code != 200:
+        raise RuntimeError(f"Instagram container creation failed: {res1.text}")
+
+    container_id = res1.json().get("id")
+
+    publish_url = f"https://graph.facebook.com/v19.0/{instagram_account_id}/media_publish"
+    res2 = requests.post(publish_url, data={"creation_id": container_id, "access_token": access_token}, timeout=20)
+    res2.raise_for_status()
+    if res2.status_code == 200:
+        return {
+            "platform": "instagram",
+            "status": "published",
+            "media_id": res2.json().get("id"),
         }
-        res1 = requests.post(container_url, data=params, timeout=20)
-        if res1.status_code != 200:
-            return {"platform": "instagram", "status": "failed", "error": res1.text}
 
-        container_id = res1.json().get("id")
-
-        publish_url = f"https://graph.facebook.com/v19.0/{instagram_account_id}/media_publish"
-        res2 = requests.post(publish_url, data={"creation_id": container_id, "access_token": access_token}, timeout=20)
-        if res2.status_code == 200:
-            return {
-                "platform": "instagram",
-                "status": "published",
-                "media_id": res2.json().get("id"),
-            }
-
-        return {"platform": "instagram", "status": "failed", "error": res2.text}
-    except Exception as e:
-        return {"platform": "instagram", "status": "error", "message": str(e)}
+    raise RuntimeError(f"Instagram publish failed: {res2.text}")

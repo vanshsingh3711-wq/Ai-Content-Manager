@@ -77,9 +77,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         # Format: {\c&H00FFFF&}ACTIVE_WORD{\c&HFFFFFF&}
         for active_idx, active_word_info in enumerate(words):
             word_start = active_word_info["start"]
-            word_end = active_word_info["end"]
-
-            # Prevent zero-length display
+            
+            # Stretch subtitle display duration to prevent flickering between words
+            if active_idx < len(words) - 1:
+                # End when the next word starts
+                word_end = words[active_idx + 1]["start"]
+            else:
+                # Last word in chunk: use its actual end time, but ensure a minimum readable duration
+                word_end = chunk_data.get("end", active_word_info["end"])
+                # Give it at least a 0.2s linger so it doesn't vanish instantly if spoken fast
+                if word_end - word_start < 0.2:
+                    word_end = word_start + 0.2
+            
+            # Prevent zero-length display fallback
             if word_end <= word_start:
                 word_end = word_start + 0.15
 

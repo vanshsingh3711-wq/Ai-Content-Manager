@@ -1,0 +1,30 @@
+Start: 0.00, End: 2.76
+  Text:  So, what's up guys? It's your boy JaxxMF.
+  Avg Logprob: -0.4197385787963867
+  Compression Ratio: 1.81
+  No Speech Prob: 0.33845794200897217
+Start: 3.50, End: 6.74
+  Text:  और अगे भी ज़सा कि आप देख सकते हो गाने का पुरा काम कातम हुएं.
+  Avg Logprob: -0.4197385787963867
+  Compression Ratio: 1.81
+  No Speech Prob: 0.33845794200897217
+Start: 7.50, End: 10.14
+  Text:  गाना आ आराए, सुन्टे को मुरनिक नाइ नहीं हैं.
+  Avg Logprob: -0.4197385787963867
+  Compression Ratio: 1.81
+  No Speech Prob: 0.33845794200897217
+Start: 10.52, End: 11.78
+  Text:  बहुत मैंड़त लगी गाने मैं.
+  Avg Logprob: -0.4197385787963867
+  Compression Ratio: 1.81
+  No Speech Prob: 0.33845794200897217
+Start: 12.30, End: 15.20
+  Text:  तब बाक लैक करना, तब बाके कमें कना, तब बाके शियर करना.
+  Avg Logprob: -0.4197385787963867
+  Compression Ratio: 1.81
+  No Speech Prob: 0.33845794200897217
+Start: 31.60, End: 41.04
+  Text:  अदाडादो से अगेन सावनेर का शेर दाडे कर ट्रक पे शावनेर का शेर दाडे कर ट्रक पे शावनेर का शेर दाडे कर ट्रक पे शावनेर का शावनेर का शेर दाडे कर ट्रक पे शावनेर का शेर दाडे कर ट्रक पे शावनेर का शावनेर का शेर दाडे कर ट्रक पे शाव
+  Avg Logprob: -0.2664005491468642
+  Compression Ratio: 6.010752688172043
+  No Speech Prob: 0.3535229563713074

@@ -33,14 +33,59 @@ def format_timestamp(seconds: float) -> str:
     return f"{minutes:02d}:{secs:05.2f}"
 
 
+def calculate_transcription_coverage(intervals: List[Tuple[float, float]], total_duration: float) -> Dict[str, float]:
+    """
+    Calculates coverage ratio and largest gap from a list of transcription intervals.
+    """
+    if not intervals or total_duration <= 0:
+        return {
+            "source_duration": total_duration,
+            "transcript_covered_duration": 0.0,
+            "transcript_coverage_ratio": 0.0,
+            "largest_transcript_gap": total_duration
+        }
+
+    # Sort and merge intervals
+    intervals.sort(key=lambda x: x[0])
+    merged = [intervals[0]]
+    for current in intervals[1:]:
+        prev = merged[-1]
+        if current[0] <= prev[1]:
+            merged[-1] = (prev[0], max(prev[1], current[1]))
+        else:
+            merged.append(current)
+
+    covered_duration = sum(end - start for start, end in merged)
+    coverage_ratio = covered_duration / total_duration if total_duration > 0 else 0.0
+
+    max_gap = 0.0
+    # Gap before first interval
+    max_gap = max(max_gap, merged[0][0])
+    # Gaps between intervals
+    for i in range(1, len(merged)):
+        gap = merged[i][0] - merged[i-1][1]
+        max_gap = max(max_gap, gap)
+    # Gap after last interval
+    if total_duration > merged[-1][1]:
+        max_gap = max(max_gap, total_duration - merged[-1][1])
+
+    return {
+        "source_duration": round(total_duration, 2),
+        "transcript_covered_duration": round(covered_duration, 2),
+        "transcript_coverage_ratio": round(coverage_ratio, 3),
+        "largest_transcript_gap": round(max_gap, 2)
+    }
+
+
+
 def transcribe_and_compress(
     audio_path: str,
-    silence_threshold_sec: float = 0.8,
+    speech_gap_threshold_sec: float = 0.8,
     model_size: str = "small",
     initial_prompt: str = "This is a video featuring Hindi and English mixed language. नमस्ते, hello, kaise ho, how are you.",
 ) -> Tuple[str, Dict[str, Any]]:
     """
-    Transcribes audio with word-level timestamps, detects silence gaps (>0.8s),
+    Transcribes audio with word-level timestamps, detects speech gaps (>0.8s),
     and compresses speech into a token-efficient bracket format with a deterministic timestamp map.
 
     Returns:
@@ -57,7 +102,7 @@ def transcribe_and_compress(
         audio_path,
         word_timestamps=True,
         beam_size=5,
-        vad_filter=False,
+        vad_filter=True,
         initial_prompt=initial_prompt,
     )
 
@@ -65,16 +110,22 @@ def transcribe_and_compress(
     for segment in segments:
         if segment.words:
             for word in segment.words:
+                stripped_word = word.word.strip()
+                if not stripped_word:
+                    continue
                 all_words.append({
-                    "word": word.word.strip(),
+                    "word": stripped_word,
                     "start": round(word.start, 2),
                     "end": round(word.end, 2),
                     "probability": round(word.probability, 2),
                 })
         else:
             # Fallback if segment lacks word breakdown
+            stripped_text = segment.text.strip()
+            if not stripped_text:
+                continue
             all_words.append({
-                "word": segment.text.strip(),
+                "word": stripped_text,
                 "start": round(segment.start, 2),
                 "end": round(segment.end, 2),
                 "probability": 1.0,
@@ -85,7 +136,7 @@ def transcribe_and_compress(
             "ID_01": {"start": 0.0, "end": 1.0, "text": "(No speech detected)", "words": []}
         })
 
-    # Group words into logical chunks based on punctuation and silences > 0.8s
+    # Group words into logical chunks based on punctuation and speech gaps > 0.8s
     chunks: List[Dict[str, Any]] = []
     current_chunk_words: List[Dict[str, Any]] = []
 
@@ -95,15 +146,15 @@ def transcribe_and_compress(
             continue
 
         prev_word = current_chunk_words[-1]
-        silence_gap = word_info["start"] - prev_word["end"]
+        speech_gap = word_info["start"] - prev_word["end"]
         prev_word_text = prev_word["word"]
 
-        # Break conditions: silence > threshold OR sentence punctuation OR chunk size >= 18 words
-        is_silence_break = silence_gap >= silence_threshold_sec
+        # Break conditions: speech gap > threshold OR sentence punctuation OR chunk size >= 18 words
+        is_speech_gap_break = speech_gap >= speech_gap_threshold_sec
         is_punct_break = any(prev_word_text.endswith(p) for p in [".", "!", "?", "\n"])
         is_len_break = len(current_chunk_words) >= 18
 
-        if is_silence_break or is_punct_break or is_len_break:
+        if is_speech_gap_break or is_punct_break or is_len_break:
             # Finalize current chunk
             chunk_start = current_chunk_words[0]["start"]
             chunk_end = current_chunk_words[-1]["end"]

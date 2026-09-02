@@ -32,4 +32,16 @@ celery_app.conf.update(
     broker_use_ssl=broker_use_ssl,
     redis_backend_use_ssl=redis_backend_use_ssl,
     result_expires=3600,
+    broker_transport_options={
+        "visibility_timeout": 3600,
+        "socket_timeout": 60,
+        "socket_connect_timeout": 60,
+        "socket_keepalive": True,
+        "retry_on_timeout": True,
+        "health_check_interval": 30,
+    },
+    redis_socket_timeout=60,
+    redis_socket_connect_timeout=60,
+    redis_socket_keepalive=True,
+    redis_retry_on_timeout=True,
 )

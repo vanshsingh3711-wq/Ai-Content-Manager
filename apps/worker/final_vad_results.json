@@ -1,0 +1,705 @@
+[
+  "ID_01: [00:00.21 - 00:01.33] So what's up guys.\nID_02: [00:01.67 - 00:02.75] It's your boy jacksmf.\nID_03: [00:03.51 - 00:07.01] अब यह भी जोसा के आप देक सत्ते हो गाने काँप पूरा काम कतम हैं.\nID_04: [00:07.39 - 00:11.11] उब दोंबाज लगत आड़ा है, अगर तर हमंध को मंहारी सनडे को नहींग न आईनैं आप बुत मैंड़ुत\nID_05: [00:11.11 - 00:11.85] लगी गाने मैं.\nID_06: [00:11.85 - 00:17.11] दर बागे कलेच्स, ख कम этना ,seok ए खब लगे चिए। शाचा भो ती Umap тому Prag demandingShare.\nID_07: [00:17.11 - 00:23.29] आप गरोंग कर पनका यहने � observe me valin deveika Spmaa devastating चबनिस तागांा उंब ,No She उस\nID_08: [00:23.29 - 00:25.07] Audio嘰ो स।\nID_09: [00:31.03 - 00:36.37] के औदाए के लए का र Sikh अगें सावनेर का शेर दादे का ट्रेक पे\nID_10: [00:37.43 - 00:40.93] शाव्टोट में चालिस न जी पी पीस अद",
+  {
+    "ID_01": {
+      "start": 0.21,
+      "end": 1.33,
+      "text": "So what's up guys.",
+      "words": [
+        {
+          "word": "So",
+          "start": 0.21,
+          "end": 0.67,
+          "probability": 0.01
+        },
+        {
+          "word": "what's",
+          "start": 0.67,
+          "end": 0.93,
+          "probability": 0.63
+        },
+        {
+          "word": "up",
+          "start": 0.93,
+          "end": 1.07,
+          "probability": 0.97
+        },
+        {
+          "word": "guys.",
+          "start": 1.07,
+          "end": 1.33,
+          "probability": 0.91
+        }
+      ]
+    },
+    "ID_02": {
+      "start": 1.67,
+      "end": 2.75,
+      "text": "It's your boy jacksmf.",
+      "words": [
+        {
+          "word": "It's",
+          "start": 1.67,
+          "end": 1.77,
+          "probability": 0.76
+        },
+        {
+          "word": "your",
+          "start": 1.77,
+          "end": 1.89,
+          "probability": 0.87
+        },
+        {
+          "word": "boy",
+          "start": 1.89,
+          "end": 2.11,
+          "probability": 0.66
+        },
+        {
+          "word": "jacksmf.",
+          "start": 2.11,
+          "end": 2.75,
+          "probability": 0.55
+        }
+      ]
+    },
+    "ID_03": {
+      "start": 3.51,
+      "end": 7.01,
+      "text": "अब यह भी जोसा के आप देक सत्ते हो गाने काँप पूरा काम कतम हैं.",
+      "words": [
+        {
+          "word": "अब",
+          "start": 3.51,
+          "end": 3.79,
+          "probability": 0.68
+        },
+        {
+          "word": "यह",
+          "start": 3.79,
+          "end": 3.95,
+          "probability": 0.61
+        },
+        {
+          "word": "भी",
+          "start": 3.95,
+          "end": 4.13,
+          "probability": 0.74
+        },
+        {
+          "word": "जोसा",
+          "start": 4.13,
+          "end": 4.51,
+          "probability": 0.53
+        },
+        {
+          "word": "के",
+          "start": 4.51,
+          "end": 4.63,
+          "probability": 0.47
+        },
+        {
+          "word": "आप",
+          "start": 4.63,
+          "end": 4.75,
+          "probability": 0.78
+        },
+        {
+          "word": "देक",
+          "start": 4.75,
+          "end": 4.95,
+          "probability": 0.73
+        },
+        {
+          "word": "सत्ते",
+          "start": 4.95,
+          "end": 5.25,
+          "probability": 0.44
+        },
+        {
+          "word": "हो",
+          "start": 5.25,
+          "end": 5.31,
+          "probability": 0.72
+        },
+        {
+          "word": "गाने",
+          "start": 5.31,
+          "end": 5.59,
+          "probability": 0.87
+        },
+        {
+          "word": "काँप",
+          "start": 5.59,
+          "end": 5.79,
+          "probability": 0.38
+        },
+        {
+          "word": "पूरा",
+          "start": 5.79,
+          "end": 5.91,
+          "probability": 0.52
+        },
+        {
+          "word": "काम",
+          "start": 5.91,
+          "end": 6.07,
+          "probability": 0.88
+        },
+        {
+          "word": "कतम",
+          "start": 6.07,
+          "end": 6.39,
+          "probability": 0.53
+        },
+        {
+          "word": "हैं.",
+          "start": 6.39,
+          "end": 7.01,
+          "probability": 0.44
+        }
+      ]
+    },
+    "ID_04": {
+      "start": 7.39,
+      "end": 11.11,
+      "text": "उब दोंबाज लगत आड़ा है, अगर तर हमंध को मंहारी सनडे को नहींग न आईनैं आप बुत मैंड़ुत",
+      "words": [
+        {
+          "word": "उब",
+          "start": 7.39,
+          "end": 7.83,
+          "probability": 0.39
+        },
+        {
+          "word": "दोंबाज",
+          "start": 7.83,
+          "end": 7.95,
+          "probability": 0.29
+        },
+        {
+          "word": "लगत",
+          "start": 7.95,
+          "end": 7.97,
+          "probability": 0.39
+        },
+        {
+          "word": "आड़ा",
+          "start": 7.97,
+          "end": 7.99,
+          "probability": 0.46
+        },
+        {
+          "word": "है,",
+          "start": 7.99,
+          "end": 8.37,
+          "probability": 0.57
+        },
+        {
+          "word": "अगर",
+          "start": 8.69,
+          "end": 9.13,
+          "probability": 0.37
+        },
+        {
+          "word": "तर",
+          "start": 9.13,
+          "end": 9.13,
+          "probability": 0.21
+        },
+        {
+          "word": "हमंध",
+          "start": 9.13,
+          "end": 9.13,
+          "probability": 0.15
+        },
+        {
+          "word": "को",
+          "start": 9.13,
+          "end": 9.13,
+          "probability": 0.15
+        },
+        {
+          "word": "मंहारी",
+          "start": 9.13,
+          "end": 9.13,
+          "probability": 0.13
+        },
+        {
+          "word": "सनडे",
+          "start": 9.13,
+          "end": 9.31,
+          "probability": 0.24
+        },
+        {
+          "word": "को",
+          "start": 9.31,
+          "end": 9.41,
+          "probability": 0.59
+        },
+        {
+          "word": "नहींग",
+          "start": 9.41,
+          "end": 9.77,
+          "probability": 0.48
+        },
+        {
+          "word": "न",
+          "start": 9.77,
+          "end": 9.85,
+          "probability": 0.59
+        },
+        {
+          "word": "आईनैं",
+          "start": 9.85,
+          "end": 10.15,
+          "probability": 0.27
+        },
+        {
+          "word": "आप",
+          "start": 10.15,
+          "end": 10.15,
+          "probability": 0.38
+        },
+        {
+          "word": "बुत",
+          "start": 10.15,
+          "end": 10.83,
+          "probability": 0.44
+        },
+        {
+          "word": "मैंड़ुत",
+          "start": 10.83,
+          "end": 11.11,
+          "probability": 0.5
+        }
+      ]
+    },
+    "ID_05": {
+      "start": 11.11,
+      "end": 11.85,
+      "text": "लगी गाने मैं.",
+      "words": [
+        {
+          "word": "लगी",
+          "start": 11.11,
+          "end": 11.31,
+          "probability": 0.91
+        },
+        {
+          "word": "गाने",
+          "start": 11.31,
+          "end": 11.53,
+          "probability": 0.81
+        },
+        {
+          "word": "मैं.",
+          "start": 11.53,
+          "end": 11.85,
+          "probability": 0.72
+        }
+      ]
+    },
+    "ID_06": {
+      "start": 11.85,
+      "end": 17.11,
+      "text": "दर बागे कलेच्स, ख कम этना ,seok ए खब लगे चिए। शाचा भो ती Umap тому Prag demandingShare.",
+      "words": [
+        {
+          "word": "दर",
+          "start": 11.85,
+          "end": 12.51,
+          "probability": 0.33
+        },
+        {
+          "word": "बागे",
+          "start": 12.51,
+          "end": 12.81,
+          "probability": 0.43
+        },
+        {
+          "word": "कलेच्स,",
+          "start": 12.81,
+          "end": 13.29,
+          "probability": 0.13
+        },
+        {
+          "word": "ख",
+          "start": 13.29,
+          "end": 13.65,
+          "probability": 0.43
+        },
+        {
+          "word": "कम",
+          "start": 13.65,
+          "end": 13.95,
+          "probability": 0.15
+        },
+        {
+          "word": "этना",
+          "start": 13.95,
+          "end": 14.23,
+          "probability": 0.28
+        },
+        {
+          "word": ",seok",
+          "start": 14.23,
+          "end": 14.47,
+          "probability": 0.14
+        },
+        {
+          "word": "ए",
+          "start": 14.47,
+          "end": 14.63,
+          "probability": 0.22
+        },
+        {
+          "word": "खब",
+          "start": 14.63,
+          "end": 14.63,
+          "probability": 0.21
+        },
+        {
+          "word": "लगे",
+          "start": 14.63,
+          "end": 14.63,
+          "probability": 0.42
+        },
+        {
+          "word": "चिए।",
+          "start": 14.63,
+          "end": 14.95,
+          "probability": 0.37
+        },
+        {
+          "word": "शाचा",
+          "start": 15.73,
+          "end": 16.09,
+          "probability": 0.28
+        },
+        {
+          "word": "भो",
+          "start": 16.09,
+          "end": 16.25,
+          "probability": 0.15
+        },
+        {
+          "word": "ती",
+          "start": 16.25,
+          "end": 17.01,
+          "probability": 0.24
+        },
+        {
+          "word": "Umap",
+          "start": 17.01,
+          "end": 17.11,
+          "probability": 0.0
+        },
+        {
+          "word": "тому",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.0
+        },
+        {
+          "word": "Prag",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.01
+        },
+        {
+          "word": "demandingShare.",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.18
+        }
+      ]
+    },
+    "ID_07": {
+      "start": 17.11,
+      "end": 23.29,
+      "text": "आप गरोंग कर पनका यहने � observe me valin deveika Spmaa devastating चबनिस तागांा उंब ,No She उस",
+      "words": [
+        {
+          "word": "आप",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.3
+        },
+        {
+          "word": "गरोंग",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.31
+        },
+        {
+          "word": "कर",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.13
+        },
+        {
+          "word": "पनका",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.07
+        },
+        {
+          "word": "यहने",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.21
+        },
+        {
+          "word": "�",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.5
+        },
+        {
+          "word": "observe",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.0
+        },
+        {
+          "word": "me",
+          "start": 17.11,
+          "end": 17.11,
+          "probability": 0.01
+        },
+        {
+          "word": "valin",
+          "start": 17.11,
+          "end": 18.57,
+          "probability": 0.0
+        },
+        {
+          "word": "deveika",
+          "start": 18.57,
+          "end": 18.57,
+          "probability": 0.0
+        },
+        {
+          "word": "Spmaa",
+          "start": 18.57,
+          "end": 18.57,
+          "probability": 0.02
+        },
+        {
+          "word": "devastating",
+          "start": 18.57,
+          "end": 18.67,
+          "probability": 0.0
+        },
+        {
+          "word": "चबनिस",
+          "start": 18.67,
+          "end": 19.31,
+          "probability": 0.06
+        },
+        {
+          "word": "तागांा",
+          "start": 19.31,
+          "end": 21.83,
+          "probability": 0.14
+        },
+        {
+          "word": "उंब",
+          "start": 21.83,
+          "end": 21.83,
+          "probability": 0.26
+        },
+        {
+          "word": ",No",
+          "start": 21.83,
+          "end": 23.19,
+          "probability": 0.0
+        },
+        {
+          "word": "She",
+          "start": 23.19,
+          "end": 23.19,
+          "probability": 0.0
+        },
+        {
+          "word": "उस",
+          "start": 23.19,
+          "end": 23.29,
+          "probability": 0.06
+        }
+      ]
+    },
+    "ID_08": {
+      "start": 23.29,
+      "end": 25.07,
+      "text": "Audio嘰ो स।",
+      "words": [
+        {
+          "word": "Audio嘰ो",
+          "start": 23.29,
+          "end": 24.19,
+          "probability": 0.04
+        },
+        {
+          "word": "स।",
+          "start": 24.19,
+          "end": 25.07,
+          "probability": 0.03
+        }
+      ]
+    },
+    "ID_09": {
+      "start": 31.03,
+      "end": 36.37,
+      "text": "के औदाए के लए का र Sikh अगें सावनेर का शेर दादे का ट्रेक पे",
+      "words": [
+        {
+          "word": "के",
+          "start": 31.03,
+          "end": 31.75,
+          "probability": 0.07
+        },
+        {
+          "word": "औदाए",
+          "start": 31.75,
+          "end": 32.47,
+          "probability": 0.18
+        },
+        {
+          "word": "के",
+          "start": 32.47,
+          "end": 32.71,
+          "probability": 0.11
+        },
+        {
+          "word": "लए",
+          "start": 32.71,
+          "end": 32.89,
+          "probability": 0.32
+        },
+        {
+          "word": "का",
+          "start": 32.89,
+          "end": 32.89,
+          "probability": 0.09
+        },
+        {
+          "word": "र",
+          "start": 32.89,
+          "end": 32.89,
+          "probability": 0.24
+        },
+        {
+          "word": "Sikh",
+          "start": 32.89,
+          "end": 32.89,
+          "probability": 0.0
+        },
+        {
+          "word": "अगें",
+          "start": 32.89,
+          "end": 33.83,
+          "probability": 0.58
+        },
+        {
+          "word": "सावनेर",
+          "start": 33.83,
+          "end": 34.85,
+          "probability": 0.71
+        },
+        {
+          "word": "का",
+          "start": 34.85,
+          "end": 34.99,
+          "probability": 0.75
+        },
+        {
+          "word": "शेर",
+          "start": 34.99,
+          "end": 35.29,
+          "probability": 0.72
+        },
+        {
+          "word": "दादे",
+          "start": 35.29,
+          "end": 35.85,
+          "probability": 0.71
+        },
+        {
+          "word": "का",
+          "start": 35.85,
+          "end": 35.97,
+          "probability": 0.6
+        },
+        {
+          "word": "ट्रेक",
+          "start": 35.97,
+          "end": 36.19,
+          "probability": 0.63
+        },
+        {
+          "word": "पे",
+          "start": 36.19,
+          "end": 36.37,
+          "probability": 0.81
+        }
+      ]
+    },
+    "ID_10": {
+      "start": 37.43,
+      "end": 40.93,
+      "text": "शाव्टोट में चालिस न जी पी पीस अद",
+      "words": [
+        {
+          "word": "शाव्टोट",
+          "start": 37.43,
+          "end": 37.95,
+          "probability": 0.59
+        },
+        {
+          "word": "में",
+          "start": 37.95,
+          "end": 38.17,
+          "probability": 0.55
+        },
+        {
+          "word": "चालिस",
+          "start": 38.17,
+          "end": 38.61,
+          "probability": 0.6
+        },
+        {
+          "word": "न",
+          "start": 38.61,
+          "end": 38.75,
+          "probability": 0.6
+        },
+        {
+          "word": "जी",
+          "start": 38.75,
+          "end": 38.89,
+          "probability": 0.57
+        },
+        {
+          "word": "पी",
+          "start": 38.89,
+          "end": 39.53,
+          "probability": 0.84
+        },
+        {
+          "word": "पीस",
+          "start": 40.19,
+          "end": 40.71,
+          "probability": 0.76
+        },
+        {
+          "word": "अद",
+          "start": 40.71,
+          "end": 40.93,
+          "probability": 0.44
+        }
+      ]
+    }
+  }
+]

@@ -24,42 +24,24 @@ def analyze_visual_context(video_path: str, video_id: str, video_duration: float
     log_info(f"VisualAnalysis: Extracting frames for {video_path}")
     frames_dir = os.path.join(temp_dir, "visual_frames")
     
-    try:
-        # Sample 1 frame per second
-        extracted_frames = extract_frames(video_path, frames_dir, interval_sec=1.0)
-        log_info(f"VisualAnalysis: Extracted {len(extracted_frames)} frames")
-    except Exception as e:
-        log_error(f"VisualAnalysis: Frame extraction failed: {traceback.format_exc()}")
-        return timeline  # Hard fail for visual analysis if we can't extract frames
-        
+    # Sample 1 frame per second
+    extracted_frames = extract_frames(video_path, frames_dir, interval_sec=1.0)
+    log_info(f"VisualAnalysis: Extracted {len(extracted_frames)} frames")
     # 2. Scene Detection (Optional)
-    try:
-        log_info("VisualAnalysis: Running Scene Detection")
-        scenes = detect_scenes(extracted_frames)
-        timeline.scenes = scenes
-        log_info(f"VisualAnalysis: Detected {len(scenes)} scenes")
-    except Exception as e:
-        log_warning(f"VisualAnalysis: Scene detection failed: {e}")
-        
+    log_info("VisualAnalysis: Running Scene Detection")
+    scenes = detect_scenes(extracted_frames)
+    timeline.scenes = scenes
+    log_info(f"VisualAnalysis: Detected {len(scenes)} scenes")
     # 3. Subject Detection (Optional)
-    try:
-        log_info("VisualAnalysis: Running Subject Detection")
-        subjects = detect_subjects(extracted_frames)
-        timeline.subjects = subjects
-        log_info(f"VisualAnalysis: Detected {len(subjects)} subject events")
-    except Exception as e:
-        log_warning(f"VisualAnalysis: Subject detection failed: {e}")
-        subjects = []
-        
+    log_info("VisualAnalysis: Running Subject Detection")
+    subjects = detect_subjects(extracted_frames)
+    timeline.subjects = subjects
+    log_info(f"VisualAnalysis: Detected {len(subjects)} subject events")
     # 4. Composition Analysis (Depends on subjects)
-    try:
-        log_info("VisualAnalysis: Running Composition Analysis")
-        composition_segments = analyze_composition(subjects, video_duration)
-        timeline.composition_segments = composition_segments
-        log_info(f"VisualAnalysis: Generated {len(composition_segments)} composition segments")
-    except Exception as e:
-        log_warning(f"VisualAnalysis: Composition analysis failed: {e}")
-        
+    log_info("VisualAnalysis: Running Composition Analysis")
+    composition_segments = analyze_composition(subjects, video_duration)
+    timeline.composition_segments = composition_segments
+    log_info(f"VisualAnalysis: Generated {len(composition_segments)} composition segments")
     # Cleanup frames since we don't need them anymore
     try:
         shutil.rmtree(frames_dir, ignore_errors=True)

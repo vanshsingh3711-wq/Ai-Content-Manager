@@ -29,6 +29,8 @@ class WorkerSettings(BaseSettings):
     
     # AI Keys (Phase 4)
     GEMINI_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
+    DEEPSEEK_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     PEXELS_API_KEY: str = ""
 
