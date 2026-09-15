@@ -21,7 +21,7 @@ def get_whisper_model(
             model_size,
             device=device,
             compute_type=compute_type,
-            cpu_threads=4,
+            cpu_threads=2,
         )
     return _model_cache[cache_key]
 

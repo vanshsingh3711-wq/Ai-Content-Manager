@@ -21,6 +21,7 @@ class CreateVideoJobRequest(BaseModel):
     video_type: VideoType = Field(default=VideoType.TALKING_HEAD)
     clerk_id: Optional[str] = Field("user_default", description="Clerk user ID")
     email: Optional[str] = Field("user@example.com", description="User email")
+    settings: Optional[dict] = Field(default=None, description="Video style, aspect ratio, and editing preferences")
 
 
 class VideoJobResponse(BaseModel):
@@ -71,6 +72,11 @@ def create_video_job(
         session.refresh(user)
         print(f"[API: VIDEOS] 👤 Created new User profile: {user.id} ({email})")
 
+    initial_edl = None
+    if payload.settings:
+        import json
+        initial_edl = json.dumps({"settings": payload.settings})
+
     # Create VideoJob
     job = VideoJob(
         user_id=user.id,
@@ -78,6 +84,7 @@ def create_video_job(
         source_url=payload.source_url,
         video_type=payload.video_type,
         status=VideoJobStatus.QUEUED,
+        edit_decision_list=initial_edl,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )

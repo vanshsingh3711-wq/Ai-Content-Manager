@@ -10,8 +10,8 @@
   "scripts": {
     "dev": "npm run dev --workspace=@ai-content-manager/web",
     "dev:web": "npm run dev --workspace=@ai-content-manager/web",
-    "dev:api": "powershell -Command \"cd apps/api; .venv/Scripts/python -m uvicorn main:app --reload --port 8000\"",
-    "dev:worker": "powershell -Command \"cd apps/worker; ..\\api\\.venv\\Scripts\\celery -A celery_app.celery_app worker --loglevel=info --concurrency=1 -E\"",
+    "dev:api": "cd apps/api && python -m uvicorn main:app --reload --port 8000",
+    "dev:worker": "cd apps/worker && nice -n 10 python -m celery -A celery_app.celery_app worker --loglevel=info --concurrency=1 -E",
     "build": "npm run build --workspace=@ai-content-manager/web",
     "lint": "npm run lint --workspace=@ai-content-manager/web"
   },

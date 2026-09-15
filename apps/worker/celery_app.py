@@ -26,6 +26,7 @@ if redis_url.startswith("rediss://"):
 celery_app.conf.update(
     task_default_queue=settings.CELERY_TASK_DEFAULT_QUEUE,
     worker_prefetch_multiplier=1,      # Prevent worker memory exhaustion
+    worker_max_tasks_per_child=1,      # Recycle child process after each video to free RAM to OS
     task_acks_late=True,               # Ensure crash recovery
     task_reject_on_worker_lost=True,
     task_track_started=True,

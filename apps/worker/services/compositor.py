@@ -33,8 +33,12 @@ def _log(tag: str, msg: str):
 
 def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     """Run an FFmpeg command, log it, and raise on failure."""
-    _log("CMD", f"({label}) {' '.join(cmd[:6])}... ({len(cmd)} args)")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    final_cmd = list(cmd)
+    if "-threads" not in final_cmd:
+        # Cap to 2 CPU threads to leave headroom for OS window manager and UI apps
+        final_cmd[1:1] = ["-threads", "2"]
+    _log("CMD", f"({label}) {' '.join(final_cmd[:8])}... ({len(final_cmd)} args)")
+    result = subprocess.run(final_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         stderr_preview = (result.stderr or "")[:1500]
         _log("STDERR", f"({label}) {stderr_preview}")

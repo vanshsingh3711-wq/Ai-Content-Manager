@@ -63,7 +63,16 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         job_source_url = job.source_url
         job_id_str = str(job.id)
 
-        log_info(f"Target Video Job: '{job_title}' | Type: {job_video_type} | Owner: {job_user_id}")
+        job_settings = {}
+        if job.edit_decision_list:
+            try:
+                parsed_init = json.loads(job.edit_decision_list)
+                if isinstance(parsed_init, dict) and "settings" in parsed_init:
+                    job_settings = parsed_init["settings"]
+            except Exception:
+                pass
+
+        log_info(f"Target Video Job: '{job_title}' | Type: {job_video_type} | Ratio: {job_settings.get('aspect_ratio', '9:16')} | Style: {job_settings.get('video_style', 'viral')}")
 
         # Prepare workspace paths
         os.makedirs(temp_job_dir, exist_ok=True)
@@ -260,9 +269,11 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # Persist validated EDL + validation report to database for observability
         edits_json_str = json.dumps({
+            "settings": job_settings,
             "unified_analysis": unified_analysis.model_dump(),
             "raw_edits": [e.model_dump() for e in edit_decision_list.edits],
             "validated_edits": validated_edits,
+            "edits": validated_edits,
             "validation_report": validation_report.model_dump(),
             "timestamp_map": timestamp_map,
         }, indent=2)
@@ -276,14 +287,24 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         # 4a. Download requested B-roll video assets — ONLY for validated edits
         broll_map = fetch_broll_assets(validated_edits, output_dir=assets_dir)
 
-        # 4b. Generate word-level styled .ass subtitle file with TikTok yellow highlighting
+        # 4b. Generate word-level styled .ass subtitle file based on caption preset
+        caption_preset = job_settings.get("caption_preset", "tiktok_yellow")
+        highlight_color = "&H0000FFFF"  # TikTok Yellow (&H00BBGGRR)
+        primary_color = "&H00FFFFFF"    # Pure White
+        if caption_preset == "neon_cyber":
+            highlight_color = "&H00FFFF00"  # Cyan
+        elif caption_preset == "modern_clean":
+            highlight_color = "&H00E0E0E0"  # Clean Light Grey
+        elif caption_preset == "boxed_pill":
+            highlight_color = "&H0000A5FF"  # Vivid Orange
+
         generate_ass_subtitles(
             timestamp_map=timestamp_map,
             output_ass_path=subtitle_ass_path,
             edits=validated_edits,
             font_size=50,
-            primary_color="&H00FFFFFF",     # White
-            highlight_color="&H0000FFFF",   # TikTok Yellow
+            primary_color=primary_color,
+            highlight_color=highlight_color,
         )
         log_step_end("ASSETS & SUBTITLES", time.time() - step4_start)
 
