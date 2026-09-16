@@ -15,12 +15,14 @@ import {
   Menu,
   X,
   ChevronRight,
+  Scissors,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VideoUploadModal } from "@/components/VideoUploadModal";
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Studio Editor", href: "/dashboard/editor", icon: Scissors },
   { name: "Videos", href: "/dashboard/videos", icon: Film },
   { name: "Queue & Jobs", href: "/dashboard/queue", icon: Layers },
   { name: "Social Accounts", href: "/dashboard/socials", icon: Share2 },
@@ -55,6 +57,12 @@ export default function DashboardLayout({
     const interval = setInterval(checkApi, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  // Allow editor workspace to be 100% full-screen without dashboard sidebar wrapper
+  const isEditorWorkspace = pathname.startsWith("/dashboard/editor/") && pathname !== "/dashboard/editor";
+  if (isEditorWorkspace) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen flex bg-[#090a0f] text-slate-100">
