@@ -1,5 +1,28 @@
 export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
+export type InterpolationType = "linear" | "hold" | "easeIn" | "easeOut" | "easeInOut" | "bezier";
+
+export interface Keyframe {
+  time: number;  // Seconds relative to the START of the clip (0 = clip start)
+  value: any;
+  interpolation: InterpolationType;
+  bezier?: { inHandle: {x: number, y: number}, outHandle: {x: number, y: number} };
+}
+
+export interface AnimationState {
+  keyframes: Keyframe[];
+}
+
+export interface ClipTransformState {
+  position?: AnimationState;
+  scale?: AnimationState;
+  rotation?: AnimationState;
+  opacity?: AnimationState;
+  volume?: AnimationState;
+  zoomFactor?: AnimationState;
+  [key: string]: AnimationState | undefined;
+}
+
 export interface VideoClip {
   id: string;
   sourceUrl: string;
@@ -12,10 +35,10 @@ export interface VideoClip {
   volume: number;         // 0 to 100 (default: 100)
   zoomFactor: number;     // 1.0 (default) to 1.3 (AI Face Zoom)
   transitionIn?: "fade" | "dissolve" | "slide_left" | "zoom_in";
-  positionX?: number;     // 0-100% (default: 50)
-  positionY?: number;     // 0-100% (default: 50)
+  position?: { x: number, y: number }; // defaults to {x: 50, y: 50}
   scale?: number;         // default: 1.0
   rotation?: number;      // degrees
+  animation?: ClipTransformState;
 }
 
 export interface BRollClip {
@@ -27,10 +50,10 @@ export interface BRollClip {
   end: number;            // End timestamp on timeline (seconds)
   opacity: number;        // 0 to 100 (default: 100)
   fitMode: "cover" | "contain";
-  positionX?: number;     // 0-100% (default: 50)
-  positionY?: number;     // 0-100% (default: 50)
+  position?: { x: number, y: number }; // defaults to {x: 50, y: 50}
   scale?: number;         // default: 1.0
   rotation?: number;      // degrees
+  animation?: ClipTransformState;
 }
 
 export type CaptionPreset = "tiktok_yellow" | "hormozi_bold" | "clean_white" | "neon_glow";
@@ -44,10 +67,10 @@ export interface CaptionBlock {
   fontSize?: number;
   textColor?: string;
   highlightColor?: string;
-  positionY?: number;     // Vertical position % from top (e.g. 75)
-  positionX?: number;     // Horizontal position % (default: 50)
+  position?: { x: number, y: number }; // defaults to {x: 50, y: 75}
   scale?: number;         // default: 1.0
   rotation?: number;      // degrees
+  animation?: ClipTransformState;
 }
 
 export interface AudioClip {
@@ -60,6 +83,7 @@ export interface AudioClip {
   fadeIn: number;         // Duration in seconds
   fadeOut: number;
   isBgm: boolean;         // If true, audio ducking is applied
+  animation?: ClipTransformState;
 }
 
 export interface TimelineProject {

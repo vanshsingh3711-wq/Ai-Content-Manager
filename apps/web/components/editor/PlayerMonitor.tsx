@@ -9,12 +9,14 @@ import {
   VolumeX,
   SkipBack,
   SkipForward,
+  Diamond,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
 import { AspectRatio } from "@/lib/timeline-types";
 import { cn } from "@/lib/utils";
 import { TransformableOverlay } from "./TransformableOverlay";
+import { evaluatePropertyAtTime, getExactKeyframe } from "@/lib/keyframes";
 
 export function PlayerMonitor() {
   const {
@@ -26,6 +28,8 @@ export function PlayerMonitor() {
     setPlayheadTime,
     setIsPlaying,
     togglePlay,
+    setKeyframe,
+    removeKeyframe,
   } = useTimelineStore(useShallow((state) => ({
     project: state.project,
     playheadTime: state.playheadTime,
@@ -35,6 +39,8 @@ export function PlayerMonitor() {
     setPlayheadTime: state.setPlayheadTime,
     setIsPlaying: state.setIsPlaying,
     togglePlay: state.togglePlay,
+    setKeyframe: state.setKeyframe,
+    removeKeyframe: state.removeKeyframe,
   })));
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -56,6 +62,37 @@ export function PlayerMonitor() {
     (t) => playheadTime >= t.start && playheadTime < t.end
   ) || null;
 
+  // Global keyframe detection and toggling
+  let activeSelectedClip: any = null;
+  if (selectedItem) {
+    if (selectedItem.type === "video") activeSelectedClip = project.tracks.videoTrack.find((c) => c.id === selectedItem.id);
+    else if (selectedItem.type === "broll") activeSelectedClip = project.tracks.brollTrack.find((c) => c.id === selectedItem.id);
+    else if (selectedItem.type === "caption") activeSelectedClip = project.tracks.textTrack.find((c) => c.id === selectedItem.id);
+  }
+
+  const selectedLocalTime = activeSelectedClip ? playheadTime - activeSelectedClip.start : 0;
+  const isSelectedOutOfBounds = activeSelectedClip ? selectedLocalTime < 0 || selectedLocalTime > (activeSelectedClip.end - activeSelectedClip.start) : true;
+  
+  const hasTransformKeyframe = activeSelectedClip && !isSelectedOutOfBounds && (
+    getExactKeyframe(activeSelectedClip.animation, "scale", selectedLocalTime) ||
+    getExactKeyframe(activeSelectedClip.animation, "position", selectedLocalTime)
+  );
+
+  const toggleGlobalKeyframe = () => {
+    if (!activeSelectedClip || !selectedItem || isSelectedOutOfBounds) return;
+    
+    if (hasTransformKeyframe) {
+      removeKeyframe(selectedItem.type, activeSelectedClip.id, "scale", selectedLocalTime);
+      removeKeyframe(selectedItem.type, activeSelectedClip.id, "position", selectedLocalTime);
+    } else {
+      const currentScale = evaluatePropertyAtTime(activeSelectedClip.animation, "scale", selectedLocalTime, activeSelectedClip.scale ?? 1.0);
+      const currentPos = evaluatePropertyAtTime(activeSelectedClip.animation, "position", selectedLocalTime, activeSelectedClip.position ?? {x: 50, y: 50});
+      
+      setKeyframe(selectedItem.type, activeSelectedClip.id, "scale", selectedLocalTime, currentScale, false);
+      setKeyframe(selectedItem.type, activeSelectedClip.id, "position", selectedLocalTime, currentPos, true);
+    }
+  };
+
   // Sync HTML5 video currentTime with store playheadTime using fast hardware seeking
   useEffect(() => {
     const video = videoRef.current;
@@ -66,8 +103,8 @@ export function PlayerMonitor() {
       const clipOffset = (playheadTime - activeVideoClip.start) * (activeVideoClip.speed || 1);
       const targetSourceTime = Math.max(0, activeVideoClip.sourceStart + clipOffset);
 
-      // Force a seek if difference is large OR if it's exactly 0 (initial load of blob URL to force frame render)
-      if (video.currentTime === 0 || Math.abs(video.currentTime - targetSourceTime) > 0.15) {
+      // Force a seek if difference is large
+      if (Math.abs(video.currentTime - targetSourceTime) > 0.15) {
         // CapCut-style hardware keyframe seeking (bypasses full frame decode for 60fps scrubbing)
         if ("fastSeek" in video && typeof (video as any).fastSeek === "function") {
           try {
@@ -79,8 +116,12 @@ export function PlayerMonitor() {
           video.currentTime = targetSourceTime;
         }
       }
+      
+      const localTime = playheadTime - activeVideoClip.start;
+      const currentVolume = evaluatePropertyAtTime(activeVideoClip.animation, "volume", localTime, activeVideoClip.volume ?? 100);
+      
       video.playbackRate = activeVideoClip.speed || 1;
-      video.volume = (activeVideoClip.volume ?? 100) / 100;
+      video.volume = currentVolume / 100;
     }
   }, [playheadTime, activeVideoClip]);
 
@@ -211,6 +252,7 @@ export function PlayerMonitor() {
           <TransformableOverlay
             id={activeVideoClip.id}
             type="video"
+            clip={activeVideoClip}
             positionX={activeVideoClip.positionX ?? 50}
             positionY={activeVideoClip.positionY ?? 50}
             scale={activeVideoClip.scale ?? activeVideoClip.zoomFactor ?? 1.0}
@@ -238,6 +280,7 @@ export function PlayerMonitor() {
           <TransformableOverlay
             id={activeBroll.id}
             type="broll"
+            clip={activeBroll}
             positionX={activeBroll.positionX ?? 50}
             positionY={activeBroll.positionY ?? 50}
             scale={activeBroll.scale ?? 1.0}
@@ -246,7 +289,7 @@ export function PlayerMonitor() {
           >
             <div
               className="w-full h-full transition-opacity duration-200"
-              style={{ opacity: (activeBroll.opacity ?? 100) / 100 }}
+              style={{ opacity: evaluatePropertyAtTime(activeBroll.animation?.opacity, playheadTime - activeBroll.start, activeBroll.opacity ?? 100) / 100 }}
             >
               <video
                 ref={brollVideoRef}
@@ -269,6 +312,7 @@ export function PlayerMonitor() {
           <TransformableOverlay
             id={activeCaption.id}
             type="caption"
+            clip={activeCaption}
             positionX={activeCaption.positionX ?? 50}
             positionY={activeCaption.positionY ?? 75}
             scale={activeCaption.scale ?? 1.0}
@@ -354,6 +398,21 @@ export function PlayerMonitor() {
 
         {/* Volume & Fullscreen */}
         <div className="flex items-center gap-1 text-slate-400">
+          <button
+            onClick={toggleGlobalKeyframe}
+            disabled={!activeSelectedClip || isSelectedOutOfBounds}
+            title={hasTransformKeyframe ? "Remove Transform Keyframe" : "Add Transform Keyframe"}
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              (!activeSelectedClip || isSelectedOutOfBounds) ? "opacity-30 cursor-not-allowed" : "hover:bg-slate-800",
+              hasTransformKeyframe ? "text-indigo-400" : "hover:text-white"
+            )}
+          >
+            <Diamond className={cn("w-3.5 h-3.5", hasTransformKeyframe && "fill-indigo-400")} />
+          </button>
+          
+          <div className="h-3 w-[1px] bg-slate-700 mx-0.5" />
+          
           <button
             onClick={() => setIsMuted(!isMuted)}
             title={isMuted ? "Unmute" : "Mute"}

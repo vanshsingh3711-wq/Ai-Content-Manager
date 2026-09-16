@@ -3,12 +3,13 @@
 import React, { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
+import { evaluatePropertyAtTime, hasAnyKeyframes } from "@/lib/keyframes";
 
 interface TransformableOverlayProps {
   id: string;
   type: "video" | "broll" | "caption";
-  positionX?: number;
-  positionY?: number;
+  clip: any; // Passing the whole clip to access keyframes
+  position?: {x: number, y: number};
   scale?: number;
   rotation?: number;
   isSelected: boolean;
@@ -18,25 +19,33 @@ interface TransformableOverlayProps {
 export function TransformableOverlay({
   id,
   type,
-  positionX = 50,
-  positionY = 50,
+  clip,
+  position = { x: 50, y: type === 'caption' ? 75 : 50 },
   scale = 1.0,
   rotation = 0,
   isSelected,
   children,
 }: TransformableOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Interpolate values based on playheadTime and clip keyframes
+  const playheadTime = useTimelineStore((state) => state.playheadTime);
+  const localTime = playheadTime - (clip?.start || 0);
+  
+  const currentPos = evaluatePropertyAtTime(clip?.animation, "position", localTime, position);
+  const currentScale = evaluatePropertyAtTime(clip?.animation, "scale", localTime, scale);
+  const currentRotation = evaluatePropertyAtTime(clip?.animation, "rotation", localTime, rotation);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
-    useTimelineStore.getState().setSelectedItem({ type: type as any, id });
+    const store = useTimelineStore.getState();
+    store.setSelectedItem({ type: type as any, id });
 
     const startX = e.clientX;
     const startY = e.clientY;
-    const initialPosX = positionX;
-    const initialPosY = positionY;
+    const initialPosX = currentPos.x;
+    const initialPosY = currentPos.y;
 
-    // We calculate movement as a percentage of the parent viewport size
     const parentNode = containerRef.current?.parentElement;
     const parentWidth = parentNode?.clientWidth || 500;
     const parentHeight = parentNode?.clientHeight || 500;
@@ -48,13 +57,24 @@ export function TransformableOverlay({
       const newPosX = initialPosX + (deltaX / parentWidth) * 100;
       const newPosY = initialPosY + (deltaY / parentHeight) * 100;
 
-      const store = useTimelineStore.getState();
-      if (type === "video") store.updateVideoClip(id, { positionX: newPosX, positionY: newPosY });
-      if (type === "broll") store.updateBRollClip(id, { positionX: newPosX, positionY: newPosY });
-      if (type === "caption") store.updateCaption(id, { positionX: newPosX, positionY: newPosY });
+      const currentStore = useTimelineStore.getState();
+      const currentLocalTime = currentStore.playheadTime - clip.start;
+      
+      const updateWithKeyframes = (updateFn: Function) => {
+        if (hasAnyKeyframes(clip.animation, "position")) {
+          currentStore.setKeyframe(type, id, "position", currentLocalTime, { x: newPosX, y: newPosY }, false);
+        } else {
+          updateFn(id, { position: { x: newPosX, y: newPosY } }, false);
+        }
+      };
+
+      if (type === "video") updateWithKeyframes(currentStore.updateVideoClip);
+      if (type === "broll") updateWithKeyframes(currentStore.updateBRollClip);
+      if (type === "caption") updateWithKeyframes(currentStore.updateCaption);
     };
 
     const handlePointerUp = () => {
+      useTimelineStore.getState().commitHistory();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
@@ -66,23 +86,34 @@ export function TransformableOverlay({
   const handleScalePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    useTimelineStore.getState().setSelectedItem({ type: type as any, id });
+    const store = useTimelineStore.getState();
+    store.setSelectedItem({ type: type as any, id });
 
     const startX = e.clientX;
-    const initialScale = scale;
+    const initialScale = currentScale;
 
     const handlePointerMove = (moveEv: PointerEvent) => {
       const deltaX = moveEv.clientX - startX;
-      // 100 pixels = 1.0 scale change
       const newScale = Math.max(0.1, initialScale + deltaX * 0.01);
 
-      const store = useTimelineStore.getState();
-      if (type === "video") store.updateVideoClip(id, { scale: newScale });
-      if (type === "broll") store.updateBRollClip(id, { scale: newScale });
-      if (type === "caption") store.updateCaption(id, { scale: newScale });
+      const currentStore = useTimelineStore.getState();
+      const currentLocalTime = currentStore.playheadTime - clip.start;
+
+      const updateWithKeyframes = (updateFn: Function) => {
+        if (hasAnyKeyframes(clip.animation, "scale")) {
+          currentStore.setKeyframe(type, id, "scale", currentLocalTime, newScale, false);
+        } else {
+          updateFn(id, { scale: newScale }, false);
+        }
+      };
+
+      if (type === "video") updateWithKeyframes(currentStore.updateVideoClip);
+      if (type === "broll") updateWithKeyframes(currentStore.updateBRollClip);
+      if (type === "caption") updateWithKeyframes(currentStore.updateCaption);
     };
 
     const handlePointerUp = () => {
+      useTimelineStore.getState().commitHistory();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
@@ -101,11 +132,11 @@ export function TransformableOverlay({
         isSelected ? "ring-2 ring-indigo-500 rounded-sm z-50" : "hover:ring-1 hover:ring-white/50"
       )}
       style={{
-        left: `${positionX}%`,
-        top: `${positionY}%`,
+        left: `${currentPos.x}%`,
+        top: `${currentPos.y}%`,
         width: isVideoType ? "100%" : "auto",
         height: isVideoType ? "100%" : "auto",
-        transform: `translate(-50%, -50%) scale(${scale}) rotate(${rotation}deg)`,
+        transform: `translate(-50%, -50%) scale(${currentScale}) rotate(${currentRotation}deg)`,
       }}
       onPointerDown={handlePointerDown}
     >

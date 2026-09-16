@@ -57,7 +57,7 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
   };
 
   const handleAddText = () => {
-    addCaption({ text: "NEW TEXT", positionY: 50, positionX: 50 });
+    addCaption({ text: "NEW TEXT", position: { x: 50, y: 50 } });
   };
 
   const handleAddBRoll = () => {

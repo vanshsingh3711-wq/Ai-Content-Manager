@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  fallback: ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -27,7 +28,7 @@ class ClerkErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
 
   render() {
     if (this.state.hasError) {
-      return <>{this.props.children}</>;
+      return <>{this.props.fallback}</>;
     }
     return this.props.children;
   }
@@ -38,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (clerkPubKey && clerkPubKey.startsWith("pk_") && !clerkPubKey.includes("your_clerk")) {
     return (
-      <ClerkErrorBoundary>
+      <ClerkErrorBoundary fallback={<>{children}</>}>
         <ClerkProvider publishableKey={clerkPubKey}>
           {children}
         </ClerkProvider>

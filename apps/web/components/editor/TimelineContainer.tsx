@@ -12,6 +12,116 @@ import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { ClipFilmstrip } from "./ClipFilmstrip";
 
+const KeyframeDiamond = ({
+  time,
+  leftPosition,
+  isActive,
+  clip,
+  trackType,
+}: {
+  time: number;
+  leftPosition: number;
+  isActive: boolean;
+  clip: any;
+  trackType: "video" | "broll" | "caption" | "audio";
+}) => {
+  const handleDrag = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const store = useTimelineStore.getState();
+    const startX = e.clientX;
+    const initialTime = time;
+    const duration = clip.end - clip.start;
+    
+    // Determine which properties have this keyframe exactly at this time
+    const animatedProps: string[] = [];
+    if (clip.animation) {
+      Object.entries(clip.animation).forEach(([prop, propState]: [string, any]) => {
+        if (propState?.keyframes?.some((kf: any) => Math.abs(kf.time - initialTime) <= 0.05)) {
+          animatedProps.push(prop);
+        }
+      });
+    }
+
+    let finalTime = initialTime;
+
+    const onMove = (moveEv: PointerEvent) => {
+      const deltaX = moveEv.clientX - startX;
+      const deltaTime = deltaX / store.zoomLevel;
+      finalTime = Math.max(0, Math.min(duration, initialTime + deltaTime));
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      
+      if (Math.abs(finalTime - initialTime) > 0.1) {
+        // Find existing keyframes and move them
+        animatedProps.forEach((prop) => {
+          const kf = clip.animation[prop].keyframes.find((k: any) => Math.abs(k.time - initialTime) <= 0.05);
+          if (kf) {
+            store.removeKeyframe(trackType, clip.id, prop, initialTime);
+            store.setKeyframe(trackType, clip.id, prop, finalTime, kf.value, false, kf.interpolation);
+          }
+        });
+        store.commitHistory();
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  return (
+    <div
+      className={cn(
+        "absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rotate-45 border shadow-md z-30 transition-transform hover:scale-110 cursor-ew-resize",
+        isActive ? "bg-red-500 border-red-300 shadow-red-500/50" : "bg-white border-slate-400"
+      )}
+      style={{ left: `${leftPosition}px`, marginLeft: '-5px' }}
+      onPointerDown={handleDrag}
+    />
+  );
+};
+
+const ClipKeyframes = ({ clip, trackType, playheadTime, zoomLevel }: { clip: any, trackType: any, playheadTime: number, zoomLevel: number }) => {
+  if (!clip.animation) return null;
+  
+  const times = new Set<number>();
+  Object.values(clip.animation).forEach((propState: any) => {
+    propState?.keyframes?.forEach((kf: any) => times.add(kf.time));
+  });
+
+  const duration = clip.end - clip.start;
+  const clipStartTime = clip.start || 0;
+
+  return (
+    <>
+      {Array.from(times).map((time) => {
+        if (time < 0 || time > duration) return null;
+        
+        // Calculate relative time in case absolute time was accidentally stored
+        const relativeTime = time >= clipStartTime && clipStartTime > 0 ? time - clipStartTime : time;
+        const leftPosition = relativeTime * zoomLevel;
+        
+        const localTime = playheadTime - clip.start;
+        const isActive = Math.abs(localTime - time) <= 0.05;
+
+        return (
+          <KeyframeDiamond
+            key={time}
+            time={time}
+            leftPosition={leftPosition}
+            isActive={isActive}
+            clip={clip}
+            trackType={trackType}
+          />
+        );
+      })}
+    </>
+  );
+};
+
 export function TimelineContainer() {
   const {
     project,
@@ -327,6 +437,7 @@ export function TimelineContainer() {
                     <div className="w-[1px] h-3 bg-white/70 rounded-full pointer-events-none" />
                   </div>
 
+                  <ClipKeyframes clip={caption} trackType="caption" playheadTime={playheadTime} zoomLevel={zoomLevel} />
                   <span className="truncate flex-1 text-center px-3 pointer-events-none">{caption.text}</span>
 
                   {/* Right Trim Handle */}
@@ -415,6 +526,7 @@ export function TimelineContainer() {
                     <div className="w-[1px] h-4 bg-white/70 rounded-full pointer-events-none" />
                   </div>
 
+                  <ClipKeyframes clip={broll} trackType="broll" playheadTime={playheadTime} zoomLevel={zoomLevel} />
                   <span className="truncate font-semibold flex-1 text-center px-3 pointer-events-none">{broll.name || "B-Roll Clip"}</span>
 
                   {/* Right Trim Handle */}
@@ -498,6 +610,8 @@ export function TimelineContainer() {
                   >
                     <div className="w-0.5 h-4 bg-white/70 rounded-full" />
                   </div>
+
+                  <ClipKeyframes clip={clip} trackType="video" playheadTime={playheadTime} zoomLevel={zoomLevel} />
 
                   {/* Clip Label */}
                   <div className="flex-1 px-2 flex flex-col justify-center truncate pointer-events-none">
@@ -595,6 +709,7 @@ export function TimelineContainer() {
                     <div className="w-[1px] h-3 bg-white/70 rounded-full pointer-events-none" />
                   </div>
 
+                  <ClipKeyframes clip={audio} trackType="audio" playheadTime={playheadTime} zoomLevel={zoomLevel} />
                   <span className="truncate flex-1 text-center px-3 pointer-events-none">{audio.name || "Music Track"}</span>
 
                   {/* Right Trim Handle */}

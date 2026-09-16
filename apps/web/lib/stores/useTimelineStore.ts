@@ -8,6 +8,7 @@ import {
   AudioClip,
   AspectRatio,
   HistoryState,
+  InterpolationType
 } from "../timeline-types";
 
 interface SelectedItem {
@@ -41,16 +42,16 @@ interface TimelineState {
   splitClipAtPlayhead: (targetType?: SelectedItem["type"], targetClipId?: string) => void;
   trimVideoClip: (clipId: string, newStart: number, newEnd: number) => void;
   deleteClip: (type: SelectedItem["type"], id: string) => void;
-  updateVideoClip: (clipId: string, updates: Partial<VideoClip>) => void;
+  updateVideoClip: (clipId: string, updates: Partial<VideoClip>, saveHistory?: boolean) => void;
   reorderVideoClips: (fromIndex: number, toIndex: number) => void;
 
   // B-Roll actions
   addBRollClip: (clip: Omit<BRollClip, "id">) => void;
-  updateBRollClip: (id: string, updates: Partial<BRollClip>) => void;
+  updateBRollClip: (id: string, updates: Partial<BRollClip>, saveHistory?: boolean) => void;
 
   // Caption actions
   addCaption: (caption?: Partial<CaptionBlock>) => void;
-  updateCaption: (id: string, updates: Partial<CaptionBlock>) => void;
+  updateCaption: (id: string, updates: Partial<CaptionBlock>, saveHistory?: boolean) => void;
 
   // Audio actions
   addAudioClip: (audio: Omit<AudioClip, "id">) => void;
@@ -59,6 +60,11 @@ interface TimelineState {
   // Undo / Redo
   undo: () => void;
   redo: () => void;
+  commitHistory: () => void;
+
+  // Keyframes
+  setKeyframe: (trackType: SelectedItem["type"], clipId: string, property: string, time: number, value: any, saveHistory?: boolean, interpolation?: InterpolationType) => void;
+  removeKeyframe: (trackType: SelectedItem["type"], clipId: string, property: string, time: number) => void;
 }
 
 const DEFAULT_PROJECT: TimelineProject = {
@@ -320,13 +326,13 @@ export const useTimelineStore = create<TimelineState>()(
     });
   },
 
-  updateVideoClip: (clipId, updates) => {
+  updateVideoClip: (clipId, updates, saveHistory = true) => {
     const { project, past } = get();
     const videoTrack = project.tracks.videoTrack.map((clip) =>
       clip.id === clipId ? { ...clip, ...updates } : clip
     );
 
-    set({
+    const newState: any = {
       project: {
         ...project,
         tracks: {
@@ -334,9 +340,14 @@ export const useTimelineStore = create<TimelineState>()(
           videoTrack,
         },
       },
-      past: [...past.slice(-29), createHistorySnapshot(project)],
-      future: [],
-    });
+    };
+
+    if (saveHistory) {
+      newState.past = [...past.slice(-29), createHistorySnapshot(project)];
+      newState.future = [];
+    }
+
+    set(newState);
   },
 
   reorderVideoClips: (fromIndex, toIndex) => {
@@ -410,12 +421,13 @@ export const useTimelineStore = create<TimelineState>()(
     });
   },
 
-  updateBRollClip: (id, updates) => {
+  updateBRollClip: (id, updates, saveHistory = true) => {
     const { project, past } = get();
     const brollTrack = project.tracks.brollTrack.map((b) =>
       b.id === id ? { ...b, ...updates } : b
     );
-    set({
+    
+    const newState: any = {
       project: {
         ...project,
         tracks: {
@@ -423,9 +435,14 @@ export const useTimelineStore = create<TimelineState>()(
           brollTrack,
         },
       },
-      past: [...past.slice(-29), createHistorySnapshot(project)],
-      future: [],
-    });
+    };
+
+    if (saveHistory) {
+      newState.past = [...past.slice(-29), createHistorySnapshot(project)];
+      newState.future = [];
+    }
+
+    set(newState);
   },
 
   addCaption: (caption) => {
@@ -458,12 +475,13 @@ export const useTimelineStore = create<TimelineState>()(
     });
   },
 
-  updateCaption: (id, updates) => {
+  updateCaption: (id, updates, saveHistory = true) => {
     const { project, past } = get();
     const textTrack = project.tracks.textTrack.map((t) =>
       t.id === id ? { ...t, ...updates } : t
     );
-    set({
+    
+    const newState: any = {
       project: {
         ...project,
         tracks: {
@@ -471,9 +489,14 @@ export const useTimelineStore = create<TimelineState>()(
           textTrack,
         },
       },
-      past: [...past.slice(-29), createHistorySnapshot(project)],
-      future: [],
-    });
+    };
+
+    if (saveHistory) {
+      newState.past = [...past.slice(-29), createHistorySnapshot(project)];
+      newState.future = [];
+    }
+
+    set(newState);
   },
 
   addAudioClip: (audioData) => {
@@ -557,6 +580,94 @@ export const useTimelineStore = create<TimelineState>()(
       future: newFuture,
     });
   },
+  
+  commitHistory: () => {
+    const { project, past } = get();
+    set({
+      past: [...past.slice(-29), createHistorySnapshot(project)],
+      future: [],
+    });
+  },
+
+  setKeyframe: (trackType, clipId, property, time, value, saveHistory = true, interpolation = "linear") => {
+    const { project, past } = get();
+    const tracks = { ...project.tracks };
+
+    const updateClipKeyframes = (clip: any) => {
+      const animation = clip.animation ? { ...clip.animation } : {};
+      const propState = animation[property] ? { ...animation[property] } : { keyframes: [] };
+      const propKeyframes = [...propState.keyframes];
+      
+      const existingIndex = propKeyframes.findIndex((kf) => Math.abs(kf.time - time) < 0.05);
+      if (existingIndex !== -1) {
+        propKeyframes[existingIndex] = { ...propKeyframes[existingIndex], time, value };
+      } else {
+        propKeyframes.push({ time, value, interpolation });
+        propKeyframes.sort((a, b) => a.time - b.time);
+      }
+      
+      propState.keyframes = propKeyframes;
+      animation[property] = propState;
+      return { ...clip, animation };
+    };
+
+    if (trackType === "video") {
+      tracks.videoTrack = tracks.videoTrack.map((c) => c.id === clipId ? updateClipKeyframes(c) : c);
+    } else if (trackType === "broll") {
+      tracks.brollTrack = tracks.brollTrack.map((c) => c.id === clipId ? updateClipKeyframes(c) : c);
+    } else if (trackType === "caption") {
+      tracks.textTrack = tracks.textTrack.map((c) => c.id === clipId ? updateClipKeyframes(c) : c);
+    } else if (trackType === "audio") {
+      tracks.audioTrack = tracks.audioTrack.map((c) => c.id === clipId ? updateClipKeyframes(c) : c);
+    }
+
+    const newState: any = { project: { ...project, tracks } };
+
+    if (saveHistory) {
+      newState.past = [...past.slice(-29), createHistorySnapshot(project)];
+      newState.future = [];
+    }
+
+    set(newState);
+  },
+
+  removeKeyframe: (trackType, clipId, property, time) => {
+    const { project, past } = get();
+    const snapshot = createHistorySnapshot(project);
+    const tracks = { ...project.tracks };
+
+    const removeClipKeyframe = (clip: any) => {
+      if (!clip.animation || !clip.animation[property]) return clip;
+      const animation = { ...clip.animation };
+      const propState = { ...animation[property] };
+      propState.keyframes = propState.keyframes.filter((kf: any) => Math.abs(kf.time - time) > 0.05);
+      
+      if (propState.keyframes.length === 0) {
+        delete animation[property];
+      } else {
+        animation[property] = propState;
+      }
+      
+      return { ...clip, animation };
+    };
+
+    if (trackType === "video") {
+      tracks.videoTrack = tracks.videoTrack.map((c) => c.id === clipId ? removeClipKeyframe(c) : c);
+    } else if (trackType === "broll") {
+      tracks.brollTrack = tracks.brollTrack.map((c) => c.id === clipId ? removeClipKeyframe(c) : c);
+    } else if (trackType === "caption") {
+      tracks.textTrack = tracks.textTrack.map((c) => c.id === clipId ? removeClipKeyframe(c) : c);
+    } else if (trackType === "audio") {
+      tracks.audioTrack = tracks.audioTrack.map((c) => c.id === clipId ? removeClipKeyframe(c) : c);
+    }
+
+    set({
+      project: { ...project, tracks },
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
     }),
     {
       name: "video-editor-draft",

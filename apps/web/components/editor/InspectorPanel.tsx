@@ -10,11 +10,148 @@ import {
   Film,
   Trash2,
   MoveVertical,
+  Diamond,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
 import { CaptionPreset } from "@/lib/timeline-types";
 import { cn } from "@/lib/utils";
+import { getExactKeyframe, evaluatePropertyAtTime, hasAnyKeyframes } from "@/lib/keyframes";
+
+function KeyframeToggle({ clip, trackType, property, currentValue }: { clip: any, trackType: any, property: string, currentValue: any }) {
+  const { playheadTime, setKeyframe, removeKeyframe } = useTimelineStore();
+  const localTime = playheadTime - clip.start;
+  const isOutOfBounds = localTime < 0 || localTime > (clip.end - clip.start);
+  
+  const existingKf = getExactKeyframe(clip.animation, property, localTime);
+  const isActive = !!existingKf; // State B
+  const isAnimated = hasAnyKeyframes(clip.animation, property); // State C
+
+  if (isOutOfBounds) return <div className="w-5" />; // Spacer
+
+  return (
+    <button
+      onClick={() => {
+        if (isActive) removeKeyframe(trackType, clip.id, property, localTime);
+        else setKeyframe(trackType, clip.id, property, localTime, currentValue);
+      }}
+      className={cn(
+        "p-0.5 flex items-center justify-center rounded hover:bg-slate-800 transition-colors",
+        isActive ? "text-indigo-400" : isAnimated ? "text-indigo-400 border border-indigo-400/50" : "text-slate-600 hover:text-slate-300"
+      )}
+      title={isActive ? "Remove Keyframe" : "Add Keyframe at Playhead"}
+    >
+      <Diamond className={cn("w-3.5 h-3.5", isActive && "fill-indigo-400")} />
+    </button>
+  );
+}
+
+function TransformControls({ clip, trackType, updateFn }: { clip: any, trackType: "video"|"broll"|"caption", updateFn: Function }) {
+  const { playheadTime } = useTimelineStore();
+  const commitHistory = () => {
+    useTimelineStore.getState().commitHistory();
+  };
+  
+  const handleScrub = (property: string, value: any) => {
+    const localTime = playheadTime - clip.start;
+    if (localTime >= 0 && localTime <= (clip.end - clip.start) && hasAnyKeyframes(clip.animation, property)) {
+      useTimelineStore.getState().setKeyframe(trackType, clip.id, property, localTime, value, false);
+    } else {
+      updateFn(clip.id, { [property]: value }, false);
+    }
+  };
+
+  const defaultY = trackType === "caption" ? 75 : 50;
+  const currentPosition = evaluatePropertyAtTime(clip.animation, "position", playheadTime - clip.start, clip.position ?? {x: 50, y: defaultY});
+  const currentScale = evaluatePropertyAtTime(clip.animation, "scale", playheadTime - clip.start, clip.scale ?? 1.0);
+  const currentRotation = evaluatePropertyAtTime(clip.animation, "rotation", playheadTime - clip.start, clip.rotation ?? 0);
+
+  return (
+    <div className="space-y-4 pt-4 border-t border-slate-800">
+      <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between items-center">
+        <span>Transform</span>
+      </h4>
+      
+      {/* Position (Vector) */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-slate-400 mb-1">
+          <span>Position</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-white text-[10px]">
+              X:{Math.round(currentPosition.x)} Y:{Math.round(currentPosition.y)}
+            </span>
+            <KeyframeToggle clip={clip} trackType={trackType} property="position" currentValue={currentPosition} />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={currentPosition.x}
+            onChange={(e) => handleScrub("position", { ...currentPosition, x: parseFloat(e.target.value) })}
+            onPointerUp={commitHistory}
+            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+          />
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={currentPosition.y}
+            onChange={(e) => handleScrub("position", { ...currentPosition, y: parseFloat(e.target.value) })}
+            onPointerUp={commitHistory}
+            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+          />
+        </div>
+      </div>
+
+      {/* Scale */}
+      <div>
+        <div className="flex justify-between text-slate-400 mb-1">
+          <span>Scale</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-white">
+              {currentScale.toFixed(2)}x
+            </span>
+            <KeyframeToggle clip={clip} trackType={trackType} property="scale" currentValue={currentScale} />
+          </div>
+        </div>
+        <input
+          type="range"
+          min="0.1"
+          max="5.0"
+          step="0.1"
+          value={currentScale}
+          onChange={(e) => handleScrub("scale", parseFloat(e.target.value))}
+          onPointerUp={commitHistory}
+          className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+        />
+      </div>
+
+      {/* Rotation */}
+      <div>
+        <div className="flex justify-between text-slate-400 mb-1">
+          <span>Rotation</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-white">
+              {Math.round(currentRotation)}°
+            </span>
+            <KeyframeToggle clip={clip} trackType={trackType} property="rotation" currentValue={currentRotation} />
+          </div>
+        </div>
+        <input
+          type="range"
+          min="-180"
+          max="180"
+          value={currentRotation}
+          onChange={(e) => handleScrub("rotation", parseFloat(e.target.value))}
+          onPointerUp={commitHistory}
+          className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+        />
+      </div>
+    </div>
+  );
+}
 
 export function InspectorPanel() {
   const {
@@ -25,6 +162,8 @@ export function InspectorPanel() {
     updateBRollClip,
     deleteClip,
     setSelectedItem,
+    playheadTime,
+    setKeyframe,
   } = useTimelineStore(useShallow((state) => ({
     project: state.project,
     selectedItem: state.selectedItem,
@@ -33,7 +172,24 @@ export function InspectorPanel() {
     updateBRollClip: state.updateBRollClip,
     deleteClip: state.deleteClip,
     setSelectedItem: state.setSelectedItem,
+    playheadTime: state.playheadTime,
+    setKeyframe: state.setKeyframe,
   })));
+
+  // Helper to handle input scrubbing with auto-keyframing
+  const handleScrub = (trackType: any, clip: any, property: string, value: number, updateFn: Function) => {
+    const localTime = playheadTime - clip.start;
+    // If the playhead is over the clip and it has ANY keyframes for this property, auto-insert/update keyframe
+    if (localTime >= 0 && localTime <= (clip.end - clip.start) && hasAnyKeyframes(clip.animation, property)) {
+      setKeyframe(trackType, clip.id, property, localTime, value, false);
+    } else {
+      updateFn(clip.id, { [property]: value }, false);
+    }
+  };
+
+  const commitHistory = () => {
+    useTimelineStore.getState().commitHistory();
+  };
 
   if (!selectedItem) {
     return (
@@ -106,50 +262,57 @@ export function InspectorPanel() {
               max="2.0"
               step="0.1"
               value={clip.speed || 1}
-              onChange={(e) =>
-                updateVideoClip(clip.id, { speed: parseFloat(e.target.value) })
-              }
+              onChange={(e) => updateVideoClip(clip.id, { speed: parseFloat(e.target.value) }, false)}
+              onPointerUp={commitHistory}
               className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
           </div>
 
-          {/* Volume Slider */}
+          {/* Volume Slider (Keyframable) */}
           <div>
             <div className="flex justify-between text-slate-400 mb-1">
               <span className="flex items-center gap-1">
                 <Volume2 className="w-3 h-3" /> Volume
               </span>
-              <span className="font-mono text-white">{clip.volume ?? 100}%</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-white">
+                  {Math.round(evaluatePropertyAtTime(clip.animation, "volume", playheadTime - clip.start, clip.volume ?? 100))}%
+                </span>
+                <KeyframeToggle clip={clip} trackType="video" property="volume" currentValue={evaluatePropertyAtTime(clip.animation, "volume", playheadTime - clip.start, clip.volume ?? 100)} />
+              </div>
             </div>
             <input
               type="range"
               min="0"
               max="100"
-              value={clip.volume ?? 100}
-              onChange={(e) =>
-                updateVideoClip(clip.id, { volume: parseInt(e.target.value) })
-              }
+              value={evaluatePropertyAtTime(clip.animation, "volume", playheadTime - clip.start, clip.volume ?? 100)}
+              onChange={(e) => handleScrub("video", clip, "volume", parseInt(e.target.value), updateVideoClip)}
+              onPointerUp={commitHistory}
               className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
           </div>
 
-          {/* Zoom Factor */}
+          {/* Zoom Factor (Keyframable) */}
           <div>
             <div className="flex justify-between text-slate-400 mb-1">
               <span className="flex items-center gap-1">
                 <ZoomIn className="w-3 h-3" /> Face Zoom
               </span>
-              <span className="font-mono text-white">{clip.zoomFactor || 1.0}x</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-white">
+                  {evaluatePropertyAtTime(clip.animation, "zoomFactor", playheadTime - clip.start, clip.zoomFactor ?? 1.0).toFixed(2)}x
+                </span>
+                <KeyframeToggle clip={clip} trackType="video" property="zoomFactor" currentValue={evaluatePropertyAtTime(clip.animation, "zoomFactor", playheadTime - clip.start, clip.zoomFactor ?? 1.0)} />
+              </div>
             </div>
             <input
               type="range"
               min="1.0"
-              max="1.4"
+              max="2.0"
               step="0.05"
-              value={clip.zoomFactor || 1.0}
-              onChange={(e) =>
-                updateVideoClip(clip.id, { zoomFactor: parseFloat(e.target.value) })
-              }
+              value={evaluatePropertyAtTime(clip.animation, "zoomFactor", playheadTime - clip.start, clip.zoomFactor ?? 1.0)}
+              onChange={(e) => handleScrub("video", clip, "zoomFactor", parseFloat(e.target.value), updateVideoClip)}
+              onPointerUp={commitHistory}
               className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
           </div>
@@ -173,6 +336,8 @@ export function InspectorPanel() {
               <option value="zoom_in">Zoom Pop</option>
             </select>
           </div>
+          
+          <TransformControls clip={clip} trackType="video" updateFn={updateVideoClip} />
         </div>
 
         {/* Delete */}
@@ -237,26 +402,8 @@ export function InspectorPanel() {
               <option value="neon_glow">Cyber Neon Glow</option>
             </select>
           </div>
-
-          {/* Position Y Slider */}
-          <div>
-            <div className="flex justify-between text-slate-400 mb-1">
-              <span className="flex items-center gap-1">
-                <MoveVertical className="w-3 h-3" /> Vertical Position
-              </span>
-              <span className="font-mono text-white">{caption.positionY || 75}%</span>
-            </div>
-            <input
-              type="range"
-              min="20"
-              max="90"
-              value={caption.positionY || 75}
-              onChange={(e) =>
-                updateCaption(caption.id, { positionY: parseInt(e.target.value) })
-              }
-              className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-            />
-          </div>
+          
+          <TransformControls clip={caption} trackType="caption" updateFn={updateCaption} />
         </div>
 
         <button
@@ -291,20 +438,26 @@ export function InspectorPanel() {
         </div>
 
         <div className="space-y-4 text-xs flex-1 overflow-y-auto">
-          {/* Opacity Slider */}
+          {/* Opacity Slider (Keyframable) */}
           <div>
             <div className="flex justify-between text-slate-400 mb-1">
-              <span>Opacity</span>
-              <span className="font-mono text-white">{broll.opacity ?? 100}%</span>
+              <span className="flex items-center gap-1">
+                <Volume2 className="w-3 h-3" /> Opacity
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-white">
+                  {Math.round(evaluatePropertyAtTime(broll.animation, "opacity", playheadTime - broll.start, broll.opacity ?? 100))}%
+                </span>
+                <KeyframeToggle clip={broll} trackType="broll" property="opacity" currentValue={evaluatePropertyAtTime(broll.animation, "opacity", playheadTime - broll.start, broll.opacity ?? 100)} />
+              </div>
             </div>
             <input
               type="range"
-              min="10"
+              min="0"
               max="100"
-              value={broll.opacity ?? 100}
-              onChange={(e) =>
-                updateBRollClip(broll.id, { opacity: parseInt(e.target.value) })
-              }
+              value={evaluatePropertyAtTime(broll.animation, "opacity", playheadTime - broll.start, broll.opacity ?? 100)}
+              onChange={(e) => handleScrub("broll", broll, "opacity", parseInt(e.target.value), updateBRollClip)}
+              onPointerUp={commitHistory}
               className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
             />
           </div>
@@ -337,6 +490,8 @@ export function InspectorPanel() {
               </button>
             </div>
           </div>
+          
+          <TransformControls clip={broll} trackType="broll" updateFn={updateBRollClip} />
         </div>
 
         <button
