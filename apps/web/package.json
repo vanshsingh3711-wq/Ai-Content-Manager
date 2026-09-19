@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-content-manager/motion-components": "*",
     "@clerk/nextjs": "^7.8.3",
     "clsx": "^2.1.1",
     "framer-motion": "^13.1.1",
