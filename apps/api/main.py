@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Dict, Any
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
@@ -53,7 +53,7 @@ def health_check() -> Dict[str, str]:
 
 
 @app.get("/", tags=["System"])
-def root() -> Dict[str, str]:
+def root() -> Dict[str, Any]:
     """Root endpoint."""
     return {
         "message": "AI Content Manager API is running",

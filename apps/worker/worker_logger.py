@@ -67,3 +67,27 @@ def log_summary(job_id: str, title: str, total_time: float, edits_count: int, ex
     print(f" Stream URL:       {export_url}")
     print(f"{separator}\n")
     sys.stdout.flush()
+
+import time
+
+class PipelineStep:
+    """Context manager to automate logging step start, end, and timing."""
+    def __init__(self, step_num: int, total_steps: int, title: str, details: str = ""):
+        self.step_num = step_num
+        self.total_steps = total_steps
+        self.title = title
+        self.details = details
+        self.start_time = 0.0
+
+    def __enter__(self):
+        self.start_time = time.time()
+        log_step(self.step_num, self.total_steps, self.title, self.details)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        duration = time.time() - self.start_time
+        if exc_type is None:
+            log_step_end(self.title, duration)
+        else:
+            log_error(f"Step '{self.title}' failed after {duration:.2f}s: {exc_val}")
+        return False  # Propagate exceptions

@@ -73,6 +73,9 @@ ai-content-manager/                     ← Root (npm workspaces monorepo)
 │   │   │   └── dashboard/
 │   │   │       ├── page.tsx            ← Dashboard overview (stats, state machine)
 │   │   │       ├── layout.tsx          ← Dashboard sidebar layout
+│   │   │       ├── editor/             ← Advanced Video Editor UI
+│   │   │       │   ├── page.tsx
+│   │   │       │   └── [id]/page.tsx   ← Dynamic editor route for specific jobs
 │   │   │       ├── videos/             ← Video management page
 │   │   │       ├── queue/              ← Queue monitoring page
 │   │   │       ├── socials/            ← Social accounts page
@@ -80,8 +83,21 @@ ai-content-manager/                     ← Root (npm workspaces monorepo)
 │   │   ├── components/
 │   │   │   ├── AuthProvider.tsx         ← Clerk auth wrapper
 │   │   │   ├── VideoUploadModal.tsx     ← Upload flow UI (presign → PUT → create-job)
-│   │   │   └── VideoDetailModal.tsx     ← Job detail viewer (status, EDL, errors)
-│   │   └── lib/utils.ts                ← cn() class merge helper
+│   │   │   ├── VideoDetailModal.tsx     ← Job detail viewer (status, EDL, errors)
+│   │   │   └── editor/                  ← Advanced Editor Components
+│   │   │       ├── TimelineContainer.tsx
+│   │   │       ├── PlayerMonitor.tsx
+│   │   │       ├── InspectorPanel.tsx
+│   │   │       ├── MediaDrawer.tsx
+│   │   │       ├── ClipFilmstrip.tsx
+│   │   │       └── TransformableOverlay.tsx
+│   │   └── lib/
+│   │       ├── utils.ts                 ← cn() class merge helper
+│   │       ├── idb.ts                   ← IndexedDB helpers for local browser caching
+│   │       ├── keyframes.ts             ← Animation / timeline keyframe logic
+│   │       ├── timeline-types.ts        ← Types for editor timeline blocks
+│   │       └── stores/
+│   │           └── useTimelineStore.ts  ← Zustand global store for editor state
 │   │
 │   └── worker/                         ← Celery background worker (Python)
 │       ├── celery_app.py               ← Celery instance (broker=Redis, SSL config)

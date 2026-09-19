@@ -31,9 +31,11 @@ export interface SocialAccount {
 
 export interface EditDecision {
   trigger_id: string;
-  action: 'cut' | 'b_roll' | 'zoom_in' | 'sfx';
+  action: 'cut' | 'b_roll' | 'zoom_in' | 'sfx' | 'motion_graphics' | 'character';
   search_query?: string;
   sound_effect?: string;
+  motion_graphics_text?: string;
+  character_action?: string;
 }
 
 export interface EditList {
