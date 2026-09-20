@@ -11,14 +11,14 @@ describe('Typography System', () => {
     it('resolves default body role correctly', () => {
       const style = resolveTypography('body', tokens);
       expect(style.role).toBe('body');
-      expect(style.fontSize).toBe(tokens.spacing.md);
+      expect(style.fontSize).toBe(tokens.spacing.xl);
       expect(style.fontWeight).toBe(400);
       expect(style.colorToken).toBe(tokens.colors.textPrimary);
     });
 
     it('resolves hero role with large scale', () => {
       const style = resolveTypography('hero', tokens);
-      expect(style.fontSize).toBe(tokens.spacing.xxl * 1.5);
+      expect(style.fontSize).toBe(tokens.spacing.xxl);
       expect(style.fontWeight).toBe(700);
     });
 

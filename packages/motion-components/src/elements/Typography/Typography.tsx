@@ -76,6 +76,76 @@ export const Typography: React.FC<TypographyProps> = ({ element, tokens }) => {
     );
   };
 
+  // Helper to slice segments for a specific line
+  // We keep a running tally of character offsets to know where this line sits in the full text.
+  let currentGlobalOffset = 0;
+  
+  const renderLineWithSegments = (lineText: string, lineIndex: number) => {
+    // If no segments are provided, just return the raw text
+    if (!textSegments || textSegments.length === 0) {
+      return lineText;
+    }
+
+    // We need to find the global start index of this line.
+    // If we assume `lines` were created by sequentially breaking `fullTextContent`,
+    // we can just find the index of lineText starting from currentGlobalOffset.
+    // Note: this is a simple heuristic assuming spaces were preserved or collapsed predictably.
+    const fullText = (textContent || textSegments.map(s => s.text).join('')).replace(/\\s+/g, ' ');
+    const normalizedLine = lineText.replace(/\\s+/g, ' ');
+    
+    // Simple fallback if complex splitting is too hard for this MVP:
+    // Just map over segments and if the segment text is found in this line, color it.
+    // But since words might repeat, we do a proper index tracking.
+    
+    const elements: React.ReactNode[] = [];
+    let lineCharIndex = 0;
+    
+    for (const segment of textSegments) {
+      if (lineCharIndex >= lineText.length) break;
+      
+      const segmentText = segment.text;
+      
+      // Look for the segment in the remaining line text
+      const remainingLine = lineText.slice(lineCharIndex);
+      const segIndexInLine = remainingLine.indexOf(segmentText);
+      
+      if (segIndexInLine !== -1) {
+        // Add any un-styled text before this segment
+        if (segIndexInLine > 0) {
+          elements.push(
+            <tspan key={`${lineIndex}-${lineCharIndex}-pre`}>
+              {remainingLine.slice(0, segIndexInLine)}
+            </tspan>
+          );
+          lineCharIndex += segIndexInLine;
+        }
+        
+        // Add the styled segment
+        elements.push(
+          <tspan 
+            key={`${lineIndex}-${lineCharIndex}-seg`}
+            fill={segment.style?.colorToken || (segment.style?.emphasis ? tokens.colors.accent : undefined)}
+            fontWeight={segment.style?.emphasis ? 700 : undefined}
+          >
+            {segmentText}
+          </tspan>
+        );
+        lineCharIndex += segmentText.length;
+      }
+    }
+    
+    // Add any trailing text
+    if (lineCharIndex < lineText.length) {
+      elements.push(
+        <tspan key={`${lineIndex}-${lineCharIndex}-post`}>
+          {lineText.slice(lineCharIndex)}
+        </tspan>
+      );
+    }
+    
+    return elements.length > 0 ? elements : lineText;
+  };
+
   return (
     <svg 
       width={element.geometry.width} 
@@ -104,10 +174,7 @@ export const Typography: React.FC<TypographyProps> = ({ element, tokens }) => {
             x={startX} 
             y={startY + index * lineHeight}
           >
-            {/* If we have segments, we would render them here by slicing the string, but for simplicity of the primitive, we just render the line. 
-                Full rich-text segment implementation across line breaks requires advanced cursor tracking. 
-                For MVP, we just render the raw string per line if textContent is provided. */}
-            {line.text}
+            {renderLineWithSegments(line.text, index)}
           </tspan>
         ))}
       </text>

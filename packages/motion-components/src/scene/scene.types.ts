@@ -7,12 +7,16 @@ import { SafeZoneDefinition } from '../layout/layout.types';
 import { TimingConfig } from '../timing/timing.types';
 import { CompositionDiagnostic } from '../validation/validation.types';
 import { TextLayoutConfig, TextSegment, TextMeasurementResult } from '../typography/typography.types';
+import { ImageMediaConfig, ResolvedImageMediaConfig } from '../media/image/image.types';
+import { VideoMediaConfig, ResolvedVideoMediaConfig } from '../media/video/video.types';
+import { AudioTrackDefinition, ResolvedAudioTrack } from '../media/audio/audio.types';
+import { CaptionTrackDefinition, ResolvedCaptionTrack } from '../media/caption/caption.types';
 import { SceneTransition } from '../transitions/transitions.types';
 import { AttentionInstruction, ResolvedAttentionSequence } from '../attention/attention.types';
 
 export interface SceneElementDefinition {
   id: string;
-  type?: 'asset' | 'text'; // Discriminator
+  type?: 'asset' | 'text' | 'image' | 'video' | 'caption'; // Discriminator
   
   // For type === 'asset' (or default)
   assetId?: string; // Explicit ID mode
@@ -22,6 +26,15 @@ export interface SceneElementDefinition {
   textContent?: string; // Simple text string
   textSegments?: TextSegment[]; // Rich text
   textConfig?: TextLayoutConfig; // Typography/layout settings
+  
+  // For type === 'image'
+  imageConfig?: ImageMediaConfig;
+  
+  // For type === 'video'
+  videoConfig?: VideoMediaConfig;
+  
+  // For type === 'caption'
+  captionConfig?: CaptionTrackDefinition;
   
   // General Placement
   placement?: PlacementRequest; // Where it wants to be
@@ -42,6 +55,7 @@ export interface SceneDefinition {
   relationships?: CompositionRelationship[];
   safeZones?: SafeZoneDefinition[];
   attention?: AttentionInstruction[];
+  audio?: AudioTrackDefinition[];
 }
 
 export interface SceneResolutionContext {
@@ -52,14 +66,23 @@ export interface SceneResolutionContext {
 
 export interface ResolvedSceneElement {
   id: string;
-  type: 'asset' | 'text';
+  type: 'asset' | 'text' | 'image' | 'video' | 'caption';
   assetId?: string; // Resolved if type === 'asset'
   
-  // Text specific
+  // Text & Caption specific
   textContent?: string;
   textSegments?: TextSegment[];
   textConfig?: TextLayoutConfig;
   textMeasurement?: TextMeasurementResult;
+  
+  // Image specific
+  imageConfig?: ResolvedImageMediaConfig;
+  
+  // Video specific
+  videoConfig?: ResolvedVideoMediaConfig;
+  
+  // Caption specific
+  captionConfig?: ResolvedCaptionTrack;
   
   geometry: { x: number; y: number; width: number; height: number };
   anchor: string;
@@ -82,6 +105,7 @@ export interface ResolvedSceneGraph {
   tokens: DesignTokens;
   elements: ResolvedSceneElement[];
   attention: ResolvedAttentionSequence;
+  audio: ResolvedAudioTrack[];
   diagnostics: CompositionDiagnostic[];
   valid: boolean;
 }

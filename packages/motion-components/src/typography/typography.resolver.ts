@@ -11,7 +11,7 @@ export function resolveTypography(
   let style: TypographyStyle = {
     role: role || 'body',
     fontFamily: 'sans-serif',
-    fontSize: tokens.spacing.md * 2, // 24 * 2 = 48px
+    fontSize: tokens.spacing.xl, // 64px
     fontWeight: 400,
     lineHeight: 1.5,
     letterSpacing: 0,
@@ -24,7 +24,7 @@ export function resolveTypography(
     case 'display':
       style = {
         ...style,
-        fontSize: tokens.spacing.xxl * 2, // 96 * 2 = 192px
+        fontSize: tokens.spacing.xxl * 1.5, // 144px
         fontWeight: 800,
         lineHeight: 1.1,
         letterSpacing: -0.02,
@@ -33,7 +33,7 @@ export function resolveTypography(
     case 'hero':
       style = {
         ...style,
-        fontSize: tokens.spacing.xxl * 1.25, // 96 * 1.25 = 120px
+        fontSize: tokens.spacing.xxl, // 96px
         fontWeight: 700,
         lineHeight: 1.2,
         letterSpacing: -0.01,
@@ -42,7 +42,7 @@ export function resolveTypography(
     case 'heading':
       style = {
         ...style,
-        fontSize: tokens.spacing.xl * 1.5, // 64 * 1.5 = 96px
+        fontSize: tokens.spacing.xl * 1.25, // 80px
         fontWeight: 600,
         lineHeight: 1.3,
       };
@@ -50,7 +50,7 @@ export function resolveTypography(
     case 'subheading':
       style = {
         ...style,
-        fontSize: tokens.spacing.lg * 1.5, // 48 * 1.5 = 72px
+        fontSize: tokens.spacing.xl, // 64px
         fontWeight: 500,
         lineHeight: 1.4,
         colorToken: tokens.colors.textSecondary,
@@ -59,7 +59,7 @@ export function resolveTypography(
     case 'body':
       style = {
         ...style,
-        fontSize: tokens.spacing.md * 2, // 48px
+        fontSize: tokens.spacing.xl, // 64px
         fontWeight: 400,
         lineHeight: 1.5,
       };
@@ -67,7 +67,7 @@ export function resolveTypography(
     case 'bodySmall':
       style = {
         ...style,
-        fontSize: tokens.spacing.sm,
+        fontSize: tokens.spacing.md * 1.5, // 36px
         fontWeight: 400,
         lineHeight: 1.5,
         colorToken: tokens.colors.textSecondary,
@@ -76,7 +76,7 @@ export function resolveTypography(
     case 'label':
       style = {
         ...style,
-        fontSize: tokens.spacing.sm * 2.5, // 16 * 2.5 = 40px
+        fontSize: tokens.spacing.lg, // 48px
         fontWeight: 600,
         lineHeight: 1.2,
         letterSpacing: 0.05,

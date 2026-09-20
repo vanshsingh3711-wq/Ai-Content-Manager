@@ -18,6 +18,11 @@ import { resolveTypography, validateTextLayout } from '../typography/typography.
 import { fitText } from '../typography/typography.measure';
 import { resolveAttentionInstructions } from '../attention/attention.resolve';
 import { ResolvedAttentionSequence } from '../attention/attention.types';
+import { resolveImageMedia } from '../media/image/image.resolver';
+import { resolveVideoMedia } from '../media/video/video.resolver';
+import { resolveAudioTrack } from '../media/audio/audio.resolver';
+import { ResolvedAudioTrack } from '../media/audio/audio.types';
+import { resolveCaptionTrack } from '../media/caption/caption.resolver';
 
 export function resolveSceneGraph(
   scene: SceneDefinition,
@@ -73,6 +78,12 @@ export function resolveSceneGraph(
     } else if (el.type === 'text') {
       // Text elements don't strictly require an assetId for the initial placement
       // because they have geometry determined by text measurement.
+    } else if (el.type === 'image') {
+      // Images rely on imageConfig.src and have their own media definitions.
+    } else if (el.type === 'video') {
+      // Videos rely on videoConfig.src and have their own media definitions.
+    } else if (el.type === 'caption') {
+      // Captions rely on captionConfig.
     } else {
       upstreamDiagnostics.push({
         reason: 'missing-asset-definition',
@@ -109,6 +120,62 @@ export function resolveSceneGraph(
       }
     }
 
+    // 1.7 Image Resolution
+    let resolvedImageConfig = undefined;
+    if (el.type === 'image') {
+      const imgRes = resolveImageMedia(el.imageConfig, el.id);
+      resolvedImageConfig = imgRes.resolved;
+      if (imgRes.diagnostics.length > 0) {
+        upstreamDiagnostics.push(...imgRes.diagnostics);
+      }
+    }
+
+    // 1.8 Video Resolution
+    let resolvedVideoConfig = undefined;
+    if (el.type === 'video') {
+      const vidRes = resolveVideoMedia(el.videoConfig, el.id);
+      resolvedVideoConfig = vidRes.resolved;
+      if (vidRes.diagnostics.length > 0) {
+        upstreamDiagnostics.push(...vidRes.diagnostics);
+      }
+    }
+
+    // 1.9 Caption Resolution
+    let resolvedCaptionConfig = undefined;
+    if (el.type === 'caption') {
+      if (el.captionConfig) {
+        const capRes = resolveCaptionTrack(el.captionConfig, finalDuration);
+        resolvedCaptionConfig = capRes.resolved;
+        if (capRes.diagnostics.length > 0) {
+          upstreamDiagnostics.push(...capRes.diagnostics);
+        }
+
+        // We must also measure the captions to reserve layout space.
+        // We find the max width/height across all cues to ensure layout stability.
+        resolvedTextConfig = el.textConfig || { role: 'caption' };
+        const typography = resolveTypography(resolvedTextConfig.role, resolvedTokens, resolvedTextConfig);
+        
+        let maxWidth = 0;
+        let maxHeight = 0;
+        
+        if (resolvedCaptionConfig) {
+          for (const cue of resolvedCaptionConfig.cues) {
+            const measurement = fitText(cue.text, typography, resolvedTextConfig);
+            if (measurement.width > maxWidth) maxWidth = measurement.width;
+            if (measurement.height > maxHeight) maxHeight = measurement.height;
+          }
+        }
+        
+        // Mock a text measurement result so the auto-positioner reserves space
+        resolvedTextMeasurement = {
+          width: maxWidth,
+          height: maxHeight,
+          lines: [], // Not used for auto positioning
+          fontSize: typography.fontSize
+        };
+      }
+    }
+
     // 2. Initial Placement Resolution (Base Geometry)
     const placementReq: PlacementRequest = {
       ...(el.placement || { positionMode: 'auto' }),
@@ -120,6 +187,24 @@ export function resolveSceneGraph(
       if (!placementReq.size) placementReq.size = {};
       placementReq.size.width = resolvedTextMeasurement.width;
       placementReq.size.height = resolvedTextMeasurement.height;
+    } else if (resolvedImageConfig && resolvedImageConfig.metadata) {
+      // If image has intrinsic metadata, we can optionally use it for default sizing
+      // But typically placement.size overrides this anyway.
+      if (!placementReq.size) placementReq.size = {};
+      if (resolvedImageConfig.metadata.width && !placementReq.size.width) {
+        placementReq.size.width = resolvedImageConfig.metadata.width;
+      }
+      if (resolvedImageConfig.metadata.height && !placementReq.size.height) {
+        placementReq.size.height = resolvedImageConfig.metadata.height;
+      }
+    } else if (resolvedVideoConfig && resolvedVideoConfig.metadata) {
+      if (!placementReq.size) placementReq.size = {};
+      if (resolvedVideoConfig.metadata.width && !placementReq.size.width) {
+        placementReq.size.width = resolvedVideoConfig.metadata.width;
+      }
+      if (resolvedVideoConfig.metadata.height && !placementReq.size.height) {
+        placementReq.size.height = resolvedVideoConfig.metadata.height;
+      }
     }
     
     const placementContext: PlacementContext = {
@@ -132,11 +217,14 @@ export function resolveSceneGraph(
     const placement = resolvePlacement(placementReq, placementContext);
     placement.id = el.id;
     
-    // Stash the text properties on the placement temporarily so we can map them back later
+    // Stash the properties on the placement temporarily so we can map them back later
     (placement as any)._textMeasurement = resolvedTextMeasurement;
     (placement as any)._textConfig = resolvedTextConfig;
     (placement as any)._textContent = fullTextContent;
     (placement as any)._textSegments = el.textSegments;
+    (placement as any)._imageConfig = resolvedImageConfig;
+    (placement as any)._videoConfig = resolvedVideoConfig;
+    (placement as any)._captionConfig = resolvedCaptionConfig;
     (placement as any)._type = el.type || 'asset';
 
     activePlacements.push(placement);
@@ -292,6 +380,9 @@ export function resolveSceneGraph(
       textSegments: (placement as any)._textSegments,
       textConfig: (placement as any)._textConfig,
       textMeasurement: (placement as any)._textMeasurement,
+      imageConfig: (placement as any)._imageConfig,
+      videoConfig: (placement as any)._videoConfig,
+      captionConfig: (placement as any)._captionConfig,
       geometry: {
         x: placement.x,
         y: placement.y,
@@ -310,7 +401,18 @@ export function resolveSceneGraph(
   // Render Gate checking
   const valid = canRenderComposition(validationResult);
 
-  // 6. Attention Resolution
+  // 6. Audio Resolution
+  const resolvedAudio: ResolvedAudioTrack[] = [];
+  const audioDiagnostics: any[] = [];
+  if (scene.audio) {
+    for (const audioDef of scene.audio) {
+      const res = resolveAudioTrack(audioDef, finalDuration);
+      if (res.resolved) resolvedAudio.push(res.resolved);
+      audioDiagnostics.push(...res.diagnostics);
+    }
+  }
+
+  // 7. Attention Resolution
   let resolvedAttention: ResolvedAttentionSequence = { instructions: [], diagnostics: [] };
   
   const baseSceneGraph: ResolvedSceneGraph = {
@@ -323,8 +425,9 @@ export function resolveSceneGraph(
     tokens: resolvedTokens,
     elements: elements.sort((a, b) => a.layer - b.layer),
     attention: resolvedAttention,
-    diagnostics: [...validationResult.diagnostics, ...tokenDiagnostics],
-    valid: valid && tokenDiagnostics.length === 0
+    audio: resolvedAudio,
+    diagnostics: [...validationResult.diagnostics, ...tokenDiagnostics, ...audioDiagnostics],
+    valid: valid && tokenDiagnostics.length === 0 && audioDiagnostics.filter(d => d.severity === 'error').length === 0
   };
 
   if (scene.attention && scene.attention.length > 0) {

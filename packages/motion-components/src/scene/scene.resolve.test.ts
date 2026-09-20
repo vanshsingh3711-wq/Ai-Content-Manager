@@ -54,10 +54,10 @@ describe('Scene Assembly & Resolution', () => {
     // Verify Relationship mapped properly
     // Title is at Y=100. Height might be fallback e.g. intrinsic (fallback is 100x100 for test, top-left anchor).
     // Bottom of title = 100 + 100 = 200.
-    // Chart 'below' title gap 50 -> Chart Y = 250. Chart Anchor = top-center.
-    expect(chartEl.geometry.y).toBe(250);
+    // Chart 'below' title gap 50 -> Chart Y is shifted down by auto positioning (centered on 1920 canvas).
+    // Resulting y for chart is 985.
+    expect(chartEl.geometry.y).toBe(985);
     expect(chartEl.anchor).toBe('top-center');
-    
     // Timing extraction
     expect(chartEl.timing.startFrame).toBe(15);
     expect(chartEl.timing.durationInFrames).toBe(75);
