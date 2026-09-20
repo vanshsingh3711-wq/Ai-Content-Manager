@@ -1,0 +1,182 @@
+import React from 'react';
+import { ATMProps } from './ATM.types';
+
+export const ATM: React.FC<ATMProps> = ({
+  x,
+  y,
+  scale = 1,
+  rotation = 0,
+  opacity = 1,
+  className = '',
+  style = {},
+}) => {
+  const isAbsolute = x !== undefined || y !== undefined;
+
+  return (
+    <div
+      data-testid="object-atm"
+      className={className}
+      style={{
+        position: isAbsolute ? 'absolute' : 'relative',
+        left: x,
+        top: y,
+        transform: `scale(${scale}) rotate(${rotation}deg)`,
+        transformOrigin: 'center',
+        opacity,
+        width: 400,
+        height: 500,
+        ...style,
+      }}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="100%" height="100%">
+        {/* SHADOW */}
+        <g id="atm-shadow" data-part="shadow">
+          <ellipse cx="200" cy="460" rx="140" ry="12" fill="#CBD5E1" opacity="0.6" />
+        </g>
+
+        {/* BODY */}
+        <g id="atm-body" data-part="body">
+          {/* Main outer casing */}
+          <rect x="90" y="30" width="220" height="420" rx="16" fill="#F8FAFC" />
+          {/* Inner casing / edge depth */}
+          <rect x="94" y="34" width="212" height="412" rx="12" fill="#F1F5F9" />
+
+          {/* Top branding cap */}
+          <path d="M 94 46 A 12 12 0 0 1 106 34 L 294 34 A 12 12 0 0 1 306 46 L 306 90 L 94 90 Z" fill="#0369A1" />
+          {/* System-safe text converted to a clean layout */}
+          <text x="200" y="70" fontFamily="system-ui, -apple-system, sans-serif" fontSize="24" fontWeight="900" fill="#FFFFFF" textAnchor="middle" letterSpacing="4">ATM</text>
+          {/* Top status indicator */}
+          <circle cx="280" cy="62" r="4" fill="#38BDF8" />
+
+          {/* Dark interaction panel */}
+          <rect x="110" y="100" width="180" height="240" rx="8" fill="#0F172A" />
+
+          {/* Bottom safe / vault area */}
+          <rect x="110" y="350" width="180" height="90" rx="6" fill="#94A3B8" />
+          {/* Vault door inset */}
+          <rect x="120" y="360" width="160" height="70" rx="4" fill="#64748B" />
+          {/* Vault hinges */}
+          <rect x="115" y="370" width="5" height="15" fill="#475569" rx="1" />
+          <rect x="115" y="400" width="5" height="15" fill="#475569" rx="1" />
+        </g>
+
+        {/* DETAILS (Misc panel elements) */}
+        <g id="atm-details" data-part="details">
+          {/* Camera / Sensor Area */}
+          <circle cx="200" cy="115" r="5" fill="#000000" />
+          <circle cx="200" cy="115" r="2" fill="#38BDF8" opacity="0.6" />
+
+          {/* Receipt slot */}
+          <rect x="125" y="280" width="40" height="8" rx="2" fill="#334155" />
+          <rect x="127" y="283" width="36" height="2" fill="#000000" />
+          {/* Receipt Icon/Label */}
+          <rect x="125" y="270" width="10" height="6" fill="#475569" rx="1" />
+        </g>
+
+        {/* BUTTONS (Beside Screen) */}
+        <g id="atm-buttons" data-part="buttons">
+          {/* Left side */}
+          <rect x="116" y="150" width="8" height="6" rx="2" fill="#475569" />
+          <rect x="116" y="170" width="8" height="6" rx="2" fill="#475569" />
+          <rect x="116" y="190" width="8" height="6" rx="2" fill="#475569" />
+          <rect x="116" y="210" width="8" height="6" rx="2" fill="#475569" />
+
+          {/* Right side */}
+          <rect x="276" y="150" width="8" height="6" rx="2" fill="#475569" />
+          <rect x="276" y="170" width="8" height="6" rx="2" fill="#475569" />
+          <rect x="276" y="190" width="8" height="6" rx="2" fill="#475569" />
+          <rect x="276" y="210" width="8" height="6" rx="2" fill="#475569" />
+        </g>
+
+        {/* SCREEN */}
+        <g id="atm-screen" data-part="screen">
+          {/* Bezel */}
+          <rect x="130" y="135" width="140" height="95" rx="4" fill="#1E293B" />
+          {/* Glass Background */}
+          <rect x="135" y="140" width="130" height="85" rx="2" fill="#0284C7" />
+        </g>
+
+        {/* SCREEN CONTENT (UI) */}
+        <g id="atm-screen-content" data-part="screenContent">
+          {/* Top status bar */}
+          <rect x="135" y="140" width="130" height="12" fill="#0369A1" />
+          <rect x="145" y="144" width="40" height="4" rx="2" fill="#BAE6FD" />
+
+          {/* Main UI Action Box */}
+          <rect x="150" y="165" width="100" height="20" rx="4" fill="#F0F9FF" />
+          <rect x="160" y="173" width="80" height="4" rx="2" fill="#0284C7" />
+
+          {/* PIN Dots */}
+          <circle cx="185" cy="205" r="3" fill="#FFFFFF" />
+          <circle cx="195" cy="205" r="3" fill="#FFFFFF" />
+          <circle cx="205" cy="205" r="3" fill="#FFFFFF" />
+          <circle cx="215" cy="205" r="3" fill="#FFFFFF" opacity="0.3" />
+        </g>
+
+        {/* CARD SLOT */}
+        <g id="atm-card-slot" data-part="cardSlot">
+          <rect x="225" y="250" width="45" height="24" rx="3" fill="#334155" />
+          <rect x="230" y="260" width="35" height="4" rx="1" fill="#000000" />
+          {/* LED indicator */}
+          <circle cx="247" cy="255" r="2" fill="#10B981" />
+        </g>
+
+        {/* KEYPAD */}
+        <g id="atm-keypad" data-part="keypad">
+          <rect x="125" y="245" width="80" height="55" rx="4" fill="#334155" />
+
+          {/* Row 1 */}
+          <rect x="132" y="252" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="148" y="252" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="164" y="252" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="180" y="252" width="16" height="8" rx="2" fill="#EF4444" /> {/* Cancel */}
+
+          {/* Row 2 */}
+          <rect x="132" y="264" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="148" y="264" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="164" y="264" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="180" y="264" width="16" height="8" rx="2" fill="#EAB308" /> {/* Clear */}
+
+          {/* Row 3 */}
+          <rect x="132" y="276" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="148" y="276" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="164" y="276" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="180" y="276" width="16" height="8" rx="2" fill="#475569" /> {/* Blank */}
+
+          {/* Row 4 */}
+          <rect x="132" y="288" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="148" y="288" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="164" y="288" width="12" height="8" rx="2" fill="#94A3B8" />
+          <rect x="180" y="288" width="16" height="8" rx="2" fill="#22C55E" /> {/* Enter */}
+        </g>
+
+        {/* CASH */}
+        <g id="atm-cash" data-part="cash">
+          {/* Positioned to stick out of the slot. Default state is visible for static preview. */}
+          <g transform="translate(145, 317)">
+            {/* Back bill */}
+            <rect x="5" y="0" width="100" height="45" rx="3" fill="#059669" />
+            {/* Front bill */}
+            <rect x="0" y="5" width="100" height="45" rx="3" fill="#10B981" />
+            {/* Bill details */}
+            <rect x="5" y="10" width="90" height="35" rx="2" fill="#34D399" />
+            <circle cx="50" cy="27" r="10" fill="#059669" opacity="0.5" />
+            <rect x="12" y="15" width="20" height="4" fill="#059669" opacity="0.4" rx="1" />
+          </g>
+        </g>
+
+        {/* CASH SLOT */}
+        {/* Purposely layered AFTER the cash so the top lip covers the origin point of the bills */}
+        <g id="atm-cash-slot" data-part="cashSlot">
+          {/* Base Bezel */}
+          <rect x="135" y="310" width="130" height="20" rx="4" fill="#334155" />
+          {/* Dark Slot Opening */}
+          <rect x="140" y="315" width="120" height="8" rx="2" fill="#000000" />
+          {/* Top Lip (Hides the top edge of the cash vector) */}
+          <rect x="135" y="310" width="130" height="6" rx="3" fill="#475569" />
+        </g>
+
+      </svg>
+    </div>
+  );
+};

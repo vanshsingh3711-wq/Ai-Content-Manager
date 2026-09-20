@@ -1,0 +1,175 @@
+import React from 'react';
+import { BankProps } from './Bank.types';
+
+export const Bank: React.FC<BankProps> = ({
+  x,
+  y,
+  scale = 1,
+  rotation = 0,
+  opacity = 1,
+  className = '',
+  style = {},
+}) => {
+  const isAbsolute = x !== undefined || y !== undefined;
+
+  return (
+    <div
+      data-testid="object-bank"
+      className={className}
+      style={{
+        position: isAbsolute ? 'absolute' : 'relative',
+        left: x,
+        top: y,
+        transform: `scale(${scale}) rotate(${rotation}deg)`,
+        transformOrigin: 'center',
+        opacity,
+        width: 400,
+        height: 400,
+        ...style,
+      }}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+        {/* SHADOW */}
+        <g id="bank-shadow" data-part="shadow">
+          <ellipse cx="200" cy="335" rx="160" ry="12" fill="#CBD5E1" opacity="0.6"/>
+        </g>
+
+        {/* DETAILS: Base Steps and Planters */}
+        <g id="bank-details" data-part="details">
+          {/* Tiered Foundation Steps */}
+          <rect x="50" y="315" width="300" height="10" rx="2" fill="#94A3B8"/>
+          <rect x="65" y="305" width="270" height="10" rx="2" fill="#CBD5E1"/>
+          <rect x="80" y="295" width="240" height="10" rx="2" fill="#E2E8F0"/>
+          
+          {/* Left Minimalist Planter */}
+          <rect x="65" y="275" width="20" height="20" rx="2" fill="#475569"/>
+          <circle cx="75" cy="265" r="12" fill="#10B981"/>
+          <circle cx="82" cy="270" r="8" fill="#059669"/>
+          <circle cx="68" cy="270" r="8" fill="#34D399"/>
+          
+          {/* Right Minimalist Planter */}
+          <rect x="315" y="275" width="20" height="20" rx="2" fill="#475569"/>
+          <circle cx="325" cy="265" r="12" fill="#10B981"/>
+          <circle cx="318" cy="270" r="8" fill="#34D399"/>
+          <circle cx="332" cy="270" r="8" fill="#059669"/>
+        </g>
+
+        {/* BUILDING: Main Back Wall */}
+        <g id="bank-building" data-part="building">
+          <rect x="90" y="150" width="220" height="145" fill="#F8FAFC"/>
+          {/* Top inner shadow under the roof for depth */}
+          <rect x="90" y="150" width="220" height="25" fill="#E2E8F0"/>
+        </g>
+
+        {/* WINDOWS */}
+        <g id="bank-windows" data-part="windows">
+          {/* Left Window */}
+          <g className="window-left">
+            <rect x="120" y="195" width="30" height="65" fill="#475569" rx="2"/>
+            <rect x="123" y="198" width="24" height="59" fill="#0F172A"/>
+            {/* Glass Reflections */}
+            <polygon points="123,210 138,198 147,198 123,217" fill="#38BDF8" opacity="0.15"/>
+            <polygon points="123,230 147,211 147,216 123,235" fill="#38BDF8" opacity="0.15"/>
+            {/* Window Grid */}
+            <rect x="123" y="225" width="24" height="2" fill="#1E293B" opacity="0.6"/>
+            <rect x="134" y="198" width="2" height="59" fill="#1E293B" opacity="0.6"/>
+          </g>
+          
+          {/* Right Window */}
+          <g className="window-right">
+            <rect x="250" y="195" width="30" height="65" fill="#475569" rx="2"/>
+            <rect x="253" y="198" width="24" height="59" fill="#0F172A"/>
+            {/* Glass Reflections */}
+            <polygon points="253,210 268,198 277,198 253,217" fill="#38BDF8" opacity="0.15"/>
+            <polygon points="253,230 277,211 277,216 253,235" fill="#38BDF8" opacity="0.15"/>
+            {/* Window Grid */}
+            <rect x="253" y="225" width="24" height="2" fill="#1E293B" opacity="0.6"/>
+            <rect x="264" y="198" width="2" height="59" fill="#1E293B" opacity="0.6"/>
+          </g>
+        </g>
+
+        {/* DOOR */}
+        <g id="bank-door" data-part="door">
+          {/* Door Frame */}
+          <rect x="180" y="210" width="40" height="85" fill="#334155" rx="2"/>
+          
+          {/* Left Door Panel */}
+          <rect x="183" y="213" width="16" height="82" fill="#0F172A"/>
+          <rect x="186" y="218" width="10" height="30" fill="#38BDF8" opacity="0.15"/>
+          <rect x="186" y="254" width="10" height="30" fill="#38BDF8" opacity="0.15"/>
+          <rect x="195" y="250" width="2" height="12" fill="#94A3B8" rx="1"/> {/* Handle */}
+          
+          {/* Right Door Panel */}
+          <rect x="201" y="213" width="16" height="82" fill="#0F172A"/>
+          <rect x="204" y="218" width="10" height="30" fill="#38BDF8" opacity="0.15"/>
+          <rect x="204" y="254" width="10" height="30" fill="#38BDF8" opacity="0.15"/>
+          <rect x="203" y="250" width="2" height="12" fill="#94A3B8" rx="1"/> {/* Handle */}
+        </g>
+
+        {/* COLUMNS */}
+        <g id="bank-columns" data-part="columns">
+          {/* Column 1 (Far Left) */}
+          <g className="column">
+            <rect x="92" y="150" width="26" height="6" rx="1" fill="#E2E8F0"/>
+            <rect x="95" y="156" width="10" height="133" fill="#FFFFFF"/>
+            <rect x="105" y="156" width="10" height="133" fill="#F1F5F9"/>
+            <rect x="92" y="289" width="26" height="6" rx="1" fill="#E2E8F0"/>
+          </g>
+          {/* Column 2 (Inner Left) */}
+          <g className="column">
+            <rect x="152" y="150" width="26" height="6" rx="1" fill="#E2E8F0"/>
+            <rect x="155" y="156" width="10" height="133" fill="#FFFFFF"/>
+            <rect x="165" y="156" width="10" height="133" fill="#F1F5F9"/>
+            <rect x="152" y="289" width="26" height="6" rx="1" fill="#E2E8F0"/>
+          </g>
+          {/* Column 3 (Inner Right) */}
+          <g className="column">
+            <rect x="222" y="150" width="26" height="6" rx="1" fill="#E2E8F0"/>
+            <rect x="225" y="156" width="10" height="133" fill="#FFFFFF"/>
+            <rect x="235" y="156" width="10" height="133" fill="#F1F5F9"/>
+            <rect x="222" y="289" width="26" height="6" rx="1" fill="#E2E8F0"/>
+          </g>
+          {/* Column 4 (Far Right) */}
+          <g className="column">
+            <rect x="282" y="150" width="26" height="6" rx="1" fill="#E2E8F0"/>
+            <rect x="285" y="156" width="10" height="133" fill="#FFFFFF"/>
+            <rect x="295" y="156" width="10" height="133" fill="#F1F5F9"/>
+            <rect x="282" y="289" width="26" height="6" rx="1" fill="#E2E8F0"/>
+          </g>
+        </g>
+
+        {/* ROOF */}
+        <g id="bank-roof" data-part="roof">
+          {/* Architrave (Bottom horizontal support) */}
+          <rect x="80" y="138" width="240" height="12" fill="#E2E8F0"/>
+          
+          {/* Frieze (Middle horizontal band for text) */}
+          <rect x="75" y="118" width="250" height="20" fill="#FFFFFF"/>
+          
+          {/* Cornice (Base of the triangle) */}
+          <rect x="65" y="110" width="270" height="8" fill="#CBD5E1"/>
+          
+          {/* Tympanum & Outer Trim (The Triangle) */}
+          <polygon points="200,40 60,110 340,110" fill="#334155"/>
+          <polygon points="200,53 82,110 318,110" fill="#1E293B"/>
+        </g>
+
+        {/* SIGN & EMBLEM */}
+        <g id="bank-sign" data-part="sign">
+          {/* Text on the Frieze (Clean, system-safe font approach) */}
+          <text x="200" y="133" fontFamily="system-ui, -apple-system, sans-serif" fontSize="13" fontWeight="800" fill="#0F172A" textAnchor="middle" letterSpacing="6">BANK</text>
+          
+          {/* Abstract Finance Emblem inside the Tympanum */}
+          <g transform="translate(0, 2)">
+            {/* Base Layer */}
+            <polygon points="200,62 218,80 200,98 182,80" fill="#38BDF8"/>
+            {/* Highlight/Facet Left */}
+            <polygon points="200,62 200,80 182,80" fill="#7DD3FC"/>
+            {/* Shadow/Facet Bottom Right */}
+            <polygon points="200,98 218,80 200,80" fill="#0284C7"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+  );
+};
