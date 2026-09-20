@@ -1,3 +1,5 @@
+import { DesignTokens } from '../../themes/tokens.types';
+
 export interface KPIAnimation {
   type?: "fade" | "slideUp";
   durationInFrames?: number;
@@ -6,6 +8,7 @@ export interface KPIAnimation {
 }
 
 export interface AnimatedKPIProps {
+  tokens?: DesignTokens;
   title: string;
 
   // Main Metric

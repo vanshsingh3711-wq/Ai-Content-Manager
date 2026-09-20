@@ -3,6 +3,7 @@ import { AnimatedKPIProps } from './AnimatedKPI.types';
 import { interpolate, formatValue } from './AnimatedKPI.utils';
 
 export const AnimatedKPI: React.FC<AnimatedKPIProps> = ({
+  tokens,
   title,
   value,
   startValue = 0,
@@ -30,16 +31,16 @@ export const AnimatedKPI: React.FC<AnimatedKPIProps> = ({
   } = animation;
 
   const {
-    background = 'transparent',
-    titleColor = '#9ca3af',
-    valueColor = '#ffffff',
-    positiveColor = '#10b981',
-    negativeColor = '#ef4444',
-    neutralColor = '#6b7280',
+    background = tokens ? tokens.colors.surface : 'transparent',
+    titleColor = tokens ? tokens.colors.textSecondary : '#9ca3af',
+    valueColor = tokens ? tokens.colors.textPrimary : '#ffffff',
+    positiveColor = tokens ? tokens.colors.success : '#10b981',
+    negativeColor = tokens ? tokens.colors.danger : '#ef4444',
+    neutralColor = tokens ? tokens.colors.textMuted : '#6b7280',
   } = style;
 
   const {
-    titleSize = 20,
+    titleSize = 20, // Typography scale should eventually come from tokens if desired, but we keep it simple here
     valueSize = 56,
     changeSize = 24,
     fontFamily = 'sans-serif',
