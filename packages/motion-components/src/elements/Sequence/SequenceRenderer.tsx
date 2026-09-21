@@ -2,6 +2,7 @@ import React from 'react';
 import { ResolvedSequence, ResolvedSequenceScene } from '../../sequence/sequence.types';
 import { SceneTransition } from '../Transition/SceneTransition';
 import { AttentionRenderer } from '../../attention/AttentionRenderer';
+import { useCurrentFrame } from 'remotion';
 
 export interface SequenceRendererProps {
   sequence: ResolvedSequence;
@@ -10,7 +11,23 @@ export interface SequenceRendererProps {
 }
 
 export const SequenceRenderer: React.FC<SequenceRendererProps> = ({ sequence, renderScene, forceFrame }) => {
-  const frame = forceFrame || 0;
+  let frame = forceFrame || 0;
+
+  // Try to use Remotion's frame if we are inside a Player/Composition
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const remotionFrame = useCurrentFrame();
+    if (forceFrame === undefined) {
+      frame = remotionFrame;
+    }
+  } catch (e) {
+    // We are not inside a Remotion Composition, fallback to forceFrame
+  }
+
+  // Handle empty sequence
+  if (!sequence || !sequence.scenes || sequence.scenes.length === 0) {
+    return <div style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: '#000' }} />;
+  }
 
   // 1. Find which scene(s) are active
   const activeScenes = sequence.scenes.filter(s => 

@@ -37,8 +37,44 @@ export class DeterministicSceneCompiler implements SceneGraphCompiler {
     if (context?.theme) {
       compiledScene.themeId = context.theme;
     }
+    if (scene.interactions) {
+      this.attachInteractions(compiledScene, scene);
+    }
 
     return compiledScene;
+  }
+
+  private attachInteractions(compiledScene: SceneDefinition, scene: SceneJSON) {
+    if (!scene.interactions || scene.interactions.length === 0) return;
+
+    for (const interaction of scene.interactions) {
+      let presenterElement = compiledScene.elements.find(e => e.id === interaction.presenterId);
+      
+      if (!presenterElement) {
+        // If the compiler hasn't created a presenter, we could create one or throw.
+        // For strict mapping, we assume the presenter element exists.
+        throw new Error(`Presenter interaction references missing presenterId: ${interaction.presenterId}`);
+      }
+      
+      if (presenterElement.type !== 'presenter') {
+        throw new Error(`Element ${interaction.presenterId} is not a presenter, but has an interaction.`);
+      }
+
+      if (!presenterElement.presenterTimeline) {
+        presenterElement.presenterTimeline = [];
+      }
+
+      presenterElement.presenterTimeline.push({
+        presenterId: interaction.presenterId,
+        // The compiler doesn't know the exact character asset ID yet, but the resolution pass uses the first one.
+        // If there's an existing timeline item, use its characterAssetId, otherwise default to a safe value or rely on the scene definition.
+        characterAssetId: presenterElement.presenterTimeline[0]?.characterAssetId || 'svg-presenter',
+        action: interaction.action,
+        targetId: interaction.targetId,
+        startFrame: interaction.startFrame,
+        durationInFrames: interaction.durationInFrames || 60,
+      });
+    }
   }
 
   private compileWithTemplate(scene: SceneJSON, context?: SceneGraphCompileContext): SceneDefinition {
@@ -139,6 +175,8 @@ export class DeterministicSceneCompiler implements SceneGraphCompiler {
       // Hydrate via imageConfig if content provided
     } else if (jsonEl.type === 'video') {
       def.type = 'video';
+    } else if (jsonEl.type === 'presenter') {
+      def.type = 'presenter';
     } else {
       def.type = 'asset';
       // For charts, KPIs, etc, the assetRequest is present or we construct a generic one
@@ -152,6 +190,9 @@ export class DeterministicSceneCompiler implements SceneGraphCompiler {
     // Animation is passed completely transparently
     if (jsonEl.animation) {
       def.animation = { ...jsonEl.animation };
+    }
+    if (jsonEl.keyframes) {
+      def.keyframes = [...jsonEl.keyframes];
     }
   }
 

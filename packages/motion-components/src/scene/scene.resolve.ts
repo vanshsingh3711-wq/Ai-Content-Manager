@@ -23,7 +23,8 @@ import { resolveVideoMedia } from '../media/video/video.resolver';
 import { resolveAudioTrack } from '../media/audio/audio.resolver';
 import { ResolvedAudioTrack } from '../media/audio/audio.types';
 import { resolveCaptionTrack } from '../media/caption/caption.resolver';
-
+import { getCharacterAdapter } from '../character/adapters';
+import { PresenterInstruction, ResolvedPresenterInstruction } from '../character/presenter.types';
 export function resolveSceneGraph(
   scene: SceneDefinition,
   context: SceneResolutionContext
@@ -84,6 +85,27 @@ export function resolveSceneGraph(
       // Videos rely on videoConfig.src and have their own media definitions.
     } else if (el.type === 'caption') {
       // Captions rely on captionConfig.
+    } else if (el.type === 'presenter') {
+      // Presenters rely on presenterTimeline and characterAssetId
+      if (el.presenterTimeline && el.presenterTimeline.length > 0) {
+        // Use the first instruction to get the characterAssetId for upstream validation
+        const firstInst = el.presenterTimeline[0];
+        const adapter = getCharacterAdapter(firstInst.characterAssetId);
+        if (!adapter) {
+          upstreamDiagnostics.push({
+            reason: 'missing-character-adapter',
+            severity: 'error',
+            elementIds: [el.id],
+            message: `No character adapter found for asset: ${firstInst.characterAssetId}`
+          } as any);
+        } else {
+          // Pre-validation before geometry is known
+          for (const inst of el.presenterTimeline) {
+            const diags = adapter.validate(inst);
+            upstreamDiagnostics.push(...diags);
+          }
+        }
+      }
     } else {
       upstreamDiagnostics.push({
         reason: 'missing-asset-definition',
@@ -211,6 +233,7 @@ export function resolveSceneGraph(
     (placement as any)._imageConfig = resolvedImageConfig;
     (placement as any)._videoConfig = resolvedVideoConfig;
     (placement as any)._captionConfig = resolvedCaptionConfig;
+    (placement as any)._presenterTimeline = el.presenterTimeline;
     (placement as any)._type = el.type || 'asset';
 
     activePlacements.push(placement);
@@ -369,6 +392,7 @@ export function resolveSceneGraph(
       imageConfig: (placement as any)._imageConfig,
       videoConfig: (placement as any)._videoConfig,
       captionConfig: (placement as any)._captionConfig,
+      presenterTimeline: (placement as any)._presenterTimeline,
       geometry: {
         x: placement.x,
         y: placement.y,
@@ -378,8 +402,62 @@ export function resolveSceneGraph(
       anchor: placement.anchor || 'center',
       timing,
       layer,
-      animation: originalEl.animation
+      animation: originalEl.animation,
+      keyframes: originalEl.keyframes ? [...originalEl.keyframes] : undefined
     });
+  }
+
+  // Second pass for Presenter Target Resolution (since geometry is now finalized)
+  for (const element of elements) {
+    if (element.type === 'presenter' && element.presenterTimeline) {
+      const resolvedTimeline: ResolvedPresenterInstruction[] = [];
+      
+      for (const pConfig of element.presenterTimeline) {
+        const adapter = getCharacterAdapter(pConfig.characterAssetId);
+        
+        let targetGeometry = undefined;
+        if (pConfig.targetId) {
+          if (pConfig.targetId === element.id) {
+            validationResult.diagnostics.push({
+              type: 'INVALID_PRESENTER_TARGET',
+              severity: 'warning',
+              elementIds: [element.id],
+              message: `Presenter cannot target itself (${element.id}).`
+            });
+          } else {
+            const targetElement = elements.find(e => e.id === pConfig.targetId);
+            if (targetElement) {
+              targetGeometry = targetElement.geometry;
+            } else {
+              validationResult.diagnostics.push({
+                type: 'MISSING_PRESENTER_TARGET',
+                severity: 'warning',
+                elementIds: [element.id],
+                message: `Presenter targetId '${pConfig.targetId}' not found in scene.`
+              });
+            }
+          }
+        }
+        
+        // Frame validation
+        if (pConfig.startFrame < 0 || (pConfig.durationInFrames && pConfig.durationInFrames <= 0)) {
+           validationResult.diagnostics.push({
+             type: 'INVALID_PRESENTER_TIMING',
+             severity: 'warning',
+             elementIds: [element.id],
+             message: `Presenter interaction has invalid timing (start: ${pConfig.startFrame}, duration: ${pConfig.durationInFrames}).`
+           });
+        }
+        
+        if (adapter) {
+          resolvedTimeline.push(adapter.resolveAction(pConfig, context, targetGeometry, element.geometry));
+        } else {
+          resolvedTimeline.push({ ...pConfig });
+        }
+      }
+      
+      element.presenterTimeline = resolvedTimeline;
+    }
   }
 
   const finalDuration = scene.durationInFrames !== undefined ? scene.durationInFrames : calculatedSceneEndFrame;

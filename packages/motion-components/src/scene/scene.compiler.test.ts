@@ -96,4 +96,32 @@ describe('Scene Graph Compiler', () => {
 
     expect(() => compiler.compile(sceneJson)).toThrow(/invalid SceneJSON/i);
   });
+
+  it('should map interactions to presenter timeline', () => {
+    const sceneJson: SceneJSON = {
+      id: 'test_interactions',
+      beatId: 'beat_4',
+      elements: [
+        { id: 'main-presenter', type: 'presenter' },
+        { id: 'chart', type: 'chart' }
+      ],
+      interactions: [
+        {
+          presenterId: 'main-presenter',
+          action: 'pointRight',
+          targetId: 'chart',
+          startFrame: 60,
+          durationInFrames: 30
+        }
+      ]
+    };
+
+    const compiled = compiler.compile(sceneJson);
+    
+    const presenter = compiled.elements.find(e => e.id === 'main-presenter');
+    expect(presenter?.presenterTimeline).toBeDefined();
+    expect(presenter?.presenterTimeline?.length).toBe(1);
+    expect(presenter?.presenterTimeline?.[0].action).toBe('pointRight');
+    expect(presenter?.presenterTimeline?.[0].targetId).toBe('chart');
+  });
 });

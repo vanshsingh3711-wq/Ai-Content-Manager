@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-content-manager/motion-components": "*",
     "@clerk/nextjs": "^7.8.3",
+    "@remotion/player": "^4.0.526",
     "clsx": "^2.1.1",
     "framer-motion": "^13.1.1",
     "lucide-react": "^1.38.0",

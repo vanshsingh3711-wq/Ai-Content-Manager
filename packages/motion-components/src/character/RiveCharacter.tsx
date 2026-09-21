@@ -3,10 +3,28 @@ import { useRive } from '@rive-app/react-canvas';
 import { AbsoluteFill } from 'remotion';
 
 export interface RiveCharacterProps {
-  action?: string;
+  width?: number;
+  height?: number;
+  state?: 'idle' | 'talking';
+  isTalking?: boolean;
+  isBlinking?: boolean;
+  isNodding?: boolean;
+  expression?: string;
+  gesture?: string;
+  pointerRotation?: number;
 }
 
-export const RiveCharacter: React.FC<RiveCharacterProps> = ({ action = 'idle' }) => {
+export const RiveCharacter: React.FC<RiveCharacterProps> = ({ 
+  width = 1000, 
+  height = 1000, 
+  state = 'idle',
+  isTalking = false,
+  isBlinking = false,
+  isNodding = false,
+  expression = 'neutral',
+  gesture = 'none',
+  pointerRotation = 0
+}) => {
   const { rive, RiveComponent } = useRive({
     src: '/28195-53259-character-builder.riv',
     autoplay: true,
@@ -19,9 +37,13 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({ action = 'idle' })
 
   return (
     <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' }}>
-      <div style={{ width: 1000, height: 1000 }}>
+      <div style={{ width, height }}>
         <RiveComponent />
       </div>
+      {isBlinking && <div style={{position: 'absolute', top: 0, right: 0}}>Blinking</div>}
+      {isNodding && <div style={{position: 'absolute', top: 20, right: 0}}>Nodding</div>}
+      <div style={{position: 'absolute', bottom: 0, right: 0}}>Exp: {expression}</div>
+      <div style={{position: 'absolute', bottom: 20, right: 0}}>Gesture: {gesture}</div>
     </AbsoluteFill>
   );
 };

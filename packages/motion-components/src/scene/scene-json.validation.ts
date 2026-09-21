@@ -2,7 +2,7 @@ import { CompositionDiagnostic } from '../validation/validation.types';
 import { SceneJSON, SceneJsonVisualType, SceneJsonRole } from './scene-json.types';
 
 const VALID_SCENE_JSON_TYPES: Set<SceneJsonVisualType> = new Set([
-  'text', 'object', 'icon', 'illustration', 'chart', 'kpi', 'image', 'video', 'diagram', 'shape', 'media', 'character'
+  'text', 'object', 'icon', 'illustration', 'chart', 'kpi', 'image', 'video', 'diagram', 'shape', 'media', 'character', 'presenter'
 ]);
 
 const VALID_SCENE_JSON_ROLES: Set<SceneJsonRole> = new Set([

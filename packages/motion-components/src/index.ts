@@ -40,3 +40,5 @@ export * from './objects/ATM';
 export * from './objects/CreditCard';
 export * from './character/RiveCharacter';
 export * from './character/SvgCharacter';
+export * from './editor';
+export * from './project';

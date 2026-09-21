@@ -13,10 +13,12 @@ import { AudioTrackDefinition, ResolvedAudioTrack } from '../media/audio/audio.t
 import { CaptionTrackDefinition, ResolvedCaptionTrack } from '../media/caption/caption.types';
 import { SceneTransition } from '../transitions/transitions.types';
 import { AttentionInstruction, ResolvedAttentionSequence } from '../attention/attention.types';
+import { PresenterInstruction, ResolvedPresenterInstruction } from '../character/presenter.types';
+import { KeyframeTrack } from '../keyframes/keyframes.types';
 
 export interface SceneElementDefinition {
   id: string;
-  type?: 'asset' | 'text' | 'image' | 'video' | 'caption'; // Discriminator
+  type?: 'asset' | 'text' | 'image' | 'video' | 'caption' | 'presenter'; // Discriminator
   
   // For type === 'asset' (or default)
   assetId?: string; // Explicit ID mode
@@ -36,12 +38,16 @@ export interface SceneElementDefinition {
   // For type === 'caption'
   captionConfig?: CaptionTrackDefinition;
   
+  // For type === 'presenter'
+  presenterTimeline?: PresenterInstruction[];
+  
   // General Placement
   placement?: PlacementRequest; // Where it wants to be
   timing?: TimingConfig; // When it exists
   layer?: number; // Optional Z-Index override
   parentId?: string; // Composition grouping
   animation?: unknown; // Animation transforms (passed through to renderer)
+  keyframes?: KeyframeTrack[]; // Deterministic keyframe overrides
 }
 
 export interface SceneDefinition {
@@ -66,7 +72,7 @@ export interface SceneResolutionContext {
 
 export interface ResolvedSceneElement {
   id: string;
-  type: 'asset' | 'text' | 'image' | 'video' | 'caption';
+  type: 'asset' | 'text' | 'image' | 'video' | 'caption' | 'presenter';
   assetId?: string; // Resolved if type === 'asset'
   
   // Text & Caption specific
@@ -84,6 +90,9 @@ export interface ResolvedSceneElement {
   // Caption specific
   captionConfig?: ResolvedCaptionTrack;
   
+  // Presenter specific
+  presenterTimeline?: ResolvedPresenterInstruction[];
+  
   geometry: { x: number; y: number; width: number; height: number };
   anchor: string;
   timing: {
@@ -93,6 +102,7 @@ export interface ResolvedSceneElement {
   };
   layer: number;
   animation?: unknown;
+  keyframes?: KeyframeTrack[];
 }
 
 export interface ResolvedSceneGraph {

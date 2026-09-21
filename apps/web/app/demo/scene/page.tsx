@@ -112,7 +112,7 @@ export default function SceneDemoPage() {
         <h1 className="text-3xl font-bold mb-6 text-white tracking-tight">Scene Assembly Pipeline Demo</h1>
         <p className="text-gray-400 mb-8 max-w-2xl text-lg">
           This demo visually represents the output of the entire orchestrated pipeline: 
-          AI Intent -> Asset Selection -> Auto Positioning -> Relationships -> Safe Zones -> Validation/Repair -> Renderable Scene Graph.
+          AI Intent &gt; Asset Selection &gt; Auto Positioning &gt; Relationships &gt; Safe Zones &gt; Validation/Repair &gt; Renderable Scene Graph.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">

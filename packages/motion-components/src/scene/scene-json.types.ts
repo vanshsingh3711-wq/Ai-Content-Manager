@@ -3,6 +3,18 @@ import { CompositionRelationship } from '../relationships/relationships.types';
 import { AttentionInstruction } from '../attention/attention.types';
 import { SceneTransition } from '../transitions/transitions.types';
 import { TimingConfig } from '../timing/timing.types';
+import { PresenterAction } from '../character/presenter.types';
+import { KeyframeTrack } from '../keyframes/keyframes.types';
+
+export interface SceneJsonPresenterInteraction {
+  presenterId: string;
+  action: PresenterAction;
+  targetId?: string;
+  startFrame: number;
+  durationInFrames?: number;
+  intensity?: number;
+  metadata?: Record<string, unknown>;
+}
 
 export type SceneJsonVisualType =
   | 'text'
@@ -16,7 +28,8 @@ export type SceneJsonVisualType =
   | 'diagram'
   | 'shape'
   | 'media'
-  | 'character';
+  | 'character'
+  | 'presenter';
 
 export type SceneJsonRole =
   | 'primary'
@@ -43,6 +56,7 @@ export interface SceneElementJSON {
   timing?: TimingConfig;
   
   metadata?: Record<string, unknown>;
+  keyframes?: KeyframeTrack[];
 }
 
 export interface SceneJSON {
@@ -54,6 +68,7 @@ export interface SceneJSON {
   elements: SceneElementJSON[];
   relationships?: CompositionRelationship[];
   attention?: AttentionInstruction[];
+  interactions?: SceneJsonPresenterInteraction[];
   transition?: SceneTransition;
   
   metadata?: Record<string, unknown>;
