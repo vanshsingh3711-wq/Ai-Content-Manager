@@ -1,7 +1,7 @@
 import { AnchorPoint, LayoutElement, SafeZoneDefinition } from '../layout/layout.types';
 
 export interface PlacementRequest {
-  assetId: string; // The resolved asset ID from Asset Selection
+  assetId?: string; // The resolved asset ID from Asset Selection
   anchor?: AnchorPoint;
   position?: { x?: number; y?: number };
   size?: { width?: number; height?: number; scale?: number };

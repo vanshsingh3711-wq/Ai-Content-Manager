@@ -12,6 +12,7 @@ describe('Attention Resolver', () => {
     durationInFrames: 300,
     theme: {} as any,
     tokens: {} as any,
+    audio: [],
     attention: { instructions: [], diagnostics: [] },
     diagnostics: [],
     valid: true,

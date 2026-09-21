@@ -10,7 +10,7 @@ export function resolveAudioTrack(
   if (!def.id || def.id.trim() === '') {
     diagnostics.push({
       severity: 'error',
-      reason: 'missing-metadata',
+      type: 'missing-metadata',
       message: 'Audio track is missing a required id.',
     });
     return { diagnostics };
@@ -19,7 +19,7 @@ export function resolveAudioTrack(
   if (!def.src || def.src.trim() === '') {
     diagnostics.push({
       severity: 'error',
-      reason: 'missing-metadata',
+      type: 'missing-metadata',
       message: `Audio track ${def.id} is missing a required src.`,
     });
     return { diagnostics };
@@ -28,7 +28,7 @@ export function resolveAudioTrack(
   if (def.startFrame < 0) {
     diagnostics.push({
       severity: 'error',
-      reason: 'invalid-bounds',
+      type: 'invalid-bounds',
       message: `Audio track ${def.id} has startFrame < 0.`,
     });
     return { diagnostics };
@@ -40,7 +40,7 @@ export function resolveAudioTrack(
     if (def.sourceStartFrame < 0) {
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Audio track ${def.id} sourceStartFrame clamped to >= 0.`,
       });
     }
@@ -51,7 +51,7 @@ export function resolveAudioTrack(
     if (def.sourceEndFrame <= sourceStartFrame) {
       diagnostics.push({
         severity: 'error',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Audio track ${def.id} has sourceEndFrame <= sourceStartFrame. Ignored.`,
       });
     } else {
@@ -64,7 +64,7 @@ export function resolveAudioTrack(
     if (def.playbackRate <= 0 || !isFinite(def.playbackRate) || isNaN(def.playbackRate)) {
       diagnostics.push({
         severity: 'error',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Audio track ${def.id} has invalid playbackRate (${def.playbackRate}). Defaulting to 1.`,
       });
     } else {
@@ -82,7 +82,7 @@ export function resolveAudioTrack(
       volume = Math.max(0, Math.min(1, isFinite(volume) ? volume : 1));
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Audio track ${def.id} volume clamped to 0-1.`,
       });
     }
@@ -94,7 +94,7 @@ export function resolveAudioTrack(
     if (def.fadeInFrames < 0) {
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Audio track ${def.id} fadeInFrames clamped to >= 0.`,
       });
     }
@@ -106,7 +106,7 @@ export function resolveAudioTrack(
     if (def.fadeOutFrames < 0) {
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Audio track ${def.id} fadeOutFrames clamped to >= 0.`,
       });
     }
@@ -119,7 +119,7 @@ export function resolveAudioTrack(
     if (def.durationInFrames <= 0) {
       diagnostics.push({
         severity: 'error',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Audio track ${def.id} has invalid durationInFrames. Using fallback.`,
       });
     } else {
@@ -147,7 +147,7 @@ export function resolveAudioTrack(
   if (fadeInFrames + fadeOutFrames > durationInFrames) {
     diagnostics.push({
       severity: 'warning',
-      reason: 'invalid-bounds',
+      type: 'invalid-bounds',
       message: `Audio track ${def.id} fades (${fadeInFrames} + ${fadeOutFrames}) exceed duration (${durationInFrames}). Fades will be clamped during playback.`,
     });
   }

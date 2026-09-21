@@ -9,7 +9,8 @@ export function resolveImageMedia(
 
   if (!config) {
     diagnostics.push({
-      elementId,
+      elementIds: [elementId],
+      type: 'missing-metadata',
       severity: 'error',
       message: `Image media configuration is missing for element ${elementId}.`,
     });
@@ -18,7 +19,8 @@ export function resolveImageMedia(
 
   if (!config.src || config.src.trim() === '') {
     diagnostics.push({
-      elementId,
+      elementIds: [elementId],
+      type: 'missing-metadata',
       severity: 'error',
       message: `Image source (src) is required but was empty for element ${elementId}.`,
     });
@@ -33,7 +35,8 @@ export function resolveImageMedia(
       fit = config.fit;
     } else {
       diagnostics.push({
-        elementId,
+        elementIds: [elementId],
+      type: 'missing-metadata',
         severity: 'warning',
         message: `Invalid image fit mode "${config.fit}" for element ${elementId}. Falling back to default "contain".`,
       });
@@ -49,14 +52,16 @@ export function resolveImageMedia(
     
     if (x !== undefined && (x < 0 || x > 1)) {
       diagnostics.push({
-        elementId,
+        elementIds: [elementId],
+      type: 'missing-metadata',
         severity: 'warning',
         message: `Image position x (${x}) out of bounds [0, 1]. Clamped to ${clampedX}.`,
       });
     }
     if (y !== undefined && (y < 0 || y > 1)) {
       diagnostics.push({
-        elementId,
+        elementIds: [elementId],
+      type: 'missing-metadata',
         severity: 'warning',
         message: `Image position y (${y}) out of bounds [0, 1]. Clamped to ${clampedY}.`,
       });
@@ -71,7 +76,8 @@ export function resolveImageMedia(
     opacity = Math.max(0, Math.min(1, config.opacity));
     if (config.opacity < 0 || config.opacity > 1) {
       diagnostics.push({
-        elementId,
+        elementIds: [elementId],
+      type: 'missing-metadata',
         severity: 'warning',
         message: `Image opacity (${config.opacity}) out of bounds [0, 1]. Clamped to ${opacity}.`,
       });
@@ -82,14 +88,16 @@ export function resolveImageMedia(
   if (config.metadata) {
     if (config.metadata.width !== undefined && config.metadata.width <= 0) {
       diagnostics.push({
-        elementId,
+        elementIds: [elementId],
+      type: 'missing-metadata',
         severity: 'error',
         message: `Image metadata width must be greater than 0.`,
       });
     }
     if (config.metadata.height !== undefined && config.metadata.height <= 0) {
       diagnostics.push({
-        elementId,
+        elementIds: [elementId],
+      type: 'missing-metadata',
         severity: 'error',
         message: `Image metadata height must be greater than 0.`,
       });

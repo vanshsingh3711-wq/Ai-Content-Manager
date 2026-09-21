@@ -59,12 +59,12 @@ export function validateComposition(
     let message = 'Validation issue found';
     if ('message' in ud && typeof ud.message === 'string') {
       message = ud.message;
-    } else if (ud.reason === 'restricted-zone-overlap') {
+    } else if ((ud as any).reason === 'restricted-zone-overlap') {
       message = `Element restricted safe zone overlap: ${(ud as any).zoneId}`;
     }
 
     diagnostics.push({
-      type: ud.reason || 'upstream-diagnostic',
+      type: (ud as any).type || (ud as any).reason || 'upstream-diagnostic',
       severity,
       message,
       elementIds: elements

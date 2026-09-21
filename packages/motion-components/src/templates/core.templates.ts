@@ -1,13 +1,13 @@
-import { SceneTemplateFactory, SceneTemplate, TemplateConfig } from '../templates.types';
-import { CompositionRelationship } from '../../relationships/relationships.types';
+import { SceneTemplateFactory, SceneTemplate, TemplateConfig } from './templates.types';
+import { CompositionRelationship } from '../relationships/relationships.types';
 
 export const HeroStatementTemplate: SceneTemplateFactory = () => ({
   id: 'hero_statement',
   name: 'Hero Statement',
   category: 'hero',
   slots: [
-    { id: 'title', role: 'primary_text', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' } },
-    { id: 'visual', role: 'supporting_visual', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' } }
+    { id: 'title', role: 'primary_text', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } },
+    { id: 'visual', role: 'supporting_visual', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } }
   ],
   relationships: [
     { sourceId: 'visual', targetId: 'title', relation: 'below', gap: 40 }
@@ -19,8 +19,8 @@ export const SingleFocusTemplate: SceneTemplateFactory = () => ({
   name: 'Single Focus',
   category: 'explanation',
   slots: [
-    { id: 'visual', role: 'primary_visual', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' } },
-    { id: 'caption', role: 'supporting_text', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' } }
+    { id: 'visual', role: 'primary_visual', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } },
+    { id: 'caption', role: 'supporting_text', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } }
   ],
   relationships: [
     { sourceId: 'caption', targetId: 'visual', relation: 'below', gap: 20 }
@@ -53,8 +53,8 @@ export const ChartInsightTemplate: SceneTemplateFactory = () => ({
   name: 'Chart + Insight',
   category: 'data',
   slots: [
-    { id: 'insight', role: 'primary_text', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' } },
-    { id: 'chart', role: 'data_visual', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' } }
+    { id: 'insight', role: 'primary_text', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } },
+    { id: 'chart', role: 'data_visual', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } }
   ],
   relationships: [
     { sourceId: 'chart', targetId: 'insight', relation: 'below', gap: 40 }
@@ -68,7 +68,7 @@ export const ComparisonTemplate: SceneTemplateFactory = () => ({
   slots: [
     { id: 'left', role: 'primary_visual', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center-right' } },
     { id: 'right', role: 'secondary_visual', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center-left' } },
-    { id: 'label', role: 'supporting_text', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' } }
+    { id: 'label', role: 'supporting_text', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } }
   ],
   relationships: [
     { sourceId: 'right', targetId: 'left', relation: 'right', gap: 100 },
@@ -93,7 +93,7 @@ export const StepByStepTemplate: SceneTemplateFactory = (config?: TemplateConfig
   const stepCount = config?.stepCount || 3;
   const direction = config?.direction || 'vertical';
   
-  const slots = [];
+  const slots: any[] = [];
   const relationships: CompositionRelationship[] = [];
 
   for (let i = 1; i <= stepCount; i++) {
@@ -101,7 +101,7 @@ export const StepByStepTemplate: SceneTemplateFactory = (config?: TemplateConfig
       id: `step_${i}`,
       role: `step_${i}`,
       required: true,
-      defaultPlacement: { positionMode: 'auto', anchor: 'center' }
+      defaultPlacement: { positionMode: 'auto', anchor: 'center' as any }
     });
 
     if (i > 1) {
@@ -126,7 +126,7 @@ export const StepByStepTemplate: SceneTemplateFactory = (config?: TemplateConfig
 export const TimelineTemplate: SceneTemplateFactory = (config?: TemplateConfig) => {
   const stepCount = config?.stepCount || 4;
   
-  const slots = [];
+  const slots: any[] = [];
   const relationships: CompositionRelationship[] = [];
 
   for (let i = 1; i <= stepCount; i++) {
@@ -134,7 +134,7 @@ export const TimelineTemplate: SceneTemplateFactory = (config?: TemplateConfig) 
       id: `point_${i}`,
       role: `timeline_point`,
       required: true,
-      defaultPlacement: { positionMode: 'auto', anchor: 'center' }
+      defaultPlacement: { positionMode: 'auto', anchor: 'center' as any }
     });
 
     if (i > 1) {
@@ -174,8 +174,8 @@ export const FullScreenQuoteTemplate: SceneTemplateFactory = () => ({
   name: 'Full-Screen Quote',
   category: 'quote',
   slots: [
-    { id: 'quote', role: 'primary_text', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' } },
-    { id: 'attribution', role: 'supporting_text', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' } }
+    { id: 'quote', role: 'primary_text', required: true, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } },
+    { id: 'attribution', role: 'supporting_text', required: false, defaultPlacement: { positionMode: 'auto', anchor: 'center' as any } }
   ],
   relationships: [
     { sourceId: 'attribution', targetId: 'quote', relation: 'below', gap: 60 }

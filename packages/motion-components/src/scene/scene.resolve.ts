@@ -101,7 +101,7 @@ export function resolveSceneGraph(
 
     if (el.type === 'text' && fullTextContent) {
       resolvedTextConfig = el.textConfig || {};
-      const typography = resolveTypography(resolvedTextConfig.role, resolvedTokens, resolvedTextConfig);
+      const typography = resolveTypography(resolvedTextConfig.role as any, resolvedTokens, resolvedTextConfig as any);
       const textDiagnostics = validateTextLayout(typography);
       if (textDiagnostics.length > 0) {
         upstreamDiagnostics.push(...textDiagnostics);
@@ -144,7 +144,7 @@ export function resolveSceneGraph(
     let resolvedCaptionConfig = undefined;
     if (el.type === 'caption') {
       if (el.captionConfig) {
-        const capRes = resolveCaptionTrack(el.captionConfig, finalDuration);
+        const capRes = resolveCaptionTrack(el.captionConfig, scene.durationInFrames || 0);
         resolvedCaptionConfig = capRes.resolved;
         if (capRes.diagnostics.length > 0) {
           upstreamDiagnostics.push(...capRes.diagnostics);
@@ -153,14 +153,14 @@ export function resolveSceneGraph(
         // We must also measure the captions to reserve layout space.
         // We find the max width/height across all cues to ensure layout stability.
         resolvedTextConfig = el.textConfig || { role: 'caption' };
-        const typography = resolveTypography(resolvedTextConfig.role, resolvedTokens, resolvedTextConfig);
+        const typography = resolveTypography(resolvedTextConfig.role as any, resolvedTokens, resolvedTextConfig as any);
         
         let maxWidth = 0;
         let maxHeight = 0;
         
         if (resolvedCaptionConfig) {
           for (const cue of resolvedCaptionConfig.cues) {
-            const measurement = fitText(cue.text, typography, resolvedTextConfig);
+            const measurement = fitText(cue.text, typography, resolvedTextConfig as any);
             if (measurement.width > maxWidth) maxWidth = measurement.width;
             if (measurement.height > maxHeight) maxHeight = measurement.height;
           }
@@ -179,32 +179,18 @@ export function resolveSceneGraph(
     // 2. Initial Placement Resolution (Base Geometry)
     const placementReq: PlacementRequest = {
       ...(el.placement || { positionMode: 'auto' }),
-      assetId
+      assetId: assetId || el.id
     };
     
     // Inject text dimensions into placement request if it's a text element
     if (resolvedTextMeasurement) {
-      if (!placementReq.size) placementReq.size = {};
-      placementReq.size.width = resolvedTextMeasurement.width;
-      placementReq.size.height = resolvedTextMeasurement.height;
+      if (!placementReq.size) placementReq.size = { width: resolvedTextMeasurement.width, height: resolvedTextMeasurement.height }; else { placementReq.size.width = resolvedTextMeasurement.width; placementReq.size.height = resolvedTextMeasurement.height; }
     } else if (resolvedImageConfig && resolvedImageConfig.metadata) {
       // If image has intrinsic metadata, we can optionally use it for default sizing
       // But typically placement.size overrides this anyway.
-      if (!placementReq.size) placementReq.size = {};
-      if (resolvedImageConfig.metadata.width && !placementReq.size.width) {
-        placementReq.size.width = resolvedImageConfig.metadata.width;
-      }
-      if (resolvedImageConfig.metadata.height && !placementReq.size.height) {
-        placementReq.size.height = resolvedImageConfig.metadata.height;
-      }
+      if (!placementReq.size) placementReq.size = { width: resolvedImageConfig.metadata.width as number, height: resolvedImageConfig.metadata.height as number }; else { if (resolvedImageConfig.metadata.width && !placementReq.size.width) placementReq.size.width = resolvedImageConfig.metadata.width as number; if (resolvedImageConfig.metadata.height && !placementReq.size.height) placementReq.size.height = resolvedImageConfig.metadata.height as number; }
     } else if (resolvedVideoConfig && resolvedVideoConfig.metadata) {
-      if (!placementReq.size) placementReq.size = {};
-      if (resolvedVideoConfig.metadata.width && !placementReq.size.width) {
-        placementReq.size.width = resolvedVideoConfig.metadata.width;
-      }
-      if (resolvedVideoConfig.metadata.height && !placementReq.size.height) {
-        placementReq.size.height = resolvedVideoConfig.metadata.height;
-      }
+      if (!placementReq.size) placementReq.size = { width: resolvedVideoConfig.metadata.width as number, height: resolvedVideoConfig.metadata.height as number }; else { if (resolvedVideoConfig.metadata.width && !placementReq.size.width) placementReq.size.width = resolvedVideoConfig.metadata.width as number; if (resolvedVideoConfig.metadata.height && !placementReq.size.height) placementReq.size.height = resolvedVideoConfig.metadata.height as number; }
     }
     
     const placementContext: PlacementContext = {
@@ -389,7 +375,7 @@ export function resolveSceneGraph(
         width: placement.width,
         height: placement.height
       },
-      anchor: placement.anchor,
+      anchor: placement.anchor || 'center',
       timing,
       layer,
       animation: originalEl.animation

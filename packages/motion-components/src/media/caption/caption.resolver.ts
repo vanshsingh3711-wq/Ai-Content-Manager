@@ -10,7 +10,7 @@ export function resolveCaptionTrack(
   if (!def.id || def.id.trim() === '') {
     diagnostics.push({
       severity: 'error',
-      reason: 'missing-metadata',
+      type: 'missing-metadata',
       message: 'Caption track is missing a required id.',
     });
     return { diagnostics };
@@ -21,7 +21,7 @@ export function resolveCaptionTrack(
   if (!def.cues || !Array.isArray(def.cues)) {
     diagnostics.push({
       severity: 'error',
-      reason: 'invalid-bounds',
+      type: 'invalid-bounds',
       message: `Caption track ${def.id} is missing cues array.`,
     });
     return { diagnostics };
@@ -36,7 +36,7 @@ export function resolveCaptionTrack(
     if (!cue.id || cue.id.trim() === '') {
       diagnostics.push({
         severity: 'error',
-        reason: 'missing-metadata',
+        type: 'missing-metadata',
         message: `Caption cue at index ${i} is missing an id.`,
       });
       continue;
@@ -45,7 +45,7 @@ export function resolveCaptionTrack(
     if (cueIds.has(cue.id)) {
       diagnostics.push({
         severity: 'error',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Duplicate caption cue id found: ${cue.id}.`,
       });
       continue;
@@ -55,7 +55,7 @@ export function resolveCaptionTrack(
     if (!cue.text || cue.text.trim() === '') {
       diagnostics.push({
         severity: 'error',
-        reason: 'missing-metadata',
+        type: 'missing-metadata',
         message: `Caption cue ${cue.id} is missing text content.`,
       });
       continue;
@@ -68,7 +68,7 @@ export function resolveCaptionTrack(
     if (endFrame <= startFrame) {
       diagnostics.push({
         severity: 'error',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Caption cue ${cue.id} has invalid timing (endFrame ${endFrame} <= startFrame ${startFrame}).`,
       });
       continue;
@@ -78,7 +78,7 @@ export function resolveCaptionTrack(
       // Cue is entirely after the scene ends. Just skip it with a warning.
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Caption cue ${cue.id} starts after scene duration (${sceneDurationInFrames}). It will not render.`,
       });
       continue;
@@ -98,7 +98,7 @@ export function resolveCaptionTrack(
         if (wordIds.has(word.id)) {
           diagnostics.push({
             severity: 'error',
-            reason: 'invalid-bounds',
+            type: 'invalid-bounds',
             message: `Duplicate caption word id found: ${word.id} in cue ${cue.id}.`,
           });
           continue;
@@ -111,7 +111,7 @@ export function resolveCaptionTrack(
         if (wStart < startFrame || wEnd > endFrame) {
           diagnostics.push({
             severity: 'warning',
-            reason: 'invalid-bounds',
+            type: 'invalid-bounds',
             message: `Caption word ${word.id} timing (${wStart}-${wEnd}) falls outside parent cue ${cue.id} bounds (${startFrame}-${endFrame}). Word highlight may clip.`,
           });
         }
@@ -145,7 +145,7 @@ export function resolveCaptionTrack(
     if (next.startFrame < current.endFrame) {
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Caption cue ${next.id} overlaps with previous cue ${current.id}. Forcing sequential display.`,
       });
       // Force strict sequence: truncate current cue to make way for the next one

@@ -25,7 +25,7 @@ export const Stagger: React.FC<StaggerProps> = ({
   const processChild = (node: React.ReactNode, staggerOffset: number): React.ReactNode => {
     if (!React.isValidElement(node)) return node;
 
-    let newProps: any = { ...node.props };
+    let newProps: any = { ...(node.props as any) };
 
     // Inject delayInFrames only into custom components (functions/classes), not DOM elements (strings)
     if (typeof node.type === 'function' || typeof node.type === 'object') {

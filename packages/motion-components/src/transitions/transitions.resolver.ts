@@ -23,6 +23,7 @@ export function resolveTransition(
   // Validate type
   if (!transitionRegistry[resolved.type]) {
     diagnostics.push({
+      type: 'invalid-transition',
       severity: 'error',
       reason: 'unknown-transition-type',
       message: `Unknown transition type: ${resolved.type}. Falling back to cut.`
@@ -34,6 +35,7 @@ export function resolveTransition(
   // Validate duration
   if (resolved.durationInFrames < 0) {
     diagnostics.push({
+      type: 'invalid-transition',
       severity: 'warning',
       reason: 'invalid-duration',
       message: `Negative transition duration: ${resolved.durationInFrames}. Clamping to 0.`

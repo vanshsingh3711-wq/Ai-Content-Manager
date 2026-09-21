@@ -63,7 +63,7 @@ export const Draw: React.FC<DrawProps> = ({
       typeof node.type === 'string' ? node.type : ''
     );
 
-    let newProps: any = { ...node.props };
+    let newProps: any = { ...(node.props as any) };
 
     if (isShape) {
       newProps = {

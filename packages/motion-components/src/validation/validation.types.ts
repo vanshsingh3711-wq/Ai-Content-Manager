@@ -36,4 +36,4 @@ export interface CompositionValidationResult {
 }
 
 // Union of all upstream diagnostic types for aggregation
-export type UpstreamDiagnostic = PlacementDiagnostic | RelationshipDiagnostic | SafeZoneDiagnostic;
+export type UpstreamDiagnostic = PlacementDiagnostic | RelationshipDiagnostic | SafeZoneDiagnostic | CompositionDiagnostic;

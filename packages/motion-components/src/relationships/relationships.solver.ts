@@ -136,7 +136,7 @@ export function resolveRelationships(
       const targetBounds = getAbsoluteBounds(targetPlacement);
 
       const newGeom = calculateRelationshipGeometry(
-        { ...sourceOriginalBounds, anchor: sourcePlacement.anchor },
+        { ...sourceOriginalBounds, anchor: sourcePlacement.anchor as any },
         targetBounds,
         rel.relation,
         rel.gap

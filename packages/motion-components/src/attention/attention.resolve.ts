@@ -53,7 +53,7 @@ export function resolveAttentionInstructions(
 
       foundValidTarget = true;
       const { x, y, width, height } = element.geometry;
-      const offset = getAnchorOffset(width, height, element.anchor);
+      const offset = getAnchorOffset(width, height, element.anchor as any);
       
       const absX = x + offset.x;
       const absY = y + offset.y;

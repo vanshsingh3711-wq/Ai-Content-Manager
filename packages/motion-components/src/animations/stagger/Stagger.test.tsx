@@ -65,8 +65,7 @@ describe('Stagger Primitive', () => {
 
   it('handles zero children', () => {
     const { getByTestId } = render(
-      <Stagger currentFrame={10}>
-      </Stagger>
+      <Stagger currentFrame={10} children={[]} />
     );
     const wrapper = getByTestId('stagger-wrapper');
     expect(wrapper.children.length).toBe(0);

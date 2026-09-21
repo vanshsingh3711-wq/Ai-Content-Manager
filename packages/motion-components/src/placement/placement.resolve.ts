@@ -116,8 +116,8 @@ export function resolvePlacement(request: PlacementRequest, context: PlacementCo
   }
 
   const placement: ResolvedPlacement = {
-    id: request.assetId, // Typically would use a unique instance ID, but using assetId for simplicity here
-    assetId: request.assetId,
+    id: request.assetId || '', // Typically would use a unique instance ID, but using assetId for simplicity here
+    assetId: request.assetId || '',
     x: finalX,
     y: finalY,
     width: finalWidth,

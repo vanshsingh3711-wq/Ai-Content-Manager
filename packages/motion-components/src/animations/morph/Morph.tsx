@@ -37,7 +37,7 @@ export const Morph: React.FC<MorphProps> = ({
   const processChild = (node: React.ReactNode): React.ReactNode => {
     if (!React.isValidElement(node)) return node;
 
-    let newProps: any = { ...node.props };
+    let newProps: any = { ...(node.props as any) };
 
     if (node.type === 'path') {
       newProps.d = morphedPath;

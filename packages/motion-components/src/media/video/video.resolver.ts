@@ -10,7 +10,7 @@ export function resolveVideoMedia(
   if (!config) {
     diagnostics.push({
       severity: 'error',
-      reason: 'missing-metadata',
+      type: 'missing-metadata',
       message: `Video element ${elementId} is missing videoConfig.`,
     });
     return { diagnostics };
@@ -19,7 +19,7 @@ export function resolveVideoMedia(
   if (!config.src || config.src.trim() === '') {
     diagnostics.push({
       severity: 'error',
-      reason: 'missing-metadata', // Reusing existing error reasons
+      type: 'missing-metadata', // Reusing existing error reasons
       message: `Video element ${elementId} is missing a required src.`,
     });
     return { diagnostics };
@@ -33,7 +33,7 @@ export function resolveVideoMedia(
   } else if (config.fit) {
     diagnostics.push({
       severity: 'warning',
-      reason: 'invalid-bounds',
+      type: 'invalid-bounds',
       message: `Video element ${elementId} provided invalid fit mode "${config.fit}". Defaulting to "contain".`,
     });
   }
@@ -45,7 +45,7 @@ export function resolveVideoMedia(
       position.x = Math.max(0, Math.min(1, position.x));
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Video element ${elementId} position.x clamped to 0-1.`,
       });
     }
@@ -53,7 +53,7 @@ export function resolveVideoMedia(
       position.y = Math.max(0, Math.min(1, position.y));
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Video element ${elementId} position.y clamped to 0-1.`,
       });
     }
@@ -66,7 +66,7 @@ export function resolveVideoMedia(
       opacity = Math.max(0, Math.min(1, opacity));
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Video element ${elementId} opacity clamped to 0-1.`,
       });
     }
@@ -78,7 +78,7 @@ export function resolveVideoMedia(
     if (config.sourceStartFrame < 0) {
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Video element ${elementId} sourceStartFrame clamped to >= 0.`,
       });
     }
@@ -89,7 +89,7 @@ export function resolveVideoMedia(
     if (config.sourceEndFrame <= sourceStartFrame) {
       diagnostics.push({
         severity: 'error',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Video element ${elementId} has sourceEndFrame <= sourceStartFrame. Ignored.`,
       });
     } else {
@@ -102,7 +102,7 @@ export function resolveVideoMedia(
     if (config.playbackRate <= 0 || !isFinite(config.playbackRate) || isNaN(config.playbackRate)) {
       diagnostics.push({
         severity: 'error',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Video element ${elementId} has invalid playbackRate (${config.playbackRate}). Defaulting to 1.`,
       });
     } else {
@@ -120,7 +120,7 @@ export function resolveVideoMedia(
       volume = Math.max(0, Math.min(1, isFinite(volume) ? volume : 1));
       diagnostics.push({
         severity: 'warning',
-        reason: 'invalid-bounds',
+        type: 'invalid-bounds',
         message: `Video element ${elementId} volume clamped to 0-1.`,
       });
     }
@@ -130,16 +130,16 @@ export function resolveVideoMedia(
   let metadata = config.metadata;
   if (metadata) {
     if (typeof metadata.width === 'number' && metadata.width <= 0) {
-      diagnostics.push({ severity: 'error', reason: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata width.` });
+      diagnostics.push({ severity: 'error', type: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata width.` });
     }
     if (typeof metadata.height === 'number' && metadata.height <= 0) {
-      diagnostics.push({ severity: 'error', reason: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata height.` });
+      diagnostics.push({ severity: 'error', type: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata height.` });
     }
     if (typeof metadata.durationInFrames === 'number' && metadata.durationInFrames <= 0) {
-      diagnostics.push({ severity: 'error', reason: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata durationInFrames.` });
+      diagnostics.push({ severity: 'error', type: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata durationInFrames.` });
     }
     if (typeof metadata.fps === 'number' && metadata.fps <= 0) {
-      diagnostics.push({ severity: 'error', reason: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata fps.` });
+      diagnostics.push({ severity: 'error', type: 'invalid-bounds', message: `Video element ${elementId} has invalid metadata fps.` });
     }
   }
 
