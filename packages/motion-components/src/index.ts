@@ -38,3 +38,5 @@ export * from './effects/FreezeHighlightEffect';
 export * from './objects/Bank';
 export * from './objects/ATM';
 export * from './objects/CreditCard';
+export * from './character/RiveCharacter';
+export * from './character/SvgCharacter';
