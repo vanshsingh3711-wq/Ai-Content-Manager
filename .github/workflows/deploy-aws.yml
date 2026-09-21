@@ -9,7 +9,7 @@ on:
 env:
   AWS_REGION: eu-north-1                  # Set to Stockholm (eu-north-1) as seen in your screenshot
   ECR_REPOSITORY: ai-content-manager      # The name of your ECR repository
-  ECS_CLUSTER: practical-squirrel-bptjbq  # The ECS cluster name from your screenshot
+  ECS_CLUSTER: practical-squirrel-bptj6q  # The ECS cluster name from your screenshot
   ECS_SERVICE: WorkerService              # The ECS service name
 
 jobs:
