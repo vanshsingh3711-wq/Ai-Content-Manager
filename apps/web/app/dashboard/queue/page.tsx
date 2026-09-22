@@ -5,16 +5,13 @@ import {
   Layers,
   Activity,
   Clock,
-  CheckCircle2,
-  AlertCircle,
   RefreshCw,
   Play,
   RotateCcw,
   Terminal,
-  Cpu,
   ChevronDown,
   ChevronUp,
-  Share2,
+  Loader2,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -40,15 +37,13 @@ export default function QueuePage() {
     setLoading(true);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     try {
-      console.log(`[FRONTEND: QUEUE] ⏳ Polling pipeline queue from: ${apiUrl}/api/v1/jobs...`);
       const res = await fetch(`${apiUrl}/api/v1/jobs`);
       if (res.ok) {
         const data = await res.json();
-        console.log(`[FRONTEND: QUEUE] ✅ Active queue items (${data.length}):`, data);
         setJobs(data);
       }
     } catch (err) {
-      console.error("[FRONTEND: QUEUE] ❌ Failed to fetch queue jobs:", err);
+      console.error("Failed to fetch queue:", err);
     } finally {
       setLoading(false);
     }
@@ -57,20 +52,11 @@ export default function QueuePage() {
   async function handleDispatch(jobId: string) {
     setActionLoading(jobId);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    console.log(`[FRONTEND: QUEUE] ⚡ Manual dispatch triggered for Job: ${jobId}`);
     try {
-      const res = await fetch(`${apiUrl}/api/v1/jobs/${jobId}/dispatch`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        const result = await res.json();
-        console.log(`[FRONTEND: QUEUE] ✅ Job dispatched to Celery worker:`, result);
-        fetchQueueJobs();
-      } else {
-        console.warn(`[FRONTEND: QUEUE] ⚠️ Dispatch failed with status ${res.status}:`, await res.text());
-      }
+      const res = await fetch(`${apiUrl}/api/v1/jobs/${jobId}/dispatch`, { method: "POST" });
+      if (res.ok) fetchQueueJobs();
     } catch (err) {
-      console.error("[FRONTEND: QUEUE] ❌ Failed to dispatch job:", err);
+      console.error("Dispatch error:", err);
     } finally {
       setActionLoading(null);
     }
@@ -79,18 +65,11 @@ export default function QueuePage() {
   async function handleRetry(jobId: string) {
     setActionLoading(jobId);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    console.log(`[FRONTEND: QUEUE] 🔁 Manual retry triggered for Job: ${jobId}`);
     try {
-      const res = await fetch(`${apiUrl}/api/v1/jobs/${jobId}/retry`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        const result = await res.json();
-        console.log(`[FRONTEND: QUEUE] ✅ Job reset and re-dispatched:`, result);
-        fetchQueueJobs();
-      }
+      const res = await fetch(`${apiUrl}/api/v1/jobs/${jobId}/retry`, { method: "POST" });
+      if (res.ok) fetchQueueJobs();
     } catch (err) {
-      console.error("[FRONTEND: QUEUE] ❌ Failed to retry job:", err);
+      console.error("Retry error:", err);
     } finally {
       setActionLoading(null);
     }
@@ -102,133 +81,97 @@ export default function QueuePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const pendingCount = jobs.filter((j) => j.status === "QUEUED").length;
-  const inProgressCount = jobs.filter((j) =>
+  const pendingCount = jobs.filter(j => j.status === "QUEUED").length;
+  const inProgressCount = jobs.filter(j =>
     ["DOWNLOADING", "TRANSCRIBING", "AI_DIRECTING", "RENDERING", "PUBLISHING"].includes(j.status)
   ).length;
-  const completedCount = jobs.filter((j) => j.status === "COMPLETED").length;
-  const failedCount = jobs.filter((j) => j.status === "FAILED").length;
-
-  const getStatusBadge = (status: QueueJob["status"]) => {
-    switch (status) {
-      case "COMPLETED":
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Completed
-          </span>
-        );
-      case "PUBLISHING":
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 animate-pulse">
-            <Share2 className="w-3.5 h-3.5 text-cyan-400" />
-            Publishing
-          </span>
-        );
-      case "FAILED":
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30">
-            <AlertCircle className="w-3.5 h-3.5" />
-            Failed
-          </span>
-        );
-      case "QUEUED":
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <Clock className="w-3.5 h-3.5" />
-            Queued
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 animate-pulse">
-            <Activity className="w-3.5 h-3.5 text-indigo-400" />
-            {status}
-          </span>
-        );
-    }
-  };
+  const completedCount = jobs.filter(j => j.status === "COMPLETED").length;
+  const failedCount = jobs.filter(j => j.status === "FAILED").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Worker Queue & Jobs</h1>
-          <p className="text-sm text-slate-400">
-            Real-time pipeline tasks dispatched to Upstash Redis & Celery media processing nodes.
-          </p>
+          <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Pipeline</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-white">Queue & Jobs</h1>
         </div>
-
         <button
           onClick={fetchQueueJobs}
-          className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800 inline-flex items-center gap-1.5 transition-all self-start sm:self-auto"
+          className="px-4 py-2.5 rounded-lg text-sm font-medium bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-neutral-800 inline-flex items-center gap-2 transition-all"
         >
-          <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-          <span>Refresh Queue</span>
+          <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+          Refresh
         </button>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-[#0d1017] border border-slate-800 space-y-1">
-          <div className="text-xs text-slate-400">Pending in Queue</div>
-          <div className="text-2xl font-bold text-amber-400">{pendingCount}</div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-2">
+          <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">Queued</span>
+          <div className="text-3xl font-semibold text-white tabular-nums">{pendingCount}</div>
         </div>
-        <div className="p-4 rounded-2xl bg-[#0d1017] border border-slate-800 space-y-1">
-          <div className="text-xs text-slate-400">In Pipeline / Rendering</div>
-          <div className="text-2xl font-bold text-indigo-400">{inProgressCount} Active</div>
+        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-2">
+          <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">In Progress</span>
+          <div className="text-3xl font-semibold text-white tabular-nums">{inProgressCount}</div>
         </div>
-        <div className="p-4 rounded-2xl bg-[#0d1017] border border-slate-800 space-y-1">
-          <div className="text-xs text-slate-400">Successfully Completed</div>
-          <div className="text-2xl font-bold text-emerald-400">{completedCount}</div>
+        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-2">
+          <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">Completed</span>
+          <div className="text-3xl font-semibold text-white tabular-nums">{completedCount}</div>
         </div>
-        <div className="p-4 rounded-2xl bg-[#0d1017] border border-slate-800 space-y-1">
-          <div className="text-xs text-slate-400">Failed / Retriable</div>
-          <div className="text-2xl font-bold text-rose-400">{failedCount}</div>
+        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-2">
+          <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">Failed</span>
+          <div className="text-3xl font-semibold text-white tabular-nums">{failedCount}</div>
         </div>
       </div>
 
-      {/* Queue Table */}
-      <div className="rounded-2xl bg-[#0d1017] border border-slate-800 overflow-hidden">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-indigo-400" />
-            <h3 className="text-sm font-semibold text-white">Pipeline Execution Stream</h3>
-          </div>
-          <span className="text-xs text-slate-400 font-mono">
-            Queue: video_processing_queue
-          </span>
+      {/* Jobs List */}
+      <div className="rounded-xl border border-neutral-800 overflow-hidden">
+        <div className="px-5 py-3 border-b border-neutral-800 bg-neutral-900/50 flex items-center justify-between">
+          <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">Execution Stream</span>
+          <span className="text-[10px] text-neutral-600 font-mono">export-jobs</span>
         </div>
 
         {loading && jobs.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
-            <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
-            <span className="text-xs">Loading queue state...</span>
+          <div className="py-20 text-center flex flex-col items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />
+            <span className="text-xs text-neutral-600">Loading queue...</span>
           </div>
         ) : jobs.length === 0 ? (
-          <div className="py-16 text-center space-y-2">
-            <Layers className="w-8 h-8 text-slate-400 mx-auto" />
+          <div className="py-20 text-center flex flex-col items-center gap-3">
+            <Layers className="w-7 h-7 text-neutral-700" />
             <h4 className="text-sm font-medium text-white">Queue is empty</h4>
-            <p className="text-xs text-slate-400">
-              Upload a video from the Videos page to dispatch your first AI pipeline job.
-            </p>
+            <p className="text-xs text-neutral-600">Upload a video to dispatch your first pipeline job.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/60">
-            {jobs.map((job) => {
+          <div className="divide-y divide-neutral-800">
+            {jobs.map(job => {
               const isExpanded = expandedLogId === job.id;
               const isActionRunning = actionLoading === job.id;
               return (
-                <div key={job.id} className="p-4 space-y-3 hover:bg-slate-900/30 transition-colors">
+                <div key={job.id} className="p-5 space-y-3 hover:bg-neutral-900/30 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-sm font-bold text-white">{job.title}</span>
-                        {getStatusBadge(job.status)}
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-white">{job.title}</span>
+                        <span className={cn(
+                          "inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider",
+                          job.status === "COMPLETED" ? "text-white" :
+                          job.status === "FAILED" ? "text-neutral-600" :
+                          "text-neutral-400"
+                        )}>
+                          <span className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            job.status === "COMPLETED" ? "bg-white" :
+                            job.status === "FAILED" ? "bg-neutral-700" :
+                            job.status === "QUEUED" ? "bg-neutral-500" :
+                            "bg-neutral-400 animate-pulse"
+                          )} />
+                          {job.status.toLowerCase().replace("_", " ")}
+                        </span>
                       </div>
-                      <div className="text-xs text-slate-400 font-mono">
-                        ID: {job.id} • Created: {formatDate(job.created_at)}
+                      <div className="text-xs text-neutral-600 font-mono">
+                        {job.id} · {formatDate(job.created_at)}
                       </div>
                     </div>
 
@@ -237,10 +180,10 @@ export default function QueuePage() {
                         <button
                           onClick={() => handleDispatch(job.id)}
                           disabled={isActionRunning}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm inline-flex items-center gap-1.5 transition-all"
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-black hover:bg-neutral-200 inline-flex items-center gap-1.5 transition-all disabled:opacity-50"
                         >
                           <Play className="w-3 h-3 fill-current" />
-                          <span>{isActionRunning ? "Dispatching..." : "Dispatch"}</span>
+                          {isActionRunning ? "Dispatching..." : "Dispatch"}
                         </button>
                       )}
 
@@ -248,33 +191,28 @@ export default function QueuePage() {
                         <button
                           onClick={() => handleRetry(job.id)}
                           disabled={isActionRunning}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow-sm inline-flex items-center gap-1.5 transition-all"
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-800 text-white hover:bg-neutral-700 inline-flex items-center gap-1.5 transition-all disabled:opacity-50"
                         >
                           <RotateCcw className="w-3 h-3" />
-                          <span>{isActionRunning ? "Retrying..." : "Retry"}</span>
+                          {isActionRunning ? "Retrying..." : "Retry"}
                         </button>
                       )}
 
                       {job.error_log && (
                         <button
                           onClick={() => setExpandedLogId(isExpanded ? null : job.id)}
-                          className="px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-300 hover:text-white border border-slate-700 inline-flex items-center gap-1"
+                          className="px-2.5 py-1.5 rounded-lg text-xs bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800 inline-flex items-center gap-1 transition-colors"
                         >
-                          <Terminal className="w-3 h-3 text-rose-400" />
-                          <span>Traceback</span>
-                          {isExpanded ? (
-                            <ChevronUp className="w-3 h-3" />
-                          ) : (
-                            <ChevronDown className="w-3 h-3" />
-                          )}
+                          <Terminal className="w-3 h-3" />
+                          Log
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Expanded Traceback View */}
                   {isExpanded && job.error_log && (
-                    <div className="p-3.5 rounded-xl bg-black/60 border border-rose-500/20 text-rose-300 font-mono text-[11px] overflow-x-auto whitespace-pre leading-relaxed">
+                    <div className="p-4 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-400 font-mono text-[11px] overflow-x-auto whitespace-pre leading-relaxed">
                       {job.error_log}
                     </div>
                   )}

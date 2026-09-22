@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Share2, Plus, Shield } from "lucide-react";
+import { Plus, Shield } from "lucide-react";
 
 function YoutubeIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -34,9 +34,6 @@ export default function SocialsPage() {
       name: "YouTube",
       desc: "Auto-publish Shorts & long-form videos with custom thumbnails and tags.",
       icon: YoutubeIcon,
-      color: "text-red-500",
-      bg: "bg-red-500/10",
-      border: "border-red-500/20",
       connected: false,
     },
     {
@@ -44,9 +41,6 @@ export default function SocialsPage() {
       name: "Instagram",
       desc: "Direct Reels publishing with automated captions and hashtag sets.",
       icon: InstagramIcon,
-      color: "text-pink-500",
-      bg: "bg-pink-500/10",
-      border: "border-pink-500/20",
       connected: false,
     },
     {
@@ -54,56 +48,56 @@ export default function SocialsPage() {
       name: "LinkedIn",
       desc: "Post talking-head video clips with generated takeaways and formatting.",
       icon: LinkedinIcon,
-      color: "text-sky-500",
-      bg: "bg-sky-500/10",
-      border: "border-sky-500/20",
       connected: false,
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Social Accounts</h1>
-        <p className="text-sm text-slate-400">
-          Connect OAuth channels for automated video publishing and scheduling.
+        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Integrations</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">Social Accounts</h1>
+        <p className="text-sm text-neutral-500 mt-2">
+          Connect your channels for automated video publishing.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {platforms.map((p) => {
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {platforms.map(p => {
           const Icon = p.icon;
           return (
             <div
               key={p.id}
-              className="p-6 rounded-2xl bg-[#0d1017] border border-slate-800/80 hover:border-slate-700/80 transition-all flex flex-col justify-between space-y-4"
+              className="p-6 rounded-xl border border-neutral-800 bg-neutral-950 flex flex-col justify-between space-y-5 hover:border-neutral-700 transition-colors"
             >
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className={`p-2.5 rounded-xl ${p.bg} ${p.border} border ${p.color}`}>
+                  <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-400">
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-600 border border-neutral-800 rounded px-2 py-0.5">
                     Not Connected
                   </span>
                 </div>
-                <h3 className="text-base font-semibold text-white">{p.name}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{p.desc}</p>
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-1">{p.name}</h3>
+                  <p className="text-xs text-neutral-500 leading-relaxed">{p.desc}</p>
+                </div>
               </div>
 
-              <button className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 inline-flex items-center justify-center gap-1.5 transition-all">
+              <button className="w-full py-2.5 rounded-lg text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800 inline-flex items-center justify-center gap-1.5 transition-colors">
                 <Plus className="w-3.5 h-3.5" />
-                <span>Connect {p.name}</span>
+                Connect {p.name}
               </button>
             </div>
           );
         })}
       </div>
 
-      <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center gap-3 text-xs text-slate-400">
-        <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
+      <div className="p-4 rounded-lg border border-neutral-800 bg-neutral-950 flex items-center gap-3 text-xs text-neutral-500">
+        <Shield className="w-4 h-4 text-neutral-600 shrink-0" />
         <span>
-          Social tokens are encrypted and stored in PostgreSQL (`SocialAccount` schema table) with automatic refresh token rotation.
+          OAuth tokens are encrypted and stored with automatic refresh rotation.
         </span>
       </div>
     </div>

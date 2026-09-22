@@ -1,78 +1,80 @@
 "use client";
 
 import React from "react";
-import { Settings as SettingsIcon, Key, Database, HardDrive, Cpu, ShieldCheck } from "lucide-react";
+import { Key, Shield } from "lucide-react";
 
 export default function SettingsPage() {
+  const envVars = [
+    { name: "CLERK_SECRET_KEY", category: "Auth", status: "pending" },
+    { name: "CLOUDFLARE_R2_CREDENTIALS", category: "Storage", status: "pending" },
+    { name: "UPSTASH_REDIS_URL", category: "Queue", status: "configured" },
+    { name: "UPSTASH_REDIS_TOKEN", category: "Queue", status: "configured" },
+    { name: "GEMINI_API_KEY", category: "AI", status: "pending" },
+    { name: "PEXELS_API_KEY", category: "Assets", status: "pending" },
+    { name: "ELEVENLABS_API_KEY", category: "TTS", status: "pending" },
+  ];
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-8 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">System Settings</h1>
-        <p className="text-sm text-slate-400">
-          Configure API endpoints, AI models, storage buckets, and credentials.
+        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Configuration</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">Settings</h1>
+        <p className="text-sm text-neutral-500 mt-2">
+          API endpoints, AI models, storage, and credentials.
         </p>
       </div>
 
+      {/* Backend Config */}
       <div className="space-y-4">
-        {/* Environment & Backend Config */}
-        <div className="p-6 rounded-2xl bg-[#0d1017] border border-slate-800 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-              <Cpu className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-white">Backend Control Plane</h3>
-              <p className="text-xs text-slate-400">FastAPI & PostgreSQL service connection</p>
-            </div>
+        <h2 className="text-lg font-semibold text-white tracking-tight">Backend</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-950">
+            <span className="text-xs text-neutral-500 uppercase tracking-wider">API Host</span>
+            <div className="font-mono text-sm text-white mt-1">http://localhost:8000</div>
           </div>
+          <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-950">
+            <span className="text-xs text-neutral-500 uppercase tracking-wider">Database</span>
+            <div className="font-mono text-sm text-white mt-1">PostgreSQL / SQLModel</div>
+          </div>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
-              <span className="text-slate-400">API Host URL:</span>
-              <div className="font-mono text-indigo-300 mt-0.5">http://localhost:8000</div>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
-              <span className="text-slate-400">Database Engine:</span>
-              <div className="font-mono text-emerald-300 mt-0.5">PostgreSQL / SQLModel</div>
-            </div>
+      {/* Environment Variables */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white tracking-tight">Environment Variables</h2>
+          <div className="flex items-center gap-1.5 text-xs text-neutral-600">
+            <Key className="w-3.5 h-3.5" />
+            Configured via .env
           </div>
         </div>
 
-        {/* AI & Storage Settings (Phases 2-4) */}
-        <div className="p-6 rounded-2xl bg-[#0d1017] border border-slate-800 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-              <Key className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-white">AI Services & Storage Keys</h3>
-              <p className="text-xs text-slate-400">Configured via root `.env` / environment variables</p>
-            </div>
-          </div>
-
-          <div className="space-y-2 text-xs">
-            {[
-              { name: "CLERK_SECRET_KEY", phase: "Phase 2 (Auth)", status: "Pending" },
-              { name: "CLOUDFLARE_R2_CREDENTIALS", phase: "Phase 2 (Storage)", status: "Pending" },
-              { name: "UPSTASH_REDIS_URL", phase: "Phase 3 (Queue)", status: "Pending" },
-              { name: "GEMINI_API_KEY", phase: "Phase 4 (AI Director)", status: "Pending" },
-              { name: "PEXELS_API_KEY", phase: "Phase 5 (B-Roll Assembly)", status: "Pending" },
-            ].map((k) => (
-              <div
-                key={k.name}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-900/40 border border-slate-800/60"
-              >
-                <div className="font-mono text-slate-300">{k.name}</div>
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-400">{k.phase}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">
-                    {k.status}
-                  </span>
-                </div>
+        <div className="rounded-xl border border-neutral-800 overflow-hidden divide-y divide-neutral-800">
+          {envVars.map(v => (
+            <div
+              key={v.name}
+              className="flex items-center justify-between px-5 py-3.5 bg-neutral-950 hover:bg-neutral-900/50 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <code className="text-sm text-white font-mono">{v.name}</code>
+                <span className="text-[10px] text-neutral-600 uppercase tracking-wider">{v.category}</span>
               </div>
-            ))}
-          </div>
+              <span className={`text-[10px] uppercase tracking-wider font-medium px-2.5 py-1 rounded border ${
+                v.status === "configured"
+                  ? "text-white border-neutral-700 bg-neutral-800"
+                  : "text-neutral-600 border-neutral-800 bg-neutral-950"
+              }`}>
+                {v.status === "configured" ? "Set" : "Pending"}
+              </span>
+            </div>
+          ))}
         </div>
+      </div>
+
+      {/* Security Note */}
+      <div className="p-4 rounded-lg border border-neutral-800 bg-neutral-950 flex items-center gap-3 text-xs text-neutral-500">
+        <Shield className="w-4 h-4 text-neutral-600 shrink-0" />
+        <span>All secrets are stored server-side only. Never exposed to the browser.</span>
       </div>
     </div>
   );

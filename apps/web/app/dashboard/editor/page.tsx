@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   Scissors,
   Upload,
-  Sparkles,
-  Smartphone,
   Play,
+  ArrowRight,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 
@@ -74,72 +73,80 @@ export default function EditorLauncherPage() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-4">
-      {/* Hero Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-8 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-purple-950/20 to-slate-900/60 border border-indigo-500/20 backdrop-blur-xl shadow-2xl">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold">
-            <Scissors className="w-3.5 h-3.5" />
-            <span>CapCut-Style Studio</span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-            Manual Video Studio
-          </h1>
-          <p className="text-sm text-slate-400 max-w-xl">
-            A high-performance multi-track video editor. Split, trim, overlay B-roll, and design animated TikTok-style subtitles with zero lag.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <label className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 active:scale-95 transition-all cursor-pointer">
-            <Upload className="w-4 h-4" />
-            <span>Upload & Edit</span>
-            <input
-              type="file"
-              accept="video/*"
-              onChange={handleQuickUpload}
-              className="hidden"
-            />
-          </label>
-
-          <Link
-            href="/dashboard/editor/demo"
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-200 font-semibold text-sm transition-all"
-          >
-            <Play className="w-4 h-4 text-indigo-400" />
-            <span>Try Sample Demo</span>
-          </Link>
-        </div>
+      {/* Header */}
+      <div>
+        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Workspace</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">Studio Editor</h1>
+        <p className="text-sm text-neutral-500 mt-2">
+          A multi-track video editor. Split, trim, overlay B-roll, and design animated captions.
+        </p>
       </div>
 
-      {/* Feature Pillars */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="p-5 rounded-xl bg-[#0d1017]/80 border border-slate-800/80 space-y-2.5">
-          <div className="h-9 w-9 rounded-lg bg-indigo-500/15 flex items-center justify-center text-indigo-400">
-            <Scissors className="w-5 h-5" />
+      {/* Action Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="group cursor-pointer p-8 rounded-xl border border-neutral-800 bg-neutral-950 hover:border-neutral-600 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-6">
+            <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+              <Upload className="w-5 h-5 text-neutral-400" />
+            </div>
+            <ArrowRight className="w-5 h-5 text-neutral-700 group-hover:text-white transition-colors" />
           </div>
-          <h3 className="text-sm font-bold text-white">Multi-Track Timeline</h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Split clips instantly with the <code className="text-indigo-300">S</code> key, drag trim handles, and ripple delete unwanted sections without leaving gaps.
+          <h2 className="text-lg font-semibold text-white mb-2">Upload & Edit</h2>
+          <p className="text-sm text-neutral-500 leading-relaxed">
+            Drop a video file from your device. Opens the full editor with your clip on the timeline.
+          </p>
+          <input
+            type="file"
+            accept="video/*"
+            onChange={handleQuickUpload}
+            className="hidden"
+          />
+        </label>
+
+        <Link
+          href="/dashboard/editor/demo"
+          className="group p-8 rounded-xl border border-neutral-800 bg-neutral-950 hover:border-neutral-600 transition-all flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+              <Play className="w-5 h-5 text-neutral-400" />
+            </div>
+            <ArrowRight className="w-5 h-5 text-neutral-700 group-hover:text-white transition-colors" />
+          </div>
+          <h2 className="text-lg font-semibold text-white mb-2">Try Sample Demo</h2>
+          <p className="text-sm text-neutral-500 leading-relaxed">
+            Explore the editor with a pre-loaded demo project. No upload needed.
+          </p>
+        </Link>
+      </div>
+
+      {/* Feature Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-3">
+          <Scissors className="w-5 h-5 text-neutral-500" />
+          <h3 className="text-sm font-medium text-white">Multi-Track Timeline</h3>
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            Split clips with <kbd className="px-1.5 py-0.5 rounded bg-neutral-800 text-white text-[10px] font-mono">S</kbd>, drag trim handles, ripple delete without gaps.
           </p>
         </div>
 
-        <div className="p-5 rounded-xl bg-[#0d1017]/80 border border-slate-800/80 space-y-2.5">
-          <div className="h-9 w-9 rounded-lg bg-yellow-500/15 flex items-center justify-center text-yellow-400">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-bold text-white">Animated Subtitles</h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            One-click text overlays with TikTok yellow highlighting, Hormozi bold red badges, and cyber neon glow presets.
+        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-3">
+          <svg className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+          </svg>
+          <h3 className="text-sm font-medium text-white">Animated Captions</h3>
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            TikTok-style highlighting, bold badges, and neon glow presets — one click.
           </p>
         </div>
 
-        <div className="p-5 rounded-xl bg-[#0d1017]/80 border border-slate-800/80 space-y-2.5">
-          <div className="h-9 w-9 rounded-lg bg-purple-500/15 flex items-center justify-center text-purple-400">
-            <Smartphone className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-bold text-white">Mobile & Offline Ready</h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            100% responsive for phone touchscreens. Edit offline anywhere from local device storage with zero phone battery drain.
+        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-3">
+          <svg className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          <h3 className="text-sm font-medium text-white">Mobile Ready</h3>
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            Fully responsive for touchscreens. Edit from any device, offline.
           </p>
         </div>
       </div>
