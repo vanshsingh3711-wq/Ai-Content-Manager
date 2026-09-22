@@ -3,14 +3,20 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { Redis } from '@upstash/redis';
 import { validateExport } from '@ai-content-manager/motion-components/src/export/export.validation';
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_URL || 'https://default-url.upstash.io',
+  token: process.env.UPSTASH_REDIS_TOKEN || 'default-token',
+});
 
 // In-memory store for export jobs
 const jobs = new Map<string, any>();
 
 export async function POST(req: Request) {
   try {
-    const { sequence, config } = await req.json();
+    const { sequence, config, renderMode } = await req.json();
 
     // 1. Validate
     const diagnostics = validateExport(sequence, config);
@@ -48,7 +54,27 @@ export async function POST(req: Request) {
       diagnostics: [],
     });
 
-    // 3. Spawn Remotion CLI
+    // 3. Dispatch Job
+    if (renderMode === 'cloud') {
+      // Send to Upstash Redis queue for Fargate Worker
+      await redis.lpush('export-jobs', JSON.stringify({
+        jobId,
+        sequence,
+        config,
+        status: 'pending'
+      }));
+      
+      jobs.set(jobId, {
+        status: 'rendering', // From frontend perspective, it's rendering in the cloud
+        diagnostics: [],
+        message: 'Dispatched to AWS Fargate Worker'
+      });
+      
+      // Cloud rendering is async and detached; we return immediately
+      return NextResponse.json({ success: true, jobId });
+    }
+
+    // Otherwise, Spawn Remotion CLI Locally
     // We execute it in the motion-components directory
     const motionComponentsDir = path.resolve(process.cwd(), '../../packages/motion-components');
     

@@ -141,16 +141,21 @@ export default function EditorStateDemoPage() {
   // Export State
   const [exportState, setExportState] = useState<{
     status: 'idle' | 'validating' | 'rendering' | 'completed' | 'failed' | 'cancelled';
+    mode: 'local' | 'cloud';
     jobId?: string;
     videoUrl?: string;
     diagnostics: any[];
     error?: string;
-  }>({ status: 'idle', diagnostics: [] });
+  }>({
+    status: 'idle',
+    mode: 'local',
+    diagnostics: []
+  });
 
   const handleExportProject = async () => {
     if (!resolvedGraph) return;
     
-    setExportState({ status: 'validating', diagnostics: [] });
+    setExportState({ status: 'validating', mode: exportState.mode, diagnostics: [] });
     
     try {
       const res = await fetch('/api/export', {
@@ -158,7 +163,8 @@ export default function EditorStateDemoPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sequence: resolvedGraph,
-          config: { format: 'mp4', codec: 'h264' }
+          config: { format: 'mp4', codec: 'h264' },
+          renderMode: exportState.mode
         })
       });
       
@@ -173,9 +179,14 @@ export default function EditorStateDemoPage() {
         return;
       }
       
-      setExportState({ status: 'rendering', jobId: data.jobId, diagnostics: [] });
+      setExportState(prev => ({ ...prev, status: 'rendering', jobId: data.jobId, diagnostics: [] }));
       
-      // Poll status
+      // If cloud, we can just say "Dispatched" and stop polling for now
+      if (exportState.mode === 'cloud') {
+        return;
+      }
+      
+      // Poll status for local rendering
       const poll = setInterval(async () => {
         try {
           const statusRes = await fetch(`/api/export?id=${data.jobId}`);
@@ -386,11 +397,27 @@ export default function EditorStateDemoPage() {
               >
                 Generate Video (AI)
               </button>
+              
+              <div className="flex bg-gray-800 rounded p-1">
+                <button 
+                  onClick={() => setExportState(prev => ({ ...prev, mode: 'local' }))}
+                  className={`flex-1 py-1 text-sm rounded font-bold transition-colors ${exportState.mode === 'local' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  Local
+                </button>
+                <button 
+                  onClick={() => setExportState(prev => ({ ...prev, mode: 'cloud' }))}
+                  className={`flex-1 py-1 text-sm rounded font-bold transition-colors ${exportState.mode === 'cloud' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  Cloud
+                </button>
+              </div>
+
               <button 
                 onClick={handleExportProject}
                 className="w-full py-2 bg-pink-900/50 hover:bg-pink-800/50 border border-pink-700/50 text-pink-200 rounded font-bold transition-colors shadow-lg"
               >
-                Export Video
+                Export Video ({exportState.mode})
               </button>
             </div>
           </div>
@@ -527,10 +554,19 @@ export default function EditorStateDemoPage() {
               {exportState.status === 'cancelled' && 'Export Cancelled'}
             </h2>
             
-            {exportState.status === 'rendering' && (
+            {exportState.status === 'rendering' && exportState.mode === 'cloud' && (
+              <div className="flex flex-col gap-2 items-center text-gray-400">
+                <div className="animate-pulse text-4xl mb-2">☁️</div>
+                <p>Job dispatched to AWS Fargate Worker.</p>
+                <p className="text-sm">You can safely close this modal while it renders in the cloud.</p>
+                <button onClick={() => setExportState(prev => ({ ...prev, status: 'idle' }))} className="mt-4 py-2 px-6 bg-gray-800 hover:bg-gray-700 text-white rounded font-bold transition-colors">Close</button>
+              </div>
+            )}
+            
+            {exportState.status === 'rendering' && exportState.mode === 'local' && (
               <div className="flex flex-col gap-2 items-center text-gray-400">
                 <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full mb-4"></div>
-                <p>Generating deterministic frames...</p>
+                <p>Generating deterministic frames locally...</p>
                 <button onClick={handleCancelExport} className="mt-4 text-sm underline hover:text-white">Cancel Export</button>
               </div>
             )}
