@@ -111,67 +111,69 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
   };
 
   const getActionBadge = (action: string) => {
-    switch (action) {
-      case "cut":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/20";
-      case "b_roll":
-        return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
-      case "zoom_in":
-        return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
-      case "sfx":
-        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-      default:
-        return "bg-purple-500/10 text-purple-400 border-purple-500/20";
-    }
+    return "bg-neutral-900 border-neutral-800 text-neutral-300";
+  };
+
+  const StatusDot = ({ status }: { status: string }) => {
+    const color =
+      status === "COMPLETED" ? "bg-white" :
+      status === "FAILED" ? "bg-neutral-500" :
+      "bg-neutral-400 animate-pulse";
+    return <span className={cn("inline-block w-1.5 h-1.5 rounded-full", color)} />;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-3xl max-h-[90vh] rounded-3xl bg-[#0d1017] border border-slate-800 shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-3xl max-h-[90vh] rounded-xl bg-neutral-950 border border-neutral-800 shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-800/80 flex items-start justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+        <div className="p-6 border-b border-neutral-800 flex items-start justify-between gap-4">
+          <div className="space-y-3">
+            <h2 className="text-xl font-semibold text-white tracking-tight leading-none">{video.title}</h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="flex items-center gap-2">
+                <StatusDot status={video.status} />
+                <span className="text-xs text-neutral-400 uppercase tracking-wider font-medium">
+                  {video.status === "COMPLETED" ? "Done" : video.status.toLowerCase().replace("_", " ")}
+                </span>
+              </span>
+              <span className="text-neutral-700">·</span>
+              <span className="text-xs text-neutral-500 uppercase tracking-wider font-medium">
                 {video.video_type === "talking_head" ? "Talking Head" : "Faceless Short"}
               </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                {video.status}
-              </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono">
+              <span className="text-neutral-700">·</span>
+              <span className="text-xs text-neutral-500 uppercase tracking-wider font-medium font-mono">
                 {aspectRatio}
               </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 capitalize">
+              <span className="text-neutral-700">·</span>
+              <span className="text-xs text-neutral-500 uppercase tracking-wider font-medium">
                 {videoStyle} style
               </span>
             </div>
-            <h2 className="text-xl font-bold text-white tracking-tight">{video.title}</h2>
-            <div className="text-xs text-slate-400 font-mono">
-              Job ID: {video.id} • Processed: {formatDate(video.updated_at)}
+            <div className="text-xs text-neutral-600 font-mono">
+              ID: {video.id} • Processed: {formatDate(video.updated_at)}
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+            className="p-2 rounded-lg text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="px-6 border-b border-slate-800/80 flex items-center gap-2 bg-slate-900/30 overflow-x-auto">
+        <div className="px-6 border-b border-neutral-800 flex items-center gap-2 bg-neutral-950 overflow-x-auto">
           <button
             onClick={() => setActiveTab("edits")}
             className={cn(
-              "px-4 py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
+              "px-4 py-3 text-xs font-medium border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
               activeTab === "edits"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:text-slate-300"
+                ? "border-white text-white"
+                : "border-transparent text-neutral-500 hover:text-neutral-300"
             )}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -181,10 +183,10 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           <button
             onClick={() => setActiveTab("style")}
             className={cn(
-              "px-4 py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
+              "px-4 py-3 text-xs font-medium border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
               activeTab === "style"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:text-slate-300"
+                ? "border-white text-white"
+                : "border-transparent text-neutral-500 hover:text-neutral-300"
             )}
           >
             <Settings2 className="w-3.5 h-3.5" />
@@ -194,10 +196,10 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           <button
             onClick={() => setActiveTab("transcript")}
             className={cn(
-              "px-4 py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
+              "px-4 py-3 text-xs font-medium border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
               activeTab === "transcript"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:text-slate-300"
+                ? "border-white text-white"
+                : "border-transparent text-neutral-500 hover:text-neutral-300"
             )}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -207,10 +209,10 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           <button
             onClick={() => setActiveTab("player")}
             className={cn(
-              "px-4 py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
+              "px-4 py-3 text-xs font-medium border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
               activeTab === "player"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:text-slate-300"
+                ? "border-white text-white"
+                : "border-transparent text-neutral-500 hover:text-neutral-300"
             )}
           >
             <Play className="w-3.5 h-3.5" />
@@ -220,10 +222,10 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           <button
             onClick={() => setActiveTab("raw")}
             className={cn(
-              "px-4 py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
+              "px-4 py-3 text-xs font-medium border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap",
               activeTab === "raw"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:text-slate-300"
+                ? "border-white text-white"
+                : "border-transparent text-neutral-500 hover:text-neutral-300"
             )}
           >
             <Terminal className="w-3.5 h-3.5" />
@@ -237,24 +239,24 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           {activeTab === "edits" && (
             <div className="space-y-3">
               {validationReport && (
-                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
+                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-neutral-300">
                   <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     {validationReport.approved_count ?? edits.length} edits validated
                   </span>
                   {validationReport.broll_budget_used !== undefined && (
-                    <span className="text-slate-400 font-mono text-[11px]">
+                    <span className="text-neutral-400 font-mono text-[11px]">
                       B-roll: {Number(validationReport.broll_budget_used).toFixed(1)}s / {Number(validationReport.broll_budget_max).toFixed(1)}s
                     </span>
                   )}
                 </div>
               )}
 
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-neutral-400">
                 AI Director editing decisions mapped to Whisper word timestamps:
               </div>
               {edits.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400 bg-slate-900/40 rounded-2xl border border-slate-800">
+                <div className="p-6 text-center text-xs text-neutral-400 bg-neutral-900 rounded-xl border border-neutral-800">
                   No edit decisions found in database.
                 </div>
               ) : (
@@ -267,7 +269,7 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                     return (
                       <div
                         key={idx}
-                        className="p-3.5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700/80 transition-colors flex items-start justify-between gap-3"
+                        className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700/80 transition-colors flex items-start justify-between gap-3"
                       >
                         <div className="space-y-1.5 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -281,38 +283,38 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                               {e.action}
                             </span>
                             {e.trigger_id && (
-                              <span className="text-xs font-mono text-indigo-300 font-semibold">
+                              <span className="text-xs font-mono text-neutral-400 font-medium">
                                 {e.trigger_id}
                               </span>
                             )}
                             {startTime !== undefined && endTime !== undefined && startTime !== null && endTime !== null && (
-                              <span className="text-[11px] font-mono text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded">
+                              <span className="text-[11px] font-mono text-neutral-400 bg-neutral-800 px-2 py-0.5 rounded">
                                 [{Number(startTime).toFixed(1)}s - {Number(endTime).toFixed(1)}s]
                               </span>
                             )}
                           </div>
 
                           {chunkInfo?.text && (
-                            <p className="text-xs text-slate-300 italic">
+                            <p className="text-xs text-neutral-300 italic">
                               "{chunkInfo.text}"
                             </p>
                           )}
 
                           {e.search_query && (
-                            <div className="text-xs text-cyan-300 font-mono">
-                              🔍 Pexels Search: <span className="underline">{e.search_query}</span>
+                            <div className="text-xs text-neutral-300 font-mono">
+                              <span className="text-neutral-500">Pexels Search:</span> <span className="underline">{e.search_query}</span>
                             </div>
                           )}
 
                           {e.sound_effect && (
-                            <div className="text-xs text-amber-300 font-mono">
-                              🔊 SFX Cue: <span>{e.sound_effect}</span>
+                            <div className="text-xs text-neutral-300 font-mono">
+                              <span className="text-neutral-500">SFX Cue:</span> <span>{e.sound_effect}</span>
                             </div>
                           )}
 
                           {e.reason && (
-                            <div className="text-[11px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-                              <span className="font-semibold text-slate-300">💡 Reason:</span> {e.reason}
+                            <div className="text-[11px] text-neutral-400 bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                              <span className="font-medium text-neutral-300">Reason:</span> {e.reason}
                             </div>
                           )}
                         </div>
@@ -327,23 +329,23 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           {/* Tab 2: Style & Ratio Config */}
           {activeTab === "style" && (
             <div className="space-y-4">
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-neutral-400">
                 Active rendering profile and AI pipeline configuration for this video:
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Ratio Card */}
-                <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-2">
+                <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Smartphone className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                      <Smartphone className="w-4 h-4 text-neutral-500" />
                       Aspect Ratio
                     </span>
-                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                    <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
                       {aspectRatio}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-300">
+                  <div className="text-xs text-neutral-400">
                     {aspectRatio === "9:16" && "Vertical Canvas (1080 × 1920) for YouTube Shorts & TikTok"}
                     {aspectRatio === "16:9" && "Landscape Canvas (1920 × 1080) for YouTube Widescreen"}
                     {aspectRatio === "1:1" && "Square Canvas (1080 × 1080) for Instagram & LinkedIn Feeds"}
@@ -352,17 +354,17 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                 </div>
 
                 {/* Style Card */}
-                <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-2">
+                <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Flame className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                      <Flame className="w-4 h-4 text-neutral-500" />
                       Video Editing Style
                     </span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 capitalize">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 capitalize">
                       {videoStyle}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-300">
+                  <div className="text-xs text-neutral-400">
                     {videoStyle === "viral" && "Fast-paced cuts, high retention, emphasis punch-ins & sound effects"}
                     {videoStyle === "cinematic" && "Atmospheric pacing, rich B-roll storytelling, and smooth transitions"}
                     {videoStyle === "educational" && "Clear instructional flow, structured explanations, zero fluff"}
@@ -371,17 +373,17 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                 </div>
 
                 {/* Captions Card */}
-                <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-2">
+                <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Type className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                      <Type className="w-4 h-4 text-neutral-500" />
                       Subtitle Preset
                     </span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 capitalize">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 capitalize">
                       {captionPreset.replace("_", " ")}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-300">
+                  <div className="text-xs text-neutral-400">
                     {captionPreset === "tiktok_yellow" && "White bold sans-serif with vibrant TikTok Yellow karaoke word highlighting"}
                     {captionPreset === "neon_cyber" && "Cyberpunk glowing cyan highlights with modern tech aesthetics"}
                     {captionPreset === "modern_clean" && "Minimalist clean typography with subtle contrast drop shadows"}
@@ -390,32 +392,32 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                 </div>
 
                 {/* AI Features Card */}
-                <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-2">
+                <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-neutral-500" />
                       AI Pipeline Modules
                     </span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
                       Active
                     </span>
                   </div>
-                  <div className="text-xs text-slate-300 space-y-1">
+                  <div className="text-xs text-neutral-400 space-y-1">
                     <div className="flex items-center justify-between text-[11px]">
                       <span>Face Tracking & Auto-Reframe:</span>
-                      <span className="text-emerald-400 font-semibold">{aiFeatures?.faceTracking !== false ? "ON" : "OFF"}</span>
+                      <span className="text-neutral-300 font-medium">{aiFeatures?.faceTracking !== false ? "ON" : "OFF"}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
                       <span>Dynamic Keyword Zooms:</span>
-                      <span className="text-emerald-400 font-semibold">{aiFeatures?.dynamicZooms !== false ? "ON" : "OFF"}</span>
+                      <span className="text-neutral-300 font-medium">{aiFeatures?.dynamicZooms !== false ? "ON" : "OFF"}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
                       <span>Smart Stock B-Roll:</span>
-                      <span className="text-emerald-400 font-semibold">{aiFeatures?.autoBroll !== false ? "ON" : "OFF"}</span>
+                      <span className="text-neutral-300 font-medium">{aiFeatures?.autoBroll !== false ? "ON" : "OFF"}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
                       <span>Silence & Mistake Trims:</span>
-                      <span className="text-emerald-400 font-semibold">{aiFeatures?.trimSilences !== false ? "ON" : "OFF"}</span>
+                      <span className="text-neutral-300 font-medium">{aiFeatures?.trimSilences !== false ? "ON" : "OFF"}</span>
                     </div>
                   </div>
                 </div>
@@ -426,10 +428,10 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           {/* Tab 3: Whisper Transcript */}
           {activeTab === "transcript" && (
             <div className="space-y-3">
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-neutral-400">
                 Silence-segmented speech transcript with word-level timing:
               </div>
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs whitespace-pre-wrap leading-relaxed">
+              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-xs whitespace-pre-wrap leading-relaxed">
                 {bracketedTranscript || "No transcript available."}
               </div>
             </div>
@@ -439,7 +441,7 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           {activeTab === "player" && (
             <div className="space-y-4">
               <div className={cn(
-                "rounded-2xl bg-black border border-slate-800 overflow-hidden flex items-center justify-center shadow-lg mx-auto",
+                "rounded-xl bg-black border border-neutral-800 overflow-hidden flex items-center justify-center shadow-lg mx-auto",
                 aspectRatio === "9:16" ? "max-w-xs aspect-[9/16] max-h-72" : "w-full aspect-video max-h-64"
               )}>
                 <video
@@ -451,29 +453,29 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                 </video>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+              <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
                 <div className="text-xs font-semibold text-white">Exported Storage Stream URL:</div>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     readOnly
                     value={video.rendered_url || video.source_url}
-                    className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 select-all"
+                    className="flex-1 px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-mono text-neutral-300 select-all"
                   />
                   <button
                     onClick={handleCopyLink}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-sm"
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 inline-flex items-center gap-1.5 transition-colors shadow-sm"
                   >
-                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     <span>{copied ? "Copied" : "Copy"}</span>
                   </button>
                   <a
                     href={video.rendered_url || video.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors border border-slate-700"
+                    className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-sm font-medium inline-flex items-center gap-1.5 transition-colors border border-neutral-700"
                   >
-                    <Download className="w-3.5 h-3.5" />
+                    <Download className="w-4 h-4" />
                     <span>Open in Tab</span>
                   </a>
                 </div>
@@ -484,8 +486,8 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           {/* Tab 5: Raw JSON */}
           {activeTab === "raw" && (
             <div className="space-y-2">
-              <div className="text-xs text-slate-400">PostgreSQL JSON stored in `edit_decision_list`:</div>
-              <pre className="p-4 rounded-2xl bg-black border border-slate-800 text-emerald-400 font-mono text-[11px] overflow-x-auto whitespace-pre leading-relaxed">
+              <div className="text-xs text-neutral-400">PostgreSQL JSON stored in `edit_decision_list`:</div>
+              <pre className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-300 font-mono text-[11px] overflow-x-auto whitespace-pre leading-relaxed">
                 {video.edit_decision_list || "{}"}
               </pre>
             </div>
@@ -493,19 +495,19 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-900/30 flex items-center justify-between">
+        <div className="p-4 border-t border-neutral-800 bg-neutral-950 flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 hover:text-white transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white transition-colors"
           >
             Close
           </button>
 
           <button
             onClick={handleCopyLink}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 inline-flex items-center gap-1.5 transition-all"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-white hover:bg-neutral-200 text-black shadow-md inline-flex items-center gap-1.5 transition-all"
           >
-            <Copy className="w-3.5 h-3.5" />
+            <Copy className="w-4 h-4" />
             <span>Copy Export URL</span>
           </button>
         </div>
