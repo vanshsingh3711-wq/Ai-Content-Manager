@@ -129,6 +129,23 @@ export default function VideosPage() {
     }
   }
 
+  async function handleRetry(e: React.MouseEvent, videoId: string) {
+    e.stopPropagation();
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/videos/${videoId}/retry`, { method: "POST" });
+      if (res.ok) {
+        fetchVideos();
+      } else {
+        const errText = await res.text();
+        alert(`Failed to retry: ${errText}`);
+      }
+    } catch (err) {
+      console.error("Retry error:", err);
+      alert("Network error. Is the backend running?");
+    }
+  }
+
   async function handleCreateFaceless() {
     if (!facelessForm.topic && !facelessForm.script) {
       alert("Please provide a topic or a script.");
@@ -699,7 +716,16 @@ export default function VideosPage() {
               <div className="col-span-2 text-xs text-neutral-600 font-mono">
                 {formatDate(video.created_at)}
               </div>
-              <div className="col-span-2 flex justify-end">
+              <div className="col-span-2 flex justify-end gap-1">
+                {video.status === "FAILED" && (
+                  <button
+                    onClick={e => handleRetry(e, video.id)}
+                    className="p-2 rounded-lg text-neutral-700 hover:text-white hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100"
+                    title="Retry"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <button
                   onClick={e => handleDelete(e, video.id)}
                   className="p-2 rounded-lg text-neutral-700 hover:text-white hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100"

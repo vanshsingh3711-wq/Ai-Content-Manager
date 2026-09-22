@@ -155,6 +155,41 @@ def update_video_job_status(
     session.refresh(job)
     return job
 
+@router.post("/{video_id}/retry", response_model=VideoJobResponse)
+def retry_video_job(
+    video_id: uuid.UUID,
+    session: Session = Depends(get_session),
+):
+    """Retries a failed video job by resetting its status and dispatching it to Celery."""
+    job = session.get(VideoJob, video_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Video job with ID {video_id} not found",
+        )
+    if job.status != VideoJobStatus.FAILED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only failed jobs can be retried. Current status is {job.status}",
+        )
+    
+    # Reset job state
+    job.status = VideoJobStatus.QUEUED
+    job.error_log = None
+    job.rendered_url = None
+    job.updated_at = datetime.now(timezone.utc)
+    
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    print(f"[API: VIDEOS] 🔄 Retrying VideoJob {job.id} (Status reset to QUEUED)")
+    
+    if settings.AUTO_DISPATCH_JOBS:
+        print(f"[API: VIDEOS] ⚡ Auto-dispatching job {job.id} to Celery queue '{settings.CELERY_TASK_DEFAULT_QUEUE}'...")
+        dispatch_job_to_celery(job.id)
+        
+    return job
+
 
 @router.delete("/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_video_job(
