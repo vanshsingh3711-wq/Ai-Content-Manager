@@ -140,7 +140,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                     temp_dir=temp_job_dir
                 )
             else:
-                visual_timeline = {"scenes": [], "subjects": [], "safe_regions": []}
+                visual_timeline = {"video_id": job_id_str, "scenes": [], "subjects": [], "safe_regions": []}
             unified_analysis = UnifiedAnalysis(
                 transcript=bracketed_transcript,
                 audio_analysis={"regions": unified_audio_regions},
