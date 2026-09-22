@@ -81,6 +81,7 @@ export default function VideosPage() {
   const [createMode, setCreateMode] = useState<CreateMode>(null);
 
   // Faceless creation state
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [facelessForm, setFacelessForm] = useState({
     script: "",
     topic: "",
@@ -125,6 +126,53 @@ export default function VideosPage() {
       if (res.ok) setVideos(prev => prev.filter(v => v.id !== videoId));
     } catch (err) {
       console.error("Delete error:", err);
+    }
+  }
+
+  async function handleCreateFaceless() {
+    if (!facelessForm.topic && !facelessForm.script) {
+      alert("Please provide a topic or a script.");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/videos/create-job`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: facelessForm.topic || "Faceless AI Video",
+          source_url: "",
+          video_type: "faceless_short",
+          clerk_id: "user_default",
+          email: "user@example.com",
+          settings: {
+            topic: facelessForm.topic,
+            script: facelessForm.script,
+            character: facelessForm.character,
+            niche: facelessForm.niche,
+            theme: facelessForm.theme,
+            aspect_ratio: facelessForm.ratio,
+            mood: facelessForm.mood,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        setPageView("library");
+        setCreateMode(null);
+        fetchVideos();
+      } else {
+        const errorText = await res.text();
+        alert(`Failed to create job: ${errorText}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error. Is the backend running?");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -379,13 +427,14 @@ export default function VideosPage() {
               >
                 ← Back
               </button>
-              <Link
-                href="/demo/script"
-                className="px-6 py-3 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 transition-colors inline-flex items-center gap-2"
+              <button
+                onClick={handleCreateFaceless}
+                disabled={isSubmitting}
+                className="px-6 py-3 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 transition-colors inline-flex items-center gap-2 disabled:opacity-50"
               >
-                Generate Video
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+                {isSubmitting ? "Generating..." : "Generate Video"}
+                {!isSubmitting && <ArrowRight className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         )}

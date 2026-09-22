@@ -31,9 +31,11 @@ COPY packages/motion-components /app/packages/motion-components
 WORKDIR /app/packages/motion-components
 RUN npm install
 
-# 4. Copy the Worker application code
+# 4. Copy the Worker application code and API models
+WORKDIR /app
+COPY apps/api ./apps/api
+COPY apps/worker ./apps/worker
 WORKDIR /app/apps/worker
-COPY apps/worker .
 
 # 5. Run Celery worker
 CMD ["celery", "-A", "celery_app.celery_app", "worker", "--loglevel=info", "--concurrency=1", "-E"]

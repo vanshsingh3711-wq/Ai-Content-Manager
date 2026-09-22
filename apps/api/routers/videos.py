@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1/videos", tags=["Videos & Jobs"])
 
 class CreateVideoJobRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
-    source_url: str = Field(..., description="S3/R2 direct upload URI")
+    source_url: str = Field(default="", description="S3/R2 direct upload URI. Empty for faceless videos.")
     video_type: VideoType = Field(default=VideoType.TALKING_HEAD)
     clerk_id: Optional[str] = Field("user_default", description="Clerk user ID")
     email: Optional[str] = Field("user@example.com", description="User email")
