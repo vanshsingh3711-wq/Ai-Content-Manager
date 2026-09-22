@@ -49,6 +49,7 @@ class JobStatusResponse(BaseModel):
     rendered_url: Optional[str] = None
     edit_decision_list: Optional[str] = None
     error_log: Optional[str] = None
+    settings: Optional[dict] = None
     created_at: str
     updated_at: str
 
@@ -167,6 +168,7 @@ def get_job_status(
         "rendered_url": job.rendered_url,
         "edit_decision_list": job.edit_decision_list,
         "error_log": job.error_log,
+        "settings": job.settings,
         "created_at": job.created_at.isoformat(),
         "updated_at": job.updated_at.isoformat(),
     }
@@ -196,6 +198,7 @@ def list_queue_jobs(
             "rendered_url": j.rendered_url,
             "edit_decision_list": j.edit_decision_list,
             "error_log": j.error_log,
+            "settings": j.settings,
             "created_at": j.created_at.isoformat(),
             "updated_at": j.updated_at.isoformat(),
         }

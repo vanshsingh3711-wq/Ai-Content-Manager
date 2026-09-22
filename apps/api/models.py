@@ -3,7 +3,7 @@ import enum
 from typing import Any, Dict, List, Optional
 import uuid
 from sqlmodel import Column, DateTime, Enum, Field, Relationship, SQLModel, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 
 
 def get_utc_now() -> datetime:
@@ -158,6 +158,11 @@ class VideoJob(SQLModel, table=True):
         default=None,
         sa_column=Column(Text, nullable=True),
         description="Error stacktrace or diagnostic logs if job failed",
+    )
+    settings: Optional[dict] = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+        description="JSON object storing frontend preferences (ratio, style, niche, character, mood, etc.)",
     )
     created_at: datetime = Field(
         default_factory=get_utc_now,
