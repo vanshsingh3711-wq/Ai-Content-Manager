@@ -9,7 +9,7 @@ from celery_app import celery_app
 from config import get_worker_db, get_worker_settings
 
 # Import models
-from models import VideoJob, VideoJobStatus
+from models import VideoJob, VideoJobStatus, VideoType
 
 # Import orchestration managers
 from services.ingest_manager import stage_raw_video
@@ -88,13 +88,24 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         # --- STEP 1: DOWNLOADING & STAGING ---
         with PipelineStep(1, 8, "DOWNLOADING & RAW MEDIA INGEST", f"Source: {job_source_url}"):
             set_job_status_downloading(job_uuid)
-            stage_raw_video(job_source_url, raw_video_path, settings.TEMP_DIR)
+            if job_video_type != VideoType.FACELESS_SHORT:
+                stage_raw_video(job_source_url, raw_video_path, settings.TEMP_DIR)
+            else:
+                log_info("Faceless video detected. Skipping raw video download.")
 
         # --- STEP 2: TRANSCRIBING & AUDIO ANALYSIS ---
         with PipelineStep(2, 8, "AUDIO EXTRACTION & SPEECH-TO-TEXT", "faster-whisper (int8 CPU / speech gap segmentation)"):
-            extract_audio_track(raw_video_path, extracted_wav_path, sample_rate=16000, channels=1)
-            ffmpeg_bin = get_ffmpeg_binary_path()
-            total_duration = _probe_duration(ffmpeg_bin, raw_video_path)
+            if job_video_type != VideoType.FACELESS_SHORT:
+                extract_audio_track(raw_video_path, extracted_wav_path, sample_rate=16000, channels=1)
+                ffmpeg_bin = get_ffmpeg_binary_path()
+                total_duration = _probe_duration(ffmpeg_bin, raw_video_path)
+            else:
+                log_info("Generating TTS Audio for Faceless Video...")
+                topic = job_settings.get("topic", job_title)
+                script = f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result."
+                os.system(f'edge-tts --text "{script}" --write-media "{extracted_wav_path}"')
+                ffmpeg_bin = get_ffmpeg_binary_path()
+                total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
 
             bracketed_transcript, timestamp_map = transcribe_and_compress(
                 audio_path=extracted_wav_path,
@@ -121,12 +132,15 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 3: VISUAL ANALYSIS ---
         with PipelineStep(3, 8, "VISUAL INTELLIGENCE LAYER", "Extracting scenes, subjects, and safe regions"):
-            visual_timeline = analyze_visual_context(
-                video_path=raw_video_path,
-                video_id=job_id_str,
-                video_duration=total_duration,
-                temp_dir=temp_job_dir
-            )
+            if job_video_type != VideoType.FACELESS_SHORT:
+                visual_timeline = analyze_visual_context(
+                    video_path=raw_video_path,
+                    video_id=job_id_str,
+                    video_duration=total_duration,
+                    temp_dir=temp_job_dir
+                )
+            else:
+                visual_timeline = {"scenes": [], "subjects": [], "safe_regions": []}
             unified_analysis = UnifiedAnalysis(
                 transcript=bracketed_transcript,
                 audio_analysis={"regions": unified_audio_regions},
