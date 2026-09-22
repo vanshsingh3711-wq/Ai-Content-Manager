@@ -278,8 +278,8 @@ def validate_blueprint(
             report.accepted_count += 1
             continue
 
-        # ── zoom_in / sfx — lightweight validation ────────────────────
-        if action in ("zoom_in", "sfx"):
+        # ── zoom_in / sfx / character / motion_graphics — lightweight validation ────────────────────
+        if action in ("zoom_in", "sfx", "character", "motion_graphics"):
             validated.append(edit)
             report.accepted_count += 1
             continue

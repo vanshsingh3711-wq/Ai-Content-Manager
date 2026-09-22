@@ -106,6 +106,13 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 os.system(f'edge-tts --text "{script}" --write-media "{extracted_wav_path}"')
                 ffmpeg_bin = get_ffmpeg_binary_path()
                 total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
+                
+                log_info("Generating blank base video with TTS audio for compositor...")
+                os.system(
+                    f'{ffmpeg_bin} -y -f lavfi -i color=c=black:s=1080x1920:d={total_duration} '
+                    f'-i "{extracted_wav_path}" '
+                    f'-c:v libx264 -preset ultrafast -c:a aac -shortest "{raw_video_path}"'
+                )
 
             bracketed_transcript, timestamp_map = transcribe_and_compress(
                 audio_path=extracted_wav_path,
