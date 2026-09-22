@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Film,
   Plus,
   RefreshCw,
-  Clock,
   CheckCircle2,
   AlertCircle,
   Video,
@@ -14,8 +14,23 @@ import {
   Layers,
   Search,
   Play,
-  Scissors,
   Share2,
+  Upload,
+  FileText,
+  User,
+  Palette,
+  Monitor,
+  Smartphone,
+  Square,
+  Sun,
+  Moon,
+  ArrowRight,
+  ArrowLeft,
+  X,
+  Clock,
+  Loader2,
+  Ratio,
+  Type,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { VideoUploadModal } from "@/components/VideoUploadModal";
@@ -35,6 +50,25 @@ interface VideoJob {
   updated_at: string;
 }
 
+type PageView = "library" | "create";
+type CreateMode = null | "faceless" | "upload";
+
+const CHARACTERS = [
+  { id: "sarah", name: "Sarah", desc: "Friendly explainer" },
+  { id: "alex", name: "Alex", desc: "Professional presenter" },
+  { id: "maya", name: "Maya", desc: "Energetic storyteller" },
+  { id: "none", name: "No Character", desc: "Voiceover only" },
+];
+
+const NICHES = [
+  "Education", "Finance", "Tech", "Health", "Motivation",
+  "Science", "History", "News", "Lifestyle", "Entertainment",
+];
+
+const MOODS = [
+  "Energetic", "Calm", "Dramatic", "Mysterious", "Uplifting", "Professional",
+];
+
 export default function VideosPage() {
   const [videos, setVideos] = useState<VideoJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,21 +76,41 @@ export default function VideosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<VideoJob | null>(null);
 
+  // Page view
+  const [pageView, setPageView] = useState<PageView>("library");
+  const [createMode, setCreateMode] = useState<CreateMode>(null);
+
+  // Faceless creation state
+  const [facelessForm, setFacelessForm] = useState({
+    script: "",
+    topic: "",
+    character: "sarah",
+    niche: "Education",
+    theme: "dark" as "dark" | "light",
+    ratio: "9:16" as "9:16" | "16:9" | "1:1",
+    mood: "Energetic",
+  });
+
+  // Upload creation state
+  const [uploadForm, setUploadForm] = useState({
+    ratio: "9:16" as "9:16" | "16:9" | "1:1",
+    style: "viral" as "viral" | "cinematic" | "educational" | "minimal",
+    theme: "dark" as "dark" | "light",
+    mood: "Energetic",
+    niche: "Education",
+  });
+
   async function fetchVideos() {
     setLoading(true);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     try {
-      console.log(`[FRONTEND: VIDEOS] 🔄 Fetching video library from: ${apiUrl}/api/v1/videos...`);
       const res = await fetch(`${apiUrl}/api/v1/videos`);
       if (res.ok) {
         const data = await res.json();
-        console.log(`[FRONTEND: VIDEOS] ✅ Received ${data.length} video jobs from database:`, data);
         setVideos(data);
-      } else {
-        console.warn(`[FRONTEND: VIDEOS] ⚠️ API returned status ${res.status}:`, await res.text());
       }
     } catch (err) {
-      console.error("[FRONTEND: VIDEOS] ❌ Network/fetch error:", err);
+      console.error("Failed to fetch videos:", err);
     } finally {
       setLoading(false);
     }
@@ -64,20 +118,13 @@ export default function VideosPage() {
 
   async function handleDelete(e: React.MouseEvent, videoId: string) {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this video job?")) return;
-
+    if (!confirm("Delete this video?")) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    console.log(`[FRONTEND: VIDEOS] 🗑️ Deleting video job: ${videoId}...`);
     try {
-      const res = await fetch(`${apiUrl}/api/v1/videos/${videoId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        console.log(`[FRONTEND: VIDEOS] ✅ Deleted job ${videoId}`);
-        setVideos((prev) => prev.filter((v) => v.id !== videoId));
-      }
+      const res = await fetch(`${apiUrl}/api/v1/videos/${videoId}`, { method: "DELETE" });
+      if (res.ok) setVideos(prev => prev.filter(v => v.id !== videoId));
     } catch (err) {
-      console.error("[FRONTEND: VIDEOS] ❌ Delete error:", err);
+      console.error("Delete error:", err);
     }
   }
 
@@ -87,194 +134,544 @@ export default function VideosPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredVideos = videos.filter((v) =>
+  const filteredVideos = videos.filter(v =>
     v.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusBadge = (status: VideoJob["status"]) => {
-    switch (status) {
-      case "COMPLETED":
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            <CheckCircle2 className="w-3 h-3" />
-            Completed
-          </span>
-        );
-      case "PUBLISHING":
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 animate-pulse">
-            <Share2 className="w-3 h-3" />
-            Publishing
-          </span>
-        );
-      case "FAILED":
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30">
-            <AlertCircle className="w-3 h-3" />
-            Failed
-          </span>
-        );
-      case "QUEUED":
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <Clock className="w-3 h-3" />
-            Queued
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 animate-pulse">
-            <Layers className="w-3 h-3" />
-            {status}
-          </span>
-        );
-    }
-  };
+  // ─── CREATE VIEW ───
+  if (pageView === "create") {
+    return (
+      <div className="space-y-8">
+        {/* Back button */}
+        <button
+          onClick={() => { setPageView("library"); setCreateMode(null); }}
+          className="inline-flex items-center gap-2 text-sm text-neutral-500 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Library
+        </button>
 
+        {/* Mode Selection */}
+        {!createMode && (
+          <>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Create</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">New Video</h1>
+              <p className="text-sm text-neutral-500 mt-2">Choose how you want to create your video.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Option 1: Faceless */}
+              <button
+                onClick={() => setCreateMode("faceless")}
+                className="group text-left p-8 rounded-xl border border-neutral-800 bg-neutral-950 hover:border-neutral-600 transition-all"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-neutral-400" />
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-neutral-700 group-hover:text-white transition-colors" />
+                </div>
+                <h2 className="text-lg font-semibold text-white mb-2">Faceless Video</h2>
+                <p className="text-sm text-neutral-500 leading-relaxed">
+                  Write or paste a script. Choose a character, niche, theme, and ratio. AI generates the entire video automatically.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {["Script", "Character", "Theme", "Auto-Generated"].map(tag => (
+                    <span key={tag} className="text-[10px] uppercase tracking-wider text-neutral-600 border border-neutral-800 rounded px-2 py-0.5">{tag}</span>
+                  ))}
+                </div>
+              </button>
+
+              {/* Option 2: Upload */}
+              <button
+                onClick={() => setCreateMode("upload")}
+                className="group text-left p-8 rounded-xl border border-neutral-800 bg-neutral-950 hover:border-neutral-600 transition-all"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-neutral-400" />
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-neutral-700 group-hover:text-white transition-colors" />
+                </div>
+                <h2 className="text-lg font-semibold text-white mb-2">Upload & Enhance</h2>
+                <p className="text-sm text-neutral-500 leading-relaxed">
+                  Upload your own footage. AI Director adds B-Roll, motion graphics, captions, SFX, and music automatically.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {["Your Footage", "AI B-Roll", "SFX", "Captions"].map(tag => (
+                    <span key={tag} className="text-[10px] uppercase tracking-wider text-neutral-600 border border-neutral-800 rounded px-2 py-0.5">{tag}</span>
+                  ))}
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ─── FACELESS CREATION FORM ─── */}
+        {createMode === "faceless" && (
+          <div className="space-y-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Faceless Video</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Configure Your Video</h1>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left: Script */}
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Topic</label>
+                  <input
+                    type="text"
+                    value={facelessForm.topic}
+                    onChange={e => setFacelessForm(p => ({ ...p, topic: e.target.value }))}
+                    placeholder="e.g. Why compound interest grows so quickly"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 text-sm text-white placeholder:text-neutral-700 focus:border-neutral-600 outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Script</label>
+                  <textarea
+                    value={facelessForm.script}
+                    onChange={e => setFacelessForm(p => ({ ...p, script: e.target.value }))}
+                    placeholder="Paste your script here... Leave blank to let AI generate it from the topic."
+                    className="w-full h-64 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 text-sm text-white placeholder:text-neutral-700 focus:border-neutral-600 outline-none transition-colors resize-none font-mono leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* Right: Options */}
+              <div className="space-y-6">
+                {/* Character */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Character</label>
+                  <div className="space-y-2">
+                    {CHARACTERS.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => setFacelessForm(p => ({ ...p, character: c.id }))}
+                        className={cn(
+                          "w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center gap-3",
+                          facelessForm.character === c.id
+                            ? "border-white bg-neutral-900 text-white"
+                            : "border-neutral-800 bg-neutral-950 text-neutral-500 hover:border-neutral-700"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+                          facelessForm.character === c.id ? "bg-white text-black" : "bg-neutral-800 text-neutral-500"
+                        )}>
+                          {c.name[0]}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">{c.name}</div>
+                          <div className="text-[11px] text-neutral-600">{c.desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Niche */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Niche</label>
+                  <div className="flex flex-wrap gap-2">
+                    {NICHES.map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setFacelessForm(p => ({ ...p, niche: n }))}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                          facelessForm.niche === n
+                            ? "border-white bg-white text-black"
+                            : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                        )}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Theme */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Theme</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFacelessForm(p => ({ ...p, theme: "dark" }))}
+                      className={cn(
+                        "flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-2",
+                        facelessForm.theme === "dark"
+                          ? "border-white bg-white text-black"
+                          : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                      )}
+                    >
+                      <Moon className="w-4 h-4" /> Dark
+                    </button>
+                    <button
+                      onClick={() => setFacelessForm(p => ({ ...p, theme: "light" }))}
+                      className={cn(
+                        "flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-2",
+                        facelessForm.theme === "light"
+                          ? "border-white bg-white text-black"
+                          : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                      )}
+                    >
+                      <Sun className="w-4 h-4" /> Light
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ratio */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Aspect Ratio</label>
+                  <div className="flex gap-2">
+                    {([
+                      { v: "9:16", icon: Smartphone, label: "9:16" },
+                      { v: "16:9", icon: Monitor, label: "16:9" },
+                      { v: "1:1", icon: Square, label: "1:1" },
+                    ] as const).map(r => (
+                      <button
+                        key={r.v}
+                        onClick={() => setFacelessForm(p => ({ ...p, ratio: r.v }))}
+                        className={cn(
+                          "flex-1 px-3 py-3 rounded-lg border text-xs font-medium transition-all flex flex-col items-center gap-1.5",
+                          facelessForm.ratio === r.v
+                            ? "border-white bg-white text-black"
+                            : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                        )}
+                      >
+                        <r.icon className="w-4 h-4" />
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mood */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Mood</label>
+                  <div className="flex flex-wrap gap-2">
+                    {MOODS.map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setFacelessForm(p => ({ ...p, mood: m }))}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                          facelessForm.mood === m
+                            ? "border-white bg-white text-black"
+                            : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                        )}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Generate Button */}
+            <div className="flex items-center justify-between pt-4 border-t border-neutral-900">
+              <button
+                onClick={() => setCreateMode(null)}
+                className="text-sm text-neutral-500 hover:text-white transition-colors"
+              >
+                ← Back
+              </button>
+              <Link
+                href="/demo/script"
+                className="px-6 py-3 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 transition-colors inline-flex items-center gap-2"
+              >
+                Generate Video
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* ─── UPLOAD & ENHANCE FORM ─── */}
+        {createMode === "upload" && (
+          <div className="space-y-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Upload & Enhance</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Configure AI Director</h1>
+              <p className="text-sm text-neutral-500 mt-2">Set preferences before uploading your footage.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Ratio */}
+              <div>
+                <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Output Ratio</label>
+                <div className="flex gap-2">
+                  {([
+                    { v: "9:16", icon: Smartphone, label: "Portrait" },
+                    { v: "16:9", icon: Monitor, label: "Landscape" },
+                    { v: "1:1", icon: Square, label: "Square" },
+                  ] as const).map(r => (
+                    <button
+                      key={r.v}
+                      onClick={() => setUploadForm(p => ({ ...p, ratio: r.v }))}
+                      className={cn(
+                        "flex-1 px-3 py-4 rounded-lg border text-xs font-medium transition-all flex flex-col items-center gap-2",
+                        uploadForm.ratio === r.v
+                          ? "border-white bg-white text-black"
+                          : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                      )}
+                    >
+                      <r.icon className="w-5 h-5" />
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Style */}
+              <div>
+                <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Editing Style</label>
+                <div className="space-y-2">
+                  {(["viral", "cinematic", "educational", "minimal"] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setUploadForm(p => ({ ...p, style: s }))}
+                      className={cn(
+                        "w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-all capitalize",
+                        uploadForm.style === s
+                          ? "border-white bg-white text-black"
+                          : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Theme + Mood + Niche */}
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Theme</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setUploadForm(p => ({ ...p, theme: "dark" }))}
+                      className={cn(
+                        "flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-2",
+                        uploadForm.theme === "dark"
+                          ? "border-white bg-white text-black"
+                          : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                      )}
+                    >
+                      <Moon className="w-4 h-4" /> Dark
+                    </button>
+                    <button
+                      onClick={() => setUploadForm(p => ({ ...p, theme: "light" }))}
+                      className={cn(
+                        "flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-2",
+                        uploadForm.theme === "light"
+                          ? "border-white bg-white text-black"
+                          : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                      )}
+                    >
+                      <Sun className="w-4 h-4" /> Light
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Mood</label>
+                  <div className="flex flex-wrap gap-2">
+                    {MOODS.map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setUploadForm(p => ({ ...p, mood: m }))}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                          uploadForm.mood === m
+                            ? "border-white bg-white text-black"
+                            : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                        )}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Niche</label>
+                  <div className="flex flex-wrap gap-2">
+                    {NICHES.map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setUploadForm(p => ({ ...p, niche: n }))}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                          uploadForm.niche === n
+                            ? "border-white bg-white text-black"
+                            : "border-neutral-800 text-neutral-500 hover:border-neutral-700"
+                        )}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Upload Button */}
+            <div className="flex items-center justify-between pt-4 border-t border-neutral-900">
+              <button
+                onClick={() => setCreateMode(null)}
+                className="text-sm text-neutral-500 hover:text-white transition-colors"
+              >
+                ← Back
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="px-6 py-3 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 transition-colors inline-flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload Video File
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Modal (reused for the upload path) */}
+        <VideoUploadModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={() => { fetchVideos(); setPageView("library"); setCreateMode(null); }}
+        />
+      </div>
+    );
+  }
+
+  // ─── LIBRARY VIEW (default) ───
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Videos Library</h1>
-          <p className="text-sm text-slate-400">
-            Direct R2 ingest, AI editing state machine, and exported videos.
-          </p>
+          <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Library</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-white">Videos</h1>
         </div>
-
         <div className="flex items-center gap-3">
           <button
             onClick={fetchVideos}
-            className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all"
-            title="Refresh list"
+            className="p-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-neutral-800 transition-all"
+            title="Refresh"
           >
             <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
           </button>
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/30 inline-flex items-center gap-2 transition-all active:scale-95"
+            onClick={() => setPageView("create")}
+            className="px-4 py-2.5 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 transition-colors inline-flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>Upload Video</span>
+            Create Video
           </button>
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search */}
       <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-neutral-600 absolute left-4 top-1/2 -translate-y-1/2" />
         <input
           type="text"
-          placeholder="Search videos by title..."
+          placeholder="Search videos..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0d1017] border border-slate-800/80 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 rounded-lg bg-neutral-950 border border-neutral-800 text-sm text-white placeholder:text-neutral-700 focus:outline-none focus:border-neutral-600 transition-colors"
         />
       </div>
 
-      {/* Videos Grid */}
+      {/* Video List */}
       {loading && videos.length === 0 ? (
-        <div className="py-20 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
-          <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
-          <span className="text-xs">Loading video pipeline jobs...</span>
+        <div className="py-20 text-center flex flex-col items-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />
+          <span className="text-xs text-neutral-600">Loading videos...</span>
         </div>
       ) : filteredVideos.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-800 bg-[#0d1017]/60 p-12 text-center flex flex-col items-center justify-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-            <Film className="w-7 h-7" />
+        <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-950 p-16 text-center flex flex-col items-center gap-4">
+          <Film className="w-8 h-8 text-neutral-700" />
+          <div>
+            <h3 className="text-sm font-medium text-white mb-1">No videos yet</h3>
+            <p className="text-xs text-neutral-600">Create your first AI video to get started.</p>
           </div>
-          <div className="max-w-md space-y-1.5">
-            <h3 className="text-base font-semibold text-white">No videos in pipeline</h3>
-            <p className="text-xs text-slate-400">
-              Upload raw video footage or create a faceless AI short.
-            </p>
-          </div>
-          <div className="pt-2">
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30 inline-flex items-center gap-2 transition-all hover:scale-105"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Upload First Video</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setPageView("create")}
+            className="mt-2 px-4 py-2 rounded-lg text-xs font-medium bg-white text-black hover:bg-neutral-200 transition-colors inline-flex items-center gap-2"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create Video
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredVideos.map((video) => (
+        <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800">
+          {/* Table Header */}
+          <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-neutral-900/50 text-[10px] text-neutral-500 font-medium uppercase tracking-wider">
+            <div className="col-span-4">Title</div>
+            <div className="col-span-2">Type</div>
+            <div className="col-span-2">Status</div>
+            <div className="col-span-2">Created</div>
+            <div className="col-span-2 text-right">Actions</div>
+          </div>
+
+          {filteredVideos.map(video => (
             <div
               key={video.id}
               onClick={() => setSelectedVideo(video)}
-              className="rounded-2xl bg-[#0d1017] border border-slate-800/80 hover:border-indigo-500/60 transition-all overflow-hidden flex flex-col justify-between group cursor-pointer shadow-sm hover:shadow-xl hover:shadow-indigo-500/5"
+              className="grid grid-cols-12 gap-4 px-5 py-4 items-center bg-neutral-950 hover:bg-neutral-900/50 transition-colors cursor-pointer group"
             >
-              {/* Card Header / Thumbnail */}
-              <div className="h-40 bg-gradient-to-br from-slate-900 via-[#101420] to-[#0d1017] relative p-4 flex flex-col justify-between border-b border-slate-800/60">
-                <div className="flex items-center justify-between z-10">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-900/80 text-slate-300 border border-slate-700/60 backdrop-blur-md">
-                    {video.video_type === "talking_head" ? (
-                      <>
-                        <Video className="w-3 h-3 text-indigo-400" />
-                        Talking Head
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3 text-purple-400" />
-                        Faceless Short
-                      </>
-                    )}
-                  </span>
-
-                  {getStatusBadge(video.status)}
-                </div>
-
-                <div className="z-10 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    {formatDate(video.created_at)}
-                  </span>
-                  <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30 group-hover:scale-110 transition-transform">
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                  </div>
-                </div>
+              <div className="col-span-4 text-sm font-medium text-white truncate group-hover:text-neutral-200">
+                {video.title}
               </div>
-
-              {/* Card Body */}
-              <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
-                <div className="space-y-1.5">
-                  <h3 className="text-sm font-bold text-white line-clamp-1 group-hover:text-indigo-300 transition-colors">
-                    {video.title}
-                  </h3>
-                  <div className="text-[11px] text-slate-400 font-mono truncate" title={video.source_url}>
-                    {video.source_url}
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="text-slate-400 font-mono text-[10px]">
-                    ID: {video.id.slice(0, 8)}...
-                  </span>
-
-                  <button
-                    onClick={(e) => handleDelete(e, video.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                    title="Delete Video"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              <div className="col-span-2 text-xs text-neutral-500 capitalize">
+                {video.video_type === "talking_head" ? "Talking Head" : "Faceless"}
+              </div>
+              <div className="col-span-2">
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider",
+                  video.status === "COMPLETED" ? "text-white" :
+                  video.status === "FAILED" ? "text-neutral-600" :
+                  "text-neutral-400"
+                )}>
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    video.status === "COMPLETED" ? "bg-white" :
+                    video.status === "FAILED" ? "bg-neutral-700" :
+                    "bg-neutral-500 animate-pulse"
+                  )} />
+                  {video.status === "COMPLETED" ? "Done" : video.status.toLowerCase().replace("_", " ")}
+                </span>
+              </div>
+              <div className="col-span-2 text-xs text-neutral-600 font-mono">
+                {formatDate(video.created_at)}
+              </div>
+              <div className="col-span-2 flex justify-end">
+                <button
+                  onClick={e => handleDelete(e, video.id)}
+                  className="p-2 rounded-lg text-neutral-700 hover:text-white hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Delete"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Upload Modal */}
+      {/* Upload Modal (for legacy upload path) */}
       <VideoUploadModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchVideos}
       />
 
-      {/* Video Details & AI Edits Inspector Modal */}
+      {/* Detail Modal */}
       <VideoDetailModal
         video={selectedVideo}
         isOpen={!!selectedVideo}
