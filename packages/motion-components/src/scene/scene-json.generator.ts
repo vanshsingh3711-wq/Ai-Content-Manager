@@ -56,10 +56,13 @@ export class DeterministicSceneJsonGenerator {
       elements.push(this.mapElementIntent(intent));
     }
 
+    const beat = storyPlan.beats.find(b => b.id === visualScene.beatId);
+    
     const sceneJson: SceneJSON = {
       id: `scene_${visualScene.beatId}`, // Deterministic based on beat
       beatId: visualScene.beatId,
       template,
+      durationInFrames: beat?.suggestedDurationInFrames, // Get precise duration from TTS/StoryPlan
       elements,
       attention: visualScene.attention,
       transition: visualScene.transition

@@ -225,6 +225,7 @@ export default function EditorStateDemoPage() {
     showModal: boolean;
     status: GenerationStatus;
     topic: string;
+    script?: string;
     duration: number;
     format: string;
     theme: string;
@@ -234,6 +235,7 @@ export default function EditorStateDemoPage() {
     showModal: false,
     status: 'idle',
     topic: 'Why compound interest grows so quickly',
+    script: '',
     duration: 30,
     format: '9:16',
     theme: 'premium_dark',
@@ -259,6 +261,7 @@ export default function EditorStateDemoPage() {
 
       const result = orchestrator.generate({
         topic: generationState.topic,
+        script: generationState.script || undefined,
         durationInSeconds: generationState.duration,
         themeId: generationState.theme,
         format: { width, height, fps: 30 },
@@ -630,6 +633,16 @@ export default function EditorStateDemoPage() {
                   />
                 </div>
                 
+                <div>
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Custom Script (Optional)</label>
+                  <textarea 
+                    value={generationState.script}
+                    onChange={(e) => setGenerationState(prev => ({...prev, script: e.target.value}))}
+                    placeholder="Leave blank to let AI write the script..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white h-24"
+                  />
+                </div>
+                
                 <div className="flex gap-4">
                   <div className="flex-1">
                     <label className="block text-sm font-bold text-gray-400 mb-1">Duration (sec)</label>
@@ -703,8 +716,10 @@ export default function EditorStateDemoPage() {
                   )}
                   <div className="text-xl font-bold">
                     {generationState.status === 'planning' && 'Planning Story...'}
+                    {generationState.status === 'audio-generation' && 'Generating Audio...'}
                     {generationState.status === 'visual-planning' && 'Creating Visual Plan...'}
                     {generationState.status === 'scene-generation' && 'Generating Scenes...'}
+                    {generationState.status === 'sfx-planning' && 'Planning Sound Effects...'}
                     {generationState.status === 'compiling' && 'Compiling Graph...'}
                     {generationState.status === 'validating' && 'Validating Output...'}
                     {generationState.status === 'completed' && 'Generation Complete!'}
