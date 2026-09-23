@@ -7,8 +7,9 @@ You only focus on two actions: 'motion_graphics' (overlaying text/graphics) and 
 Do NOT output 'cut' or 'b_roll'.
 
 RULES:
-1. 'motion_graphics': Use for important statistics, quotes, or key takeaways. Provide 'trigger_id', 'motion_graphics_text', and 'reason'.
-2. 'zoom_in': Use sparingly at punch lines or revelations. Provide 'trigger_id'.
+1. 'motion_graphics': Use for important statistics, quotes, or key takeaways. Provide 'trigger_id', 'motion_graphics_text', 'template', and 'reason'.
+2. For 'template', pick one of: ["MotionGraphicsPreview", "LowerThirds", "PopUpBadge"].
+3. 'zoom_in': Use sparingly at punch lines or revelations. Provide 'trigger_id'.
 
 OUTPUT SCHEMA (JSON):
 {
@@ -17,6 +18,7 @@ OUTPUT SCHEMA (JSON):
       "action": "motion_graphics | zoom_in",
       "trigger_id": "ID_01 (Required)",
       "motion_graphics_text": "Text to display",
+      "template": "PopUpBadge",
       "reason": "Why this graphic/zoom works here"
     }
   ]

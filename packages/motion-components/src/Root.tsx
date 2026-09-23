@@ -7,6 +7,8 @@ import { ResolvedSequence } from './sequence/sequence.types';
 import { RenderErrorBoundary } from './render/RenderErrorBoundary';
 import { renderDefaultScene } from './render/DefaultSceneRenderer';
 import { MotionGraphicsPreview } from './elements/Typography/MotionGraphicsPreview';
+import { LowerThirds } from './elements/Typography/LowerThirds';
+import { PopUpBadge } from './elements/Typography/PopUpBadge';
 
 export const RemotionRoot: React.FC = () => {
   const inputProps = getInputProps();
@@ -29,6 +31,30 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="MotionGraphicsPreview"
         component={MotionGraphicsPreview}
+        durationInFrames={150}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{
+          text: 'Default Text'
+        }}
+      />
+      
+      <Composition
+        id="LowerThirds"
+        component={LowerThirds}
+        durationInFrames={150}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{
+          text: 'Default Text'
+        }}
+      />
+      
+      <Composition
+        id="PopUpBadge"
+        component={PopUpBadge}
         durationInFrames={150}
         fps={30}
         width={1080}

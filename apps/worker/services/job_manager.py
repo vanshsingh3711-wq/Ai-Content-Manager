@@ -20,6 +20,54 @@ def set_job_status_downloading(job_uuid: uuid.UUID):
     finally:
         session.close()
 
+def set_job_status_transcribing(job_uuid: uuid.UUID):
+    session = get_worker_db()
+    try:
+        job = session.get(VideoJob, job_uuid)
+        if job:
+            job.status = VideoJobStatus.TRANSCRIBING
+            job.updated_at = get_utc_now()
+            session.add(job)
+            session.commit()
+    finally:
+        session.close()
+
+def set_job_status_ai_directing(job_uuid: uuid.UUID):
+    session = get_worker_db()
+    try:
+        job = session.get(VideoJob, job_uuid)
+        if job:
+            job.status = VideoJobStatus.AI_DIRECTING
+            job.updated_at = get_utc_now()
+            session.add(job)
+            session.commit()
+    finally:
+        session.close()
+
+def set_job_status_rendering(job_uuid: uuid.UUID):
+    session = get_worker_db()
+    try:
+        job = session.get(VideoJob, job_uuid)
+        if job:
+            job.status = VideoJobStatus.RENDERING
+            job.updated_at = get_utc_now()
+            session.add(job)
+            session.commit()
+    finally:
+        session.close()
+
+def set_job_status_publishing(job_uuid: uuid.UUID):
+    session = get_worker_db()
+    try:
+        job = session.get(VideoJob, job_uuid)
+        if job:
+            job.status = VideoJobStatus.PUBLISHING
+            job.updated_at = get_utc_now()
+            session.add(job)
+            session.commit()
+    finally:
+        session.close()
+
 def set_job_status_completed(job_uuid: uuid.UUID, final_video_url: str, edits_json_str: str):
     session = get_worker_db()
     try:

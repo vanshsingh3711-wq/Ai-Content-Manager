@@ -21,6 +21,7 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 from services.media_extractor import get_ffmpeg_binary_path
 from services.editing_config import EDITING_CONFIG
+from services.sfx_manager import fetch_sfx
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +80,26 @@ def _render_remotion_composition(comp_id: str, props: dict, duration_sec: float,
         return None
     return out_path
 
+_HW_CODEC = None
+
+def _get_video_codec(ffmpeg_bin: str) -> str:
+    global _HW_CODEC
+    if _HW_CODEC is not None:
+        return _HW_CODEC
+    
+    try:
+        res = subprocess.run([ffmpeg_bin, "-encoders"], capture_output=True, text=True)
+        if "h264_nvenc" in res.stdout:
+            _HW_CODEC = "h264_nvenc"
+        elif "h264_videotoolbox" in res.stdout:
+            _HW_CODEC = "h264_videotoolbox"
+        else:
+            _HW_CODEC = "libx264"
+    except Exception:
+        _HW_CODEC = "libx264"
+        
+    _log("HW_ACCEL", f"Selected video codec: {_HW_CODEC}")
+    return _HW_CODEC
 
 def _get_ffprobe_bin(ffmpeg_bin: str) -> str:
     """Derive the ffprobe binary path from the ffmpeg binary path.
@@ -510,15 +531,17 @@ def render_video_pipeline(
         for a in seg["actions"]:
             if a["action"] == "motion_graphics":
                 motion_graphics_text = a.get("motion_graphics_text")
+                mg_template = a.get("template", "MotionGraphicsPreview")
             elif a["action"] == "character":
                 character_action = a.get("character_action")
             elif a["action"] == "sfx":
                 has_sfx = True
+                sfx_keyword = a.get("sound_effect", "pop")
 
         mg_path = None
         if motion_graphics_text:
             mg_path = _render_remotion_composition(
-                "MotionGraphicsPreview", 
+                mg_template, 
                 {"text": motion_graphics_text},
                 duration, source_fps, temp_dir, f"mg_{seg['chunk_id']}"
             )
@@ -576,9 +599,21 @@ def render_video_pipeline(
             
         current_a = "0:a"
         if has_sfx:
-            # We assume a pop.wav exists or we skip
-            sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../apps/web/public/assets/audio/pop.wav"))
-            if os.path.exists(sfx_path):
+            sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
+            sfx_fetched = False
+            
+            if sfx_keyword:
+                _log("SFX", f"Fetching SFX for keyword: '{sfx_keyword}'...")
+                sfx_fetched = fetch_sfx(sfx_keyword, sfx_path)
+                
+            if not sfx_fetched:
+                # Fallback to local pop.wav
+                fallback_sfx = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../apps/web/public/assets/audio/pop.wav"))
+                if os.path.exists(fallback_sfx):
+                    sfx_path = fallback_sfx
+                    sfx_fetched = True
+                    
+            if sfx_fetched and os.path.exists(sfx_path):
                 cmd.extend(["-i", sfx_path])
                 _log("SFX", f"Adding SFX for {seg['chunk_id']}")
                 video_filters.append(f"[0:a][{input_idx}:a]amix=inputs=2:duration=first:dropout_transition=2[sfx_a];")
@@ -594,7 +629,7 @@ def render_video_pipeline(
             "-map", current_a,
             "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
             "-r", str(source_fps),
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:v", _get_video_codec(ffmpeg_bin), "-preset", "fast", "-crf", "23",
             "-c:a", "aac", "-b:a", "192k",
             "-pix_fmt", "yuv420p",
             "-shortest",
@@ -629,7 +664,7 @@ def render_video_pipeline(
                     "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
                     "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
                     "-r", str(source_fps),
-                    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                    "-c:v", _get_video_codec(ffmpeg_bin), "-preset", "fast", "-crf", "23",
                     "-c:a", "aac", "-b:a", "192k",
                     "-pix_fmt", "yuv420p",
                     seg_output,
@@ -683,7 +718,7 @@ def render_video_pipeline(
             ffmpeg_bin, "-y",
             "-i", concat_output,
             "-vf", sub_filter,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:v", _get_video_codec(ffmpeg_bin), "-preset", "fast", "-crf", "23",
             "-c:a", "copy",
             "-pix_fmt", "yuv420p",
             "-movflags", "+faststart",

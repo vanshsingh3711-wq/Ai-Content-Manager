@@ -13,8 +13,15 @@ from models import VideoJob, VideoJobStatus, VideoType
 
 # Import orchestration managers
 from services.ingest_manager import stage_raw_video
-from services.job_manager import set_job_status_downloading, set_job_status_completed, set_job_status_failed
-
+from services.job_manager import (
+    set_job_status_downloading,
+    set_job_status_transcribing,
+    set_job_status_ai_directing,
+    set_job_status_rendering,
+    set_job_status_publishing,
+    set_job_status_completed,
+    set_job_status_failed
+)
 # Import Services
 from services.media_extractor import extract_audio_track, get_ffmpeg_binary_path
 from services.transcriber import transcribe_and_compress, calculate_transcription_coverage
@@ -96,6 +103,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 2: TRANSCRIBING & AUDIO ANALYSIS ---
         with PipelineStep(2, 8, "AUDIO EXTRACTION & SPEECH-TO-TEXT", "faster-whisper (int8 CPU / speech gap segmentation)"):
+            set_job_status_transcribing(job_uuid)
             if job_video_type != VideoType.FACELESS_SHORT:
                 extract_audio_track(raw_video_path, extracted_wav_path, sample_rate=16000, channels=1)
                 ffmpeg_bin = get_ffmpeg_binary_path()
@@ -158,6 +166,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 4: MULTI-AGENT AI DIRECTORS ---
         with PipelineStep(4, 8, "MULTI-AGENT AI DIRECTORS", "Parallel execution of B-Roll, Motion Graphics, and Character Planners"):
+            set_job_status_ai_directing(job_uuid)
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 future_broll = executor.submit(generate_broll_plan, unified_json_str)
                 future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str)
@@ -227,6 +236,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 8: FFMPEG COMPOSITOR & PUBLISHING ---
         with PipelineStep(8, 8, "FFMPEG RENDERING & PUBLISHING", "Assembly of final MP4 and social export"):
+            set_job_status_rendering(job_uuid)
             render_video_pipeline(
                 raw_video_path=raw_video_path,
                 output_mp4_path=rendered_mp4_path,
@@ -236,6 +246,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 timestamp_map=timestamp_map,
             )
             
+            set_job_status_publishing(job_uuid)
             final_video_url = upload_rendered_video_to_storage(
                 local_mp4_path=rendered_mp4_path,
                 job_id=job_id_str,

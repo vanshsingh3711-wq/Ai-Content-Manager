@@ -16,6 +16,13 @@ def _wait_for_internet_retry(func):
                 print(f"[!] Network connection lost. Waiting 10s for internet to return (Attempt {attempt})...")
                 time.sleep(10)
                 attempt += 1
+            except requests.exceptions.HTTPError as e:
+                if e.response is not None and e.response.status_code in [429, 500, 502, 503, 504]:
+                    print(f"[!] API rate limit or server error ({e.response.status_code}). Retrying in 10s (Attempt {attempt})...")
+                    time.sleep(10)
+                    attempt += 1
+                else:
+                    raise
     return wrapper
 
 @_wait_for_internet_retry
