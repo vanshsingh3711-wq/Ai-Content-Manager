@@ -41,6 +41,7 @@ export default function DashboardLayout({
   useEffect(() => {
     async function checkApi() {
       try {
+        // Force Vercel rebuild to pick up new NEXT_PUBLIC_API_URL
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const res = await fetch(`${apiUrl}/health`, { method: "GET" });
         if (res.ok) {
