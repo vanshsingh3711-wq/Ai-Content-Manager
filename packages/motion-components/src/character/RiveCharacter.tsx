@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRive } from '@rive-app/react-canvas';
-import { AbsoluteFill } from 'remotion';
+import { AbsoluteFill, delayRender, continueRender } from 'remotion';
 
 export interface RiveCharacterProps {
   width?: number;
@@ -25,10 +25,14 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
   gesture = 'none',
   pointerRotation = 0
 }) => {
+  const [handle] = useState(() => delayRender("Loading Rive Character"));
+  
   const { rive, RiveComponent } = useRive({
     src: '/28195-53259-character-builder.riv',
     autoplay: true,
-    // stateMachines: "State Machine 1" // You can enable this once the state machine name is known
+    onLoad: () => {
+      continueRender(handle);
+    }
   });
 
   // If you know the state machine input names, you can trigger them here:
