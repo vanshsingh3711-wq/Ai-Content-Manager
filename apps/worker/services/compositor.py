@@ -39,10 +39,15 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     if "-threads" not in final_cmd:
         # Cap to 2 CPU threads to leave headroom for OS window manager and UI apps
         final_cmd[1:1] = ["-threads", "2"]
+    if "-hide_banner" not in final_cmd:
+        final_cmd[1:1] = ["-hide_banner"]
+        
     _log("CMD", f"({label}) {' '.join(final_cmd[:8])}... ({len(final_cmd)} args)")
     result = subprocess.run(final_cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        stderr_preview = (result.stderr or "")[:1500]
+        stderr_text = result.stderr or ""
+        # The actual error is usually at the end of the FFmpeg output
+        stderr_preview = stderr_text[-2000:] if len(stderr_text) > 2000 else stderr_text
         _log("STDERR", f"({label}) {stderr_preview}")
         raise RuntimeError(
             f"FFmpeg failed for '{label}' (exit code {result.returncode}):\n{stderr_preview}"
@@ -88,16 +93,26 @@ def _get_video_codec(ffmpeg_bin: str) -> str:
     if _HW_CODEC is not None:
         return _HW_CODEC
     
+    _HW_CODEC = "libx264"
     try:
         res = subprocess.run([ffmpeg_bin, "-encoders"], capture_output=True, text=True)
         if "h264_nvenc" in res.stdout:
-            _HW_CODEC = "h264_nvenc"
+            # Test if nvenc actually works (needs GPU)
+            test = subprocess.run(
+                [ffmpeg_bin, "-hide_banner", "-y", "-f", "lavfi", "-i", "color=c=black:s=64x64", "-c:v", "h264_nvenc", "-t", "0.1", "-f", "null", "-"],
+                capture_output=True
+            )
+            if test.returncode == 0:
+                _HW_CODEC = "h264_nvenc"
         elif "h264_videotoolbox" in res.stdout:
-            _HW_CODEC = "h264_videotoolbox"
-        else:
-            _HW_CODEC = "libx264"
+            test = subprocess.run(
+                [ffmpeg_bin, "-hide_banner", "-y", "-f", "lavfi", "-i", "color=c=black:s=64x64", "-c:v", "h264_videotoolbox", "-t", "0.1", "-f", "null", "-"],
+                capture_output=True
+            )
+            if test.returncode == 0:
+                _HW_CODEC = "h264_videotoolbox"
     except Exception:
-        _HW_CODEC = "libx264"
+        pass
         
     _log("HW_ACCEL", f"Selected video codec: {_HW_CODEC}")
     return _HW_CODEC
@@ -574,8 +589,9 @@ def render_video_pipeline(
             video_filters.append(
                 f"[{input_idx}:v]fps={source_fps},scale=1080:1920:force_original_aspect_ratio=increase,"
                 f"crop=1080:1920,setpts=PTS-STARTPTS+{start_t}/TB[broll_v];"
+                f"{current_v}[broll_v]overlay=x=0:y=0:eof_action=pass[with_broll];"
             )
-            current_v = "[broll_v]"
+            current_v = "[with_broll]"
             input_idx += 1
             
         if mg_path:
