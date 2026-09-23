@@ -42,29 +42,29 @@ export function MobileBottomBar({ onOpenDrawer }: MobileBottomBarProps) {
   };
 
   return (
-    <div className="h-14 border-t border-slate-800/80 bg-[#0c0f17] md:hidden px-2 flex items-center justify-around z-40 select-none">
+    <div className="h-14 border-t border-neutral-900 bg-neutral-950 md:hidden px-2 flex items-center justify-around z-40 select-none">
       {/* Split */}
       <button
         onClick={handleSplit}
-        className="flex flex-col items-center gap-1 text-slate-300 active:text-indigo-400 p-1"
+        className="flex flex-col items-center gap-1 text-neutral-400 active:text-white p-1"
       >
-        <Scissors className="w-4 h-4 text-indigo-400" />
+        <Scissors className="w-4 h-4 text-white" />
         <span className="text-[10px] font-semibold">Split</span>
       </button>
 
       {/* B-Roll */}
       <button
         onClick={() => onOpenDrawer("broll")}
-        className="flex flex-col items-center gap-1 text-slate-300 active:text-purple-400 p-1"
+        className="flex flex-col items-center gap-1 text-neutral-400 active:text-white p-1"
       >
-        <Film className="w-4 h-4 text-purple-400" />
+        <Film className="w-4 h-4 text-neutral-400" />
         <span className="text-[10px] font-semibold">Overlay</span>
       </button>
 
       {/* Text / Captions */}
       <button
         onClick={() => onOpenDrawer("captions")}
-        className="flex flex-col items-center gap-1 text-slate-300 active:text-yellow-400 p-1"
+        className="flex flex-col items-center gap-1 text-neutral-400 active:text-white p-1"
       >
         <Type className="w-4 h-4 text-yellow-400" />
         <span className="text-[10px] font-semibold">Text</span>
@@ -73,9 +73,9 @@ export function MobileBottomBar({ onOpenDrawer }: MobileBottomBarProps) {
       {/* Audio */}
       <button
         onClick={() => onOpenDrawer("audio")}
-        className="flex flex-col items-center gap-1 text-slate-300 active:text-emerald-400 p-1"
+        className="flex flex-col items-center gap-1 text-neutral-400 active:text-white p-1"
       >
-        <Music className="w-4 h-4 text-emerald-400" />
+        <Music className="w-4 h-4 text-neutral-400" />
         <span className="text-[10px] font-semibold">Audio</span>
       </button>
 
@@ -85,7 +85,7 @@ export function MobileBottomBar({ onOpenDrawer }: MobileBottomBarProps) {
         disabled={!selectedItem}
         className={cn(
           "flex flex-col items-center gap-1 p-1 transition-opacity",
-          selectedItem ? "text-rose-400 opacity-100" : "text-slate-400 opacity-40 cursor-not-allowed"
+          selectedItem ? "text-rose-400 opacity-100" : "text-neutral-500 opacity-40 cursor-not-allowed"
         )}
       >
         <Trash2 className="w-4 h-4" />

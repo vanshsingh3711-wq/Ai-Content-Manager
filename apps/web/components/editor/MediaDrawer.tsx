@@ -176,17 +176,17 @@ export function MediaDrawer({
   return (
     <aside
       className={cn(
-        "w-64 md:w-72 border-r border-slate-800/80 bg-[#0d1017] flex flex-col z-30 transition-transform select-none shadow-2xl",
+        "w-64 md:w-72 border-r border-neutral-900 bg-neutral-950 flex flex-col z-30 transition-transform select-none shadow-2xl",
         isOpenMobile ? "fixed inset-y-0 left-0 translate-x-0" : "hidden md:flex"
       )}
     >
       {/* Mobile Close Bar */}
       {isOpenMobile && (
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800 bg-slate-950 md:hidden">
-          <span className="text-xs font-bold text-slate-300 capitalize">{currentTab} Studio</span>
+        <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-900 bg-neutral-950 md:hidden">
+          <span className="text-xs font-bold text-neutral-400 capitalize">{currentTab} Studio</span>
           <button
             onClick={onCloseMobile}
-            className="p-1 text-slate-400 hover:text-white rounded"
+            className="p-1 text-neutral-500 hover:text-white rounded"
           >
             <X className="w-4 h-4" />
           </button>
@@ -194,14 +194,14 @@ export function MediaDrawer({
       )}
 
       {/* Top Tabs */}
-      <div className="flex items-center border-b border-slate-800/80 p-1.5 gap-1 bg-slate-950/40">
+      <div className="flex items-center border-b border-neutral-900 p-1.5 gap-1 bg-neutral-950">
         <button
           onClick={() => handleTabSelect("media")}
           className={cn(
             "flex-1 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1 transition-all",
             currentTab === "media"
-              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
-              : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+              ? "bg-white/10 text-white border border-neutral-700"
+              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
           )}
         >
           <Upload className="w-3.5 h-3.5" />
@@ -213,8 +213,8 @@ export function MediaDrawer({
           className={cn(
             "flex-1 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1 transition-all",
             currentTab === "captions"
-              ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/40"
-              : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+              ? "bg-white/10 text-white border border-neutral-700"
+              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
           )}
         >
           <Type className="w-3.5 h-3.5" />
@@ -226,8 +226,8 @@ export function MediaDrawer({
           className={cn(
             "flex-1 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1 transition-all",
             currentTab === "broll"
-              ? "bg-purple-600/30 text-purple-300 border border-purple-500/40"
-              : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+              ? "bg-white/10 text-white border border-neutral-700"
+              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
           )}
         >
           <Film className="w-3.5 h-3.5" />
@@ -239,8 +239,8 @@ export function MediaDrawer({
           className={cn(
             "flex-1 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1 transition-all",
             currentTab === "audio"
-              ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40"
-              : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+              ? "bg-white/10 text-white border border-neutral-700"
+              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
           )}
         >
           <Music className="w-3.5 h-3.5" />
@@ -249,22 +249,22 @@ export function MediaDrawer({
       </div>
 
       {/* Drawer Content */}
-      <div className="flex-1 overflow-y-auto p-3 text-slate-200">
+      <div className="flex-1 overflow-y-auto p-3 text-neutral-300">
         {/* TAB 1: MEDIA UPLOAD */}
         {currentTab === "media" && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
                 Project Footage
               </h3>
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-700/80 hover:border-indigo-500/60 rounded-xl p-5 cursor-pointer bg-slate-900/40 hover:bg-slate-900/70 transition-all group">
-                <div className="h-10 w-10 rounded-full bg-indigo-600/15 group-hover:bg-indigo-600/25 flex items-center justify-center mb-2 transition-colors">
-                  <Upload className="w-5 h-5 text-indigo-400" />
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-neutral-700 hover:border-white/60 rounded-xl p-5 cursor-pointer bg-neutral-900/40 hover:bg-neutral-900/70 transition-all group">
+                <div className="h-10 w-10 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center mb-2 transition-colors">
+                  <Upload className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-xs font-bold text-slate-200 group-hover:text-white">
+                <span className="text-xs font-bold text-neutral-300 group-hover:text-white">
                   Pick Video File
                 </span>
-                <span className="text-[10px] text-slate-400 mt-0.5 text-center">
+                <span className="text-[10px] text-neutral-500 mt-0.5 text-center">
                   Instant local load (MP4, MOV, WebM)
                 </span>
                 <input
@@ -278,18 +278,18 @@ export function MediaDrawer({
 
             {project.tracks.videoTrack.length > 0 && (
               <div>
-                <h4 className="text-[11px] font-semibold text-slate-400 mb-2">Clips on Timeline</h4>
+                <h4 className="text-[11px] font-semibold text-neutral-500 mb-2">Clips on Timeline</h4>
                 <div className="space-y-1.5">
                   {project.tracks.videoTrack.map((clip, i) => (
                     <div
                       key={clip.id}
                       onClick={() => setPlayheadTime(clip.start)}
-                      className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer text-xs"
+                      className="flex items-center justify-between p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 cursor-pointer text-xs"
                     >
-                      <span className="truncate max-w-[140px] font-medium text-slate-300">
+                      <span className="truncate max-w-[140px] font-medium text-neutral-300">
                         {clip.name || `Clip ${i + 1}`}
                       </span>
-                      <span className="font-mono text-[10px] text-indigo-400">
+                      <span className="font-mono text-[10px] text-neutral-400">
                         {(clip.end - clip.start).toFixed(1)}s
                       </span>
                     </div>
@@ -304,7 +304,7 @@ export function MediaDrawer({
         {currentTab === "captions" && (
           <div className="space-y-4">
             <form onSubmit={handleAddCaptionSubmit} className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">
                 Add Subtitle / Text
               </label>
               <textarea
@@ -312,7 +312,7 @@ export function MediaDrawer({
                 onChange={(e) => setCaptionInput(e.target.value)}
                 placeholder="Type your caption here..."
                 rows={2}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-400 outline-none focus:border-yellow-500/70 resize-none"
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-xs text-white placeholder-neutral-500 outline-none focus:border-white resize-none"
               />
               <button
                 type="submit"
@@ -326,7 +326,7 @@ export function MediaDrawer({
 
             {/* Presets */}
             <div>
-              <h4 className="text-[11px] font-semibold text-slate-400 mb-2">Caption Presets</h4>
+              <h4 className="text-[11px] font-semibold text-neutral-500 mb-2">Caption Presets</h4>
               <div className="grid grid-cols-2 gap-2">
                 {presets.map((preset) => (
                   <button
@@ -335,11 +335,11 @@ export function MediaDrawer({
                     className={cn(
                       "p-2 rounded-lg border text-left transition-all text-xs flex flex-col justify-between",
                       selectedPreset === preset.id
-                        ? "border-yellow-400/80 bg-yellow-950/20"
-                        : "border-slate-800 bg-slate-900/50 hover:bg-slate-900"
+                        ? "border-white bg-white/10"
+                        : "border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900"
                     )}
                   >
-                    <span className="text-[10px] font-bold text-slate-300 mb-1">{preset.label}</span>
+                    <span className="text-[10px] font-bold text-neutral-300 mb-1">{preset.label}</span>
                     <div className={cn("text-[10px] px-1.5 py-0.5 rounded text-center truncate", preset.previewClass)}>
                       SAMPLE
                     </div>
@@ -354,26 +354,26 @@ export function MediaDrawer({
         {currentTab === "broll" && (
           <div className="space-y-3">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-neutral-500" />
               <input
                 type="text"
                 value={brollSearch}
                 onChange={(e) => setBrollSearch(e.target.value)}
                 placeholder="Search stock footage..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white placeholder-slate-400 outline-none focus:border-purple-500"
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white placeholder-neutral-500 outline-none focus:border-white"
               />
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-[11px] font-semibold text-slate-400">Popular Stock Clips</h4>
+              <h4 className="text-[11px] font-semibold text-neutral-500">Popular Stock Clips</h4>
               {STOCK_BROLL.map((clip, i) => (
                 <div
                   key={i}
-                  className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-purple-500/50 transition-all flex items-center justify-between"
+                  className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-white/50 transition-all flex items-center justify-between"
                 >
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-slate-200">{clip.name}</span>
-                    <span className="text-[10px] text-purple-400">{clip.tag}</span>
+                    <span className="text-xs font-semibold text-neutral-300">{clip.name}</span>
+                    <span className="text-[10px] text-neutral-500">{clip.tag}</span>
                   </div>
                   <button
                     onClick={() =>
@@ -386,7 +386,7 @@ export function MediaDrawer({
                         fitMode: "cover",
                       })
                     }
-                    className="p-1 rounded bg-purple-600 hover:bg-purple-500 text-white shadow"
+                    className="p-1 rounded bg-white hover:bg-neutral-200 text-black shadow"
                     title="Insert at Playhead"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -400,15 +400,15 @@ export function MediaDrawer({
         {/* TAB 4: AUDIO TRACKS */}
         {currentTab === "audio" && (
           <div className="space-y-3">
-            <h4 className="text-[11px] font-semibold text-slate-400">Royalty-Free Audio</h4>
+            <h4 className="text-[11px] font-semibold text-neutral-500">Royalty-Free Audio</h4>
             {PRESET_MUSIC.map((track, i) => (
               <div
                 key={i}
-                className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 transition-all flex items-center justify-between"
+                className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-white/50 transition-all flex items-center justify-between"
               >
                 <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-slate-200">{track.name}</span>
-                  <span className="text-[10px] text-emerald-400">{track.duration}s loop</span>
+                  <span className="text-xs font-semibold text-neutral-300">{track.name}</span>
+                  <span className="text-[10px] text-neutral-500">{track.duration}s loop</span>
                 </div>
                 <button
                   onClick={() =>
@@ -423,7 +423,7 @@ export function MediaDrawer({
                       isBgm: true,
                     })
                   }
-                  className="p-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white shadow"
+                  className="p-1 rounded bg-white hover:bg-neutral-200 text-black shadow"
                   title="Insert at Playhead"
                 >
                   <Plus className="w-3.5 h-3.5" />

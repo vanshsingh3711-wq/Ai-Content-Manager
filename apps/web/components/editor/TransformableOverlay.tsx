@@ -129,7 +129,7 @@ export function TransformableOverlay({
       ref={containerRef}
       className={cn(
         "absolute flex items-center justify-center transition-none cursor-grab active:cursor-grabbing",
-        isSelected ? "ring-2 ring-indigo-500 rounded-sm z-50" : "hover:ring-1 hover:ring-white/50"
+        isSelected ? "ring-2 ring-white rounded-sm z-50" : "hover:ring-1 hover:ring-white/50"
       )}
       style={{
         left: `${currentPos.x}%`,
@@ -149,7 +149,7 @@ export function TransformableOverlay({
         <>
           {/* Scale Handle (Bottom Right) */}
           <div
-            className="absolute -bottom-2 -right-2 w-4 h-4 bg-indigo-500 rounded-full border-2 border-white cursor-nwse-resize shadow-md"
+            className="absolute -bottom-2 -right-2 w-4 h-4 bg-white rounded-full border-2 border-black cursor-nwse-resize shadow-md"
             onPointerDown={handleScalePointerDown}
           />
         </>

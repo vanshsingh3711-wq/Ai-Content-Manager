@@ -238,12 +238,12 @@ export function PlayerMonitor() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-2 md:p-4 bg-[#08090e] relative overflow-hidden select-none">
+    <div className="flex-1 flex flex-col items-center justify-center p-2 md:p-4 bg-black relative overflow-hidden select-none">
       {/* Viewport Frame */}
       <div
         onPointerDown={() => useTimelineStore.getState().setSelectedItem(null)}
         className={cn(
-          "relative bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-800/80 flex items-center justify-center transition-all duration-300",
+          "relative bg-black rounded-xl overflow-hidden shadow-2xl border border-neutral-900 flex items-center justify-center transition-all duration-300",
           getAspectRatioClasses(project.aspectRatio)
         )}
       >
@@ -269,8 +269,8 @@ export function PlayerMonitor() {
             />
           </TransformableOverlay>
         ) : (
-          <div className="flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-            <RotateCcw className="w-8 h-8 mb-2 animate-spin text-slate-400" />
+          <div className="flex flex-col items-center justify-center text-neutral-500 p-6 text-center">
+            <RotateCcw className="w-8 h-8 mb-2 animate-spin text-neutral-500" />
             <p className="text-xs">No media at current timestamp</p>
           </div>
         )}
@@ -336,7 +336,7 @@ export function PlayerMonitor() {
                 </span>
               )}
               {activeCaption.stylePreset === "neon_glow" && (
-                <span className="font-bold text-center text-xl md:text-2xl text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)] px-3 py-1 bg-slate-950/70 rounded-lg border border-cyan-400/50">
+                <span className="font-bold text-center text-xl md:text-2xl text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)] px-3 py-1 bg-neutral-950/70 rounded-lg border border-cyan-400/50">
                   {activeCaption.text}
                 </span>
               )}
@@ -361,11 +361,11 @@ export function PlayerMonitor() {
       </div>
 
       {/* Playback Controls Bar */}
-      <div className="mt-3 flex items-center justify-between w-full max-w-md px-4 py-1.5 bg-[#0f131d]/90 backdrop-blur-md rounded-xl border border-slate-800/80 text-slate-300 shadow-lg">
+      <div className="mt-3 flex items-center justify-between w-full max-w-md px-4 py-1.5 bg-neutral-950/90 backdrop-blur-md rounded-xl border border-neutral-900 text-neutral-400 shadow-lg">
         {/* Timestamp */}
-        <div className="font-mono text-xs text-slate-400 tabular-nums">
+        <div className="font-mono text-xs text-neutral-500 tabular-nums">
           <span className="text-white font-semibold">{formatTime(playheadTime)}</span>
-          <span className="mx-1 text-slate-400">/</span>
+          <span className="mx-1 text-neutral-500">/</span>
           <span>{formatTime(project.duration)}</span>
         </div>
 
@@ -374,7 +374,7 @@ export function PlayerMonitor() {
           <button
             onClick={() => setPlayheadTime(Math.max(0, playheadTime - 1))}
             title="Step backward 1s (Left Arrow)"
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-neutral-500 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors"
           >
             <SkipBack className="w-3.5 h-3.5" />
           </button>
@@ -382,7 +382,7 @@ export function PlayerMonitor() {
           <button
             onClick={togglePlay}
             title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-            className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 hover:scale-105 active:scale-95 text-white flex items-center justify-center shadow-md shadow-indigo-600/30 transition-transform"
+            className="h-8 w-8 rounded-full bg-white hover:bg-neutral-200 hover:scale-105 active:scale-95 text-black flex items-center justify-center shadow-md shadow-white/10 transition-transform"
           >
             {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
           </button>
@@ -390,33 +390,33 @@ export function PlayerMonitor() {
           <button
             onClick={() => setPlayheadTime(Math.min(project.duration, playheadTime + 1))}
             title="Step forward 1s (Right Arrow)"
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-neutral-500 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors"
           >
             <SkipForward className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Volume & Fullscreen */}
-        <div className="flex items-center gap-1 text-slate-400">
+        <div className="flex items-center gap-1 text-neutral-500">
           <button
             onClick={toggleGlobalKeyframe}
             disabled={!activeSelectedClip || isSelectedOutOfBounds}
             title={hasTransformKeyframe ? "Remove Transform Keyframe" : "Add Transform Keyframe"}
             className={cn(
               "p-1.5 rounded-lg transition-colors",
-              (!activeSelectedClip || isSelectedOutOfBounds) ? "opacity-30 cursor-not-allowed" : "hover:bg-slate-800",
-              hasTransformKeyframe ? "text-indigo-400" : "hover:text-white"
+              (!activeSelectedClip || isSelectedOutOfBounds) ? "opacity-30 cursor-not-allowed" : "hover:bg-neutral-900",
+              hasTransformKeyframe ? "text-white" : "hover:text-white"
             )}
           >
-            <Diamond className={cn("w-3.5 h-3.5", hasTransformKeyframe && "fill-indigo-400")} />
+            <Diamond className={cn("w-3.5 h-3.5", hasTransformKeyframe && "fill-white")} />
           </button>
           
-          <div className="h-3 w-[1px] bg-slate-700 mx-0.5" />
+          <div className="h-3 w-[1px] bg-neutral-800 mx-0.5" />
           
           <button
             onClick={() => setIsMuted(!isMuted)}
             title={isMuted ? "Unmute" : "Mute"}
-            className="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors"
           >
             {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5" />}
           </button>

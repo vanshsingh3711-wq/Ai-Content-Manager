@@ -76,7 +76,7 @@ const KeyframeDiamond = ({
     <div
       className={cn(
         "absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rotate-45 border shadow-md z-30 transition-transform hover:scale-110 cursor-ew-resize",
-        isActive ? "bg-red-500 border-red-300 shadow-red-500/50" : "bg-white border-slate-400"
+        isActive ? "bg-red-500 border-red-300 shadow-red-500/50" : "bg-white border-neutral-500"
       )}
       style={{ left: `${leftPosition}px`, marginLeft: '-5px' }}
       onPointerDown={handleDrag}
@@ -333,8 +333,8 @@ export function TimelineContainer() {
           className="absolute top-0 flex flex-col items-center pointer-events-none"
           style={{ left: `${x}px` }}
         >
-          <div className="h-2 w-[1px] bg-slate-700" />
-          <span className="text-[9px] text-slate-400 font-mono mt-0.5 select-none">
+          <div className="h-2 w-[1px] bg-neutral-800" />
+          <span className="text-[9px] text-neutral-500 font-mono mt-0.5 select-none">
             {formatted}
           </span>
         </div>
@@ -346,14 +346,14 @@ export function TimelineContainer() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex flex-col bg-[#0b0e16] select-none relative overflow-hidden"
+      className="flex-1 flex flex-col bg-black select-none relative overflow-hidden"
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
       {/* Scrollable Timeline Viewport */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-x-auto overflow-y-auto relative scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent"
+        className="flex-1 overflow-x-auto overflow-y-auto relative scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
       >
@@ -362,7 +362,7 @@ export function TimelineContainer() {
           style={{ width: `${timelineWidth}px` }}
         >
           {/* Ruler Bar */}
-          <div className="absolute top-0 left-0 right-0 h-6 border-b border-slate-800/80 bg-[#0d111b] cursor-pointer">
+          <div className="absolute top-0 left-0 right-0 h-6 border-b border-neutral-900 bg-neutral-950 cursor-pointer">
             {renderRuler()}
           </div>
 
@@ -377,8 +377,8 @@ export function TimelineContainer() {
           </div>
 
           {/* TRACK 1: Text & Captions */}
-          <div className="mt-2 mb-2 relative h-9 border-y border-slate-800/40 bg-slate-950/40 flex items-center">
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-800 text-[10px] text-yellow-400 font-semibold shadow">
+          <div className="mt-2 mb-2 relative h-9 border-y border-neutral-900 bg-neutral-950/40 flex items-center">
+            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-yellow-400 font-semibold shadow">
               <Type className="w-3 h-3" />
               <span>Captions</span>
             </div>
@@ -466,9 +466,9 @@ export function TimelineContainer() {
           </div>
 
           {/* TRACK 2: B-Roll & Overlays */}
-          <div className="mb-2 relative h-10 border-y border-slate-800/40 bg-slate-950/40 flex items-center">
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-800 text-[10px] text-purple-400 font-semibold shadow">
-              <Film className="w-3 h-3" />
+          <div className="mb-2 relative h-10 border-y border-neutral-900 bg-neutral-950/40 flex items-center">
+            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
+              <Film className="w-3 h-3 text-neutral-400" />
               <span>B-Roll</span>
             </div>
 
@@ -555,9 +555,9 @@ export function TimelineContainer() {
           </div>
 
           {/* TRACK 3: Main Video Track (Primary Footage) */}
-          <div className="mb-2 relative h-14 border-y border-slate-800/80 bg-slate-950/80 flex items-center">
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-800 text-[10px] text-indigo-400 font-semibold shadow">
-              <Video className="w-3 h-3" />
+          <div className="mb-2 relative h-14 border-y border-neutral-900 bg-neutral-950/80 flex items-center">
+            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
+              <Video className="w-3 h-3 text-neutral-400" />
               <span>Main Video</span>
             </div>
 
@@ -577,8 +577,8 @@ export function TimelineContainer() {
                   className={cn(
                     "clip-item absolute h-12 rounded-lg border flex items-center justify-between group cursor-pointer transition-all shadow-md overflow-hidden",
                     isSelected
-                      ? "bg-indigo-600/35 border-indigo-400 ring-2 ring-indigo-400/50 z-10"
-                      : "bg-indigo-950/40 border-indigo-500/30 hover:bg-indigo-900/40"
+                      ? "bg-neutral-800/80 border-white ring-2 ring-white/20 z-10"
+                      : "bg-neutral-900/80 border-neutral-700 hover:bg-neutral-800/80"
                   )}
                   style={{ left: `${left}px`, width: `${width}px` }}
                 >
@@ -605,7 +605,7 @@ export function TimelineContainer() {
                       });
                       (e.target as HTMLElement).setPointerCapture(e.pointerId);
                     }}
-                    className="clip-handle w-3 h-full hover:bg-indigo-400 bg-indigo-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
+                    className="clip-handle w-3 h-full hover:bg-neutral-500 bg-neutral-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
                     title="Drag to trim start"
                   >
                     <div className="w-0.5 h-4 bg-white/70 rounded-full" />
@@ -615,10 +615,10 @@ export function TimelineContainer() {
 
                   {/* Clip Label */}
                   <div className="flex-1 px-2 flex flex-col justify-center truncate pointer-events-none">
-                    <span className="text-xs font-bold text-white truncate">
+                    <span className="text-xs font-bold text-white truncate drop-shadow-md">
                       {clip.name || `Clip ${idx + 1}`}
                     </span>
-                    <span className="text-[10px] text-indigo-300 font-mono">
+                    <span className="text-[10px] text-neutral-300 font-mono drop-shadow-md">
                       {(clip.end - clip.start).toFixed(1)}s • {clip.speed || 1}x
                     </span>
                   </div>
@@ -638,7 +638,7 @@ export function TimelineContainer() {
                       });
                       (e.target as HTMLElement).setPointerCapture(e.pointerId);
                     }}
-                    className="clip-handle w-3 h-full hover:bg-indigo-400 bg-indigo-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
+                    className="clip-handle w-3 h-full hover:bg-neutral-500 bg-neutral-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
                     title="Drag to trim end"
                   >
                     <div className="w-0.5 h-4 bg-white/70 rounded-full" />
@@ -649,9 +649,9 @@ export function TimelineContainer() {
           </div>
 
           {/* TRACK 4: Background Music & Audio */}
-          <div className="relative h-9 border-y border-slate-800/40 bg-slate-950/40 flex items-center">
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-800 text-[10px] text-emerald-400 font-semibold shadow">
-              <Music className="w-3 h-3" />
+          <div className="relative h-9 border-y border-neutral-900 bg-neutral-950/40 flex items-center">
+            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
+              <Music className="w-3 h-3 text-neutral-400" />
               <span>Audio</span>
             </div>
 

@@ -113,14 +113,14 @@ export default function StudioEditorPage() {
 
   if (!mounted) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#07090e] text-slate-400">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-neutral-500">
         Loading editor workspace...
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#07090e] text-slate-100 overflow-hidden select-none">
+    <div className="fixed inset-0 z-50 flex flex-col bg-black text-neutral-100 overflow-hidden select-none">
       {/* 1. Top Navbar */}
       <EditorTopNav
         onExport={handleExport}
@@ -142,14 +142,14 @@ export default function StudioEditorPage() {
         )}
 
         {/* Center: Video Preview + Timeline */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#07090e]">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-black">
           {/* Top Half: Video Monitor */}
           <div className="flex-1 flex flex-col min-h-0">
             <PlayerMonitor />
           </div>
 
           {/* Bottom Half: Toolbar + Timeline */}
-          <div className="h-[270px] md:h-[300px] flex flex-col border-t border-slate-800/80 bg-[#0d1017]">
+          <div className="h-[270px] md:h-[300px] flex flex-col border-t border-neutral-900 bg-neutral-950">
             <TimelineToolbar onOpenDrawer={handleOpenDrawer} />
             <TimelineContainer />
           </div>
@@ -165,7 +165,7 @@ export default function StudioEditorPage() {
       {/* Export Success Modal */}
       {exportModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f131d] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="bg-neutral-950 border border-neutral-900 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                 <CheckCircle2 className="w-5 h-5" />
@@ -173,17 +173,17 @@ export default function StudioEditorPage() {
               </div>
               <button
                 onClick={() => setExportModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-neutral-500 hover:text-white p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-neutral-300 leading-relaxed">
               Your CapCut-style timeline has been compiled into high-resolution compositing instructions (cuts: {project.tracks.videoTrack.length}, captions: {project.tracks.textTrack.length}, overlays: {project.tracks.brollTrack.length}).
             </p>
 
-            <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 font-mono text-[11px] text-indigo-300 max-h-32 overflow-y-auto">
+            <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 font-mono text-[11px] text-neutral-300 max-h-32 overflow-y-auto">
               <pre>{JSON.stringify({
                 aspectRatio: project.aspectRatio,
                 duration: `${project.duration.toFixed(1)}s`,
@@ -194,7 +194,7 @@ export default function StudioEditorPage() {
 
             <button
               onClick={() => setExportModalOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold text-xs text-white shadow-lg transition-colors"
+              className="w-full py-2.5 rounded-xl bg-white hover:bg-neutral-200 font-bold text-xs text-black shadow-lg transition-colors"
             >
               Done
             </button>

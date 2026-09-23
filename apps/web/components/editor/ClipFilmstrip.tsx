@@ -112,7 +112,7 @@ export function ClipFilmstrip({ sourceUrl, start, end, width }: ClipFilmstripPro
           />
         ))
       ) : (
-        <div className="w-full h-full bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-indigo-950/40 animate-pulse" />
+        <div className="w-full h-full bg-gradient-to-r from-neutral-900/40 via-neutral-800/30 to-neutral-900/40 animate-pulse" />
       )}
     </div>
   );
