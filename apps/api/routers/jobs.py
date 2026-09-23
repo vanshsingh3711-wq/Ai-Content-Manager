@@ -7,6 +7,7 @@ from sqlmodel import Session, select, desc
 from config import get_settings
 from database import get_session
 from models import VideoJob, VideoJobStatus
+from storage import get_presigned_url_from_full_url
 
 settings = get_settings()
 
@@ -164,8 +165,8 @@ def get_job_status(
         "id": job.id,
         "title": job.title,
         "status": job.status,
-        "source_url": job.source_url,
-        "rendered_url": job.rendered_url,
+        "source_url": get_presigned_url_from_full_url(job.source_url),
+        "rendered_url": get_presigned_url_from_full_url(job.rendered_url),
         "edit_decision_list": job.edit_decision_list,
         "error_log": job.error_log,
         "settings": job.settings,
@@ -194,8 +195,8 @@ def list_queue_jobs(
             "id": j.id,
             "title": j.title,
             "status": j.status,
-            "source_url": j.source_url,
-            "rendered_url": j.rendered_url,
+            "source_url": get_presigned_url_from_full_url(j.source_url),
+            "rendered_url": get_presigned_url_from_full_url(j.rendered_url),
             "edit_decision_list": j.edit_decision_list,
             "error_log": j.error_log,
             "settings": j.settings,

@@ -19,12 +19,20 @@ def get_s3_client():
     if not endpoint_url and settings.R2_ACCOUNT_ID:
         endpoint_url = f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
+    region = "auto"
+    if endpoint_url and "amazonaws.com" in endpoint_url:
+        match = re.search(r"s3\.([a-z0-9-]+)\.amazonaws\.com", endpoint_url)
+        if match:
+            region = match.group(1)
+        else:
+            region = "us-east-1"
+
     return boto3.client(
         "s3",
         endpoint_url=endpoint_url,
         aws_access_key_id=settings.R2_ACCESS_KEY_ID,
         aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-        config=Config(signature_version="s3v4", region_name="auto"),
+        config=Config(signature_version="s3v4", region_name=region),
     )
 
 
@@ -107,3 +115,22 @@ def generate_presigned_download_url(file_key: str, expires_in: int = 3600) -> Op
             return None
             
     return f"http://localhost:{settings.PORT}/api/v1/storage/download?key={file_key}"
+
+
+def get_presigned_url_from_full_url(full_url: Optional[str]) -> Optional[str]:
+    """Extracts the file key from a full S3/R2 URL and returns a presigned download URL."""
+    if not full_url:
+        return full_url
+    
+    # Try to extract the key if it matches our standard prefixes
+    try:
+        if "/raw-uploads/" in full_url:
+            file_key = "raw-uploads/" + full_url.split("/raw-uploads/", 1)[1]
+            return generate_presigned_download_url(file_key) or full_url
+        elif "/rendered-exports/" in full_url:
+            file_key = "rendered-exports/" + full_url.split("/rendered-exports/", 1)[1]
+            return generate_presigned_download_url(file_key) or full_url
+    except Exception:
+        pass
+        
+    return full_url

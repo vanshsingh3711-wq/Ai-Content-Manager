@@ -9,6 +9,7 @@ from config import get_settings
 from database import get_session
 from models import User, VideoJob, VideoJobStatus, VideoType
 from routers.jobs import dispatch_job_to_celery
+from storage import get_presigned_url_from_full_url
 
 settings = get_settings()
 
@@ -94,6 +95,9 @@ def create_video_job(
         print(f"[API: VIDEOS] ⚡ Auto-dispatching job {job.id} to Celery queue '{settings.CELERY_TASK_DEFAULT_QUEUE}'...")
         dispatch_job_to_celery(job.id)
 
+    # Sign the urls before returning
+    job.source_url = get_presigned_url_from_full_url(job.source_url)
+    job.rendered_url = get_presigned_url_from_full_url(job.rendered_url)
     return job
 
 
@@ -107,6 +111,10 @@ def list_video_jobs(
     statement = select(VideoJob).order_by(desc(VideoJob.created_at)).offset(offset).limit(limit)
     jobs = session.exec(statement).all()
     print(f"[API: VIDEOS] 📋 Listing {len(jobs)} video jobs from database")
+    # Sign urls
+    for j in jobs:
+        j.source_url = get_presigned_url_from_full_url(j.source_url)
+        j.rendered_url = get_presigned_url_from_full_url(j.rendered_url)
     return jobs
 
 
@@ -124,6 +132,9 @@ def get_video_job(
             detail=f"Video job with ID {video_id} not found",
         )
     print(f"[API: VIDEOS] 🔍 Retrieved job {job.id}: Status={job.status}")
+    # Sign urls
+    job.source_url = get_presigned_url_from_full_url(job.source_url)
+    job.rendered_url = get_presigned_url_from_full_url(job.rendered_url)
     return job
 
 
@@ -153,6 +164,9 @@ def update_video_job_status(
     session.add(job)
     session.commit()
     session.refresh(job)
+    
+    job.source_url = get_presigned_url_from_full_url(job.source_url)
+    job.rendered_url = get_presigned_url_from_full_url(job.rendered_url)
     return job
 
 @router.post("/{video_id}/retry", response_model=VideoJobResponse)
@@ -188,6 +202,8 @@ def retry_video_job(
         print(f"[API: VIDEOS] ⚡ Auto-dispatching job {job.id} to Celery queue '{settings.CELERY_TASK_DEFAULT_QUEUE}'...")
         dispatch_job_to_celery(job.id)
         
+    job.source_url = get_presigned_url_from_full_url(job.source_url)
+    job.rendered_url = get_presigned_url_from_full_url(job.rendered_url)
     return job
 
 

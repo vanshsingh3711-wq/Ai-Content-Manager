@@ -54,10 +54,11 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             log_error(error_msg)
             return {"status": "error", "message": error_msg}
 
-        if job.status not in [VideoJobStatus.QUEUED, VideoJobStatus.FAILED]:
+        if job.status == VideoJobStatus.COMPLETED:
             log_info(f"Job {job_id} is already in state '{job.status}'. Skipping idempotently.")
             return {"status": "skipped", "current_status": job.status}
-
+        elif job.status not in [VideoJobStatus.QUEUED, VideoJobStatus.FAILED]:
+            log_warning(f"Job {job_id} is in intermediate state '{job.status}'. Assuming previous worker crashed. Automatically recovering and restarting job.")
         job_title = job.title
         job_video_type = job.video_type
         job_user_id = str(job.user_id)
