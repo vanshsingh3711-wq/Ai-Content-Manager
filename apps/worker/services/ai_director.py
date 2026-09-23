@@ -2,6 +2,7 @@ import os
 import json
 import time
 import socket
+import re
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 from openai import OpenAI, APIConnectionError
@@ -65,13 +66,20 @@ def _call_llm(system_prompt: str, user_prompt: str) -> EditList:
 
     content = response.choices[0].message.content
     if content:
-        if content.startswith("```json"):
-            content = content.replace("```json", "").replace("```", "").strip()
+        content = content.strip()
+        # More robust markdown extraction
+        match = re.search(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL | re.IGNORECASE)
+        if match:
+            content = match.group(1).strip()
             
-        parsed_json = json.loads(content)
-        if isinstance(parsed_json, list):
-            parsed_json = {"edits": parsed_json}
-        return EditList.model_validate(parsed_json)
+        try:
+            parsed_json = json.loads(content)
+            if isinstance(parsed_json, list):
+                parsed_json = {"edits": parsed_json}
+            return EditList.model_validate(parsed_json)
+        except Exception as e:
+            print(f"[!] Failed to parse LLM output: {e}\nRaw output: {content}")
+            return EditList(edits=[])
     
     raise ValueError("LLM returned empty content")
 
