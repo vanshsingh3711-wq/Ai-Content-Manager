@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import json
 from typing import Any, Dict, List, Optional, Tuple
 from services.media_extractor import get_ffmpeg_binary_path
 from services.editing_config import EDITING_CONFIG
@@ -46,6 +47,37 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
             f"FFmpeg failed for '{label}' (exit code {result.returncode}):\n{stderr_preview}"
         )
     return result
+
+def _render_remotion_composition(comp_id: str, props: dict, duration_sec: float, fps: float, temp_dir: str, prefix: str) -> Optional[str]:
+    """Spawns Remotion CLI to render a transparent WebM overlay."""
+    out_path = os.path.join(temp_dir, f"{prefix}.webm")
+    
+    # Calculate duration in frames
+    frames = int(duration_sec * fps)
+    frames_arg = f"0-{max(1, frames - 1)}"
+    
+    props_json = json.dumps(props)
+    
+    motion_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../packages/motion-components"))
+    if not os.path.exists(motion_dir):
+        # Fallback for docker container path
+        motion_dir = "/app/packages/motion-components"
+        
+    cmd = [
+        "npx", "remotion", "render", "src/Root.tsx", comp_id,
+        out_path,
+        f"--props={props_json}",
+        f"--frames={frames_arg}",
+        "--pixel-format=yuva420p",
+        "--codec=vp8"
+    ]
+    
+    _log("REMOTION", f"Rendering {comp_id} to {out_path} ({frames} frames)")
+    result = subprocess.run(cmd, cwd=motion_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        _log("REMOTION_ERR", result.stderr)
+        return None
+    return out_path
 
 
 def _get_ffprobe_bin(ffmpeg_bin: str) -> str:
@@ -471,70 +503,104 @@ def render_video_pipeline(
                         broll_path = candidate
                         break
 
-        # Build video filter
-        filters = ["scale=1080:1920:force_original_aspect_ratio=increase", "crop=1080:1920"]
+        motion_graphics_text = None
+        character_action = None
+        has_sfx = False
 
+        for a in seg["actions"]:
+            if a["action"] == "motion_graphics":
+                motion_graphics_text = a.get("motion_graphics_text")
+            elif a["action"] == "character":
+                character_action = a.get("character_action")
+            elif a["action"] == "sfx":
+                has_sfx = True
+
+        mg_path = None
+        if motion_graphics_text:
+            mg_path = _render_remotion_composition(
+                "MotionGraphicsPreview", 
+                {"text": motion_graphics_text},
+                duration, source_fps, temp_dir, f"mg_{seg['chunk_id']}"
+            )
+            
+        char_path = None
+        if character_action:
+            char_path = _render_remotion_composition(
+                "RiveCharacterPreview", 
+                {"action": character_action},
+                duration, source_fps, temp_dir, f"char_{seg['chunk_id']}"
+            )
+
+        cmd = [ffmpeg_bin, "-y", "-i", raw_video_path]
+        
+        input_idx = 1
+        video_filters = []
+        
+        base_scale = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
         if "zoom_in" in action_types:
-            # Fast crop-based zoom: scale up 15% then crop to 1080x1920 (center)
-            filters = [
-                "scale=1242:2208:force_original_aspect_ratio=increase",  # 1080*1.15 = 1242
-                "crop=1080:1920",
-            ]
+            base_scale = "scale=1242:2208:force_original_aspect_ratio=increase,crop=1080:1920"
             _log("ZOOM", f"Applying 1.15x crop zoom on {seg['chunk_id']}")
-
-        vf_chain = ",".join(filters)
-
+            
+        video_filters.append(f"[0:v]{base_scale}[base_v];")
+        current_v = "[base_v]"
+        
         if broll_path:
-            # ──────────────────────────────────────────────────────────
-            # B-ROLL SEGMENT: Replace video with B-roll, KEEP original audio
-            #
-            # AUDIO OWNERSHIP: Input 0 (raw video) provides the ONLY audio.
-            # Input 1 (B-roll) provides ONLY video — its audio is explicitly
-            # discarded with -an on the B-roll input.
-            # ──────────────────────────────────────────────────────────
+            cmd.extend(["-an", "-i", broll_path])
             _log("BROLL", f"Overlaying B-roll for {seg['chunk_id']}: {os.path.basename(broll_path)}")
-            _log("AUDIO", f"  Primary audio source: original video (input 0)")
-            _log("AUDIO", f"  B-roll audio: DISCARDED (visual-only overlay)")
-
-            cmd = [
-                ffmpeg_bin, "-y",
-                # Input 0: Original video (provides AUDIO)
-                "-i", raw_video_path,
-                # Input 1: B-roll (provides VIDEO ONLY — audio discarded)
-                "-an", "-i", broll_path,
-                "-filter_complex",
-                # Use B-roll video, scaled to portrait format and normalized to source FPS
-                # Offset B-roll PTS so it starts correctly when we apply output -ss
-                f"[1:v]fps={source_fps},scale=1080:1920:force_original_aspect_ratio=increase,"
-                f"crop=1080:1920,setpts=PTS-STARTPTS+{start_t}/TB[broll];"
-                f"[broll]format=yuv420p[vout]",
-                # EXPLICIT STREAM MAPPING:
-                # Video: B-roll visual ([vout])
-                # Audio: Original video audio (0:a) — MANDATORY, not optional
-                "-map", "[vout]",
-                "-map", "0:a",
-                "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
-                "-r", str(source_fps),
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-c:a", "aac", "-b:a", "192k",
-                "-pix_fmt", "yuv420p",
-                "-shortest",  # Ensure A/V duration match
-                "-movflags", "+faststart",
-                seg_output,
-            ]
-        else:
-            cmd = [
-                ffmpeg_bin, "-y",
-                "-i", raw_video_path,
-                "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
-                "-vf", vf_chain,
-                "-r", str(source_fps),
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-c:a", "aac", "-b:a", "192k",
-                "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",
-                seg_output,
-            ]
+            video_filters.append(
+                f"[{input_idx}:v]fps={source_fps},scale=1080:1920:force_original_aspect_ratio=increase,"
+                f"crop=1080:1920,setpts=PTS-STARTPTS+{start_t}/TB[broll_v];"
+            )
+            current_v = "[broll_v]"
+            input_idx += 1
+            
+        if mg_path:
+            cmd.extend(["-i", mg_path])
+            _log("MG", f"Overlaying Motion Graphics for {seg['chunk_id']}")
+            video_filters.append(
+                f"[{input_idx}:v]setpts=PTS-STARTPTS+{start_t}/TB[mg_v];"
+                f"{current_v}[mg_v]overlay=x=0:y=0:eof_action=pass[with_mg];"
+            )
+            current_v = "[with_mg]"
+            input_idx += 1
+            
+        if char_path:
+            cmd.extend(["-i", char_path])
+            _log("CHAR", f"Overlaying Character for {seg['chunk_id']}")
+            video_filters.append(
+                f"[{input_idx}:v]scale=400:-1,setpts=PTS-STARTPTS+{start_t}/TB[char_v];"
+                f"{current_v}[char_v]overlay=x=50:y=H-h-150:eof_action=pass[with_char];"
+            )
+            current_v = "[with_char]"
+            input_idx += 1
+            
+        current_a = "0:a"
+        if has_sfx:
+            # We assume a pop.wav exists or we skip
+            sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../apps/web/public/assets/audio/pop.wav"))
+            if os.path.exists(sfx_path):
+                cmd.extend(["-i", sfx_path])
+                _log("SFX", f"Adding SFX for {seg['chunk_id']}")
+                video_filters.append(f"[0:a][{input_idx}:a]amix=inputs=2:duration=first:dropout_transition=2[sfx_a];")
+                current_a = "[sfx_a]"
+                input_idx += 1
+                
+        video_filters.append(f"{current_v}format=yuv420p[vout]")
+        filter_str = "".join(video_filters)
+        
+        cmd.extend([
+            "-filter_complex", filter_str,
+            "-map", "[vout]",
+            "-map", current_a,
+            "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
+            "-r", str(source_fps),
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "192k",
+            "-pix_fmt", "yuv420p",
+            "-shortest",
+            "-movflags", "+faststart",
+            seg_output,
+        ])
 
         try:
             _run_ffmpeg(cmd, f"segment_{seg['chunk_id']}")
@@ -554,9 +620,9 @@ def render_video_pipeline(
                 raise RuntimeError(f"FFmpeg produced empty output for segment {seg['chunk_id']}")
         except RuntimeError as e:
             _log("ERROR", f"Segment {seg['chunk_id']} FAILED: {e}")
-            # For b_roll failures, retry without b_roll overlay
-            if broll_path:
-                _log("RETRY", f"Retrying {seg['chunk_id']} without B-roll overlay...")
+            # For overlay failures, retry without overlays
+            if broll_path or mg_path or char_path or has_sfx:
+                _log("RETRY", f"Retrying {seg['chunk_id']} without any overlays...")
                 fallback_cmd = [
                     ffmpeg_bin, "-y",
                     "-i", raw_video_path,

@@ -6,6 +6,7 @@ import { SequenceRenderer } from './elements/Sequence/SequenceRenderer';
 import { ResolvedSequence } from './sequence/sequence.types';
 import { RenderErrorBoundary } from './render/RenderErrorBoundary';
 import { renderDefaultScene } from './render/DefaultSceneRenderer';
+import { MotionGraphicsPreview } from './elements/Typography/MotionGraphicsPreview';
 
 export const RemotionRoot: React.FC = () => {
   const inputProps = getInputProps();
@@ -22,6 +23,18 @@ export const RemotionRoot: React.FC = () => {
         height={1920}
         defaultProps={{
           action: 'surprised'
+        }}
+      />
+      
+      <Composition
+        id="MotionGraphicsPreview"
+        component={MotionGraphicsPreview}
+        durationInFrames={150}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{
+          text: 'Default Text'
         }}
       />
       
