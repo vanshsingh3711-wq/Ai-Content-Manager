@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@motion/*": ["../../packages/motion-components/src/*"]
     }
   },
   "include": [
