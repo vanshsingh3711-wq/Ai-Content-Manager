@@ -70,7 +70,8 @@ def _render_remotion_composition(comp_id: str, props: dict, duration_sec: float,
         f"--props={props_json}",
         f"--frames={frames_arg}",
         "--pixel-format=yuva420p",
-        "--codec=vp8"
+        "--codec=vp8",
+        "--image-format=png"
     ]
     
     _log("REMOTION", f"Rendering {comp_id} to {out_path} ({frames} frames)")
