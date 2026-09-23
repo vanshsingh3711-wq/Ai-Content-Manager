@@ -47,7 +47,7 @@ export default function Home() {
       {/* ─── HERO ─── */}
       <main className="flex-1">
         <section className="max-w-6xl mx-auto px-6 pt-24 pb-20">
-          <div className="max-w-3xl space-y-6">
+          <div className="max-w-3xl mx-auto text-center space-y-6">
             <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium">
               Autonomous Video Pipeline
             </p>
@@ -58,13 +58,13 @@ export default function Home() {
               viral content.
             </h1>
 
-            <p className="max-w-xl text-base text-neutral-500 leading-relaxed">
+            <p className="max-w-xl mx-auto text-base text-neutral-500 leading-relaxed">
               Upload your video. The AI Director handles transcription,
               B-roll sourcing, motion graphics, captions, SFX, and
               multi-platform publishing — automatically.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-start gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <Link
                 href="/dashboard"
                 className="px-6 py-3 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 inline-flex items-center gap-2 transition-colors"
