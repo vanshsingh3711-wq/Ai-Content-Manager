@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRive } from '@rive-app/react-canvas';
-import { AbsoluteFill, delayRender, continueRender } from 'remotion';
+import { AbsoluteFill, delayRender, continueRender, staticFile } from 'remotion';
 
 export interface RiveCharacterProps {
   width?: number;
@@ -28,7 +28,7 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
   const [handle] = useState(() => delayRender("Loading Rive Character"));
   
   const { rive, RiveComponent } = useRive({
-    src: '/28195-53259-character-builder.riv',
+    src: staticFile('28195-53259-character-builder.riv'),
     autoplay: true,
     onLoad: () => {
       continueRender(handle);
