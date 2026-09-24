@@ -443,6 +443,7 @@ def render_video_pipeline(
     broll_map: Optional[Dict[str, str]] = None,
     edits: Optional[List[Dict[str, Any]]] = None,
     timestamp_map: Optional[Dict[str, Any]] = None,
+    settings: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Composites the final video by applying AI edit decisions:
@@ -463,6 +464,7 @@ def render_video_pipeline(
     broll_map = broll_map or {}
     edits = edits or []
     timestamp_map = timestamp_map or {}
+    settings = settings or {}
 
     _log("START", f"raw_video={raw_video_path}")
     _log("START", f"output={output_mp4_path}")
@@ -581,8 +583,9 @@ def render_video_pipeline(
                 char_props["gesture"] = "present"
                 char_props["isNodding"] = True
                 
+            char_component = settings.get("character_asset", "SvgCharacterPreview")
             char_path = _render_remotion_composition(
-                "SvgCharacterPreview", 
+                char_component, 
                 char_props,
                 duration, source_fps, temp_dir, f"char_{seg['chunk_id']}"
             )

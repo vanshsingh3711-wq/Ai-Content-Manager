@@ -244,6 +244,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 broll_map=broll_map,
                 edits=validated_edits,
                 timestamp_map=timestamp_map,
+                settings=job_settings,
             )
             
             set_job_status_publishing(job_uuid)

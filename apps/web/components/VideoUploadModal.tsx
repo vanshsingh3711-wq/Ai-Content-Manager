@@ -56,7 +56,8 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
   const [aspectRatio, setAspectRatio] = useState<AspectRatioType>("9:16");
   const [videoStyle, setVideoStyle] = useState<VideoStyleType>("viral");
   const [captionPreset, setCaptionPreset] = useState<CaptionPresetType>("tiktok_yellow");
-  const [activeTab, setActiveTab] = useState<"ratio" | "style" | "captions" | "ai">("ratio");
+  const [characterAsset, setCharacterAsset] = useState<"SvgCharacterPreview" | "RiveCharacterPreview">("SvgCharacterPreview");
+  const [activeTab, setActiveTab] = useState<"ratio" | "style" | "captions" | "ai" | "character">("ratio");
 
   // AI Feature Toggles
   const [aiFeatures, setAiFeatures] = useState({
@@ -128,6 +129,7 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
       aspectRatio,
       videoStyle,
       captionPreset,
+      characterAsset,
       aiFeatures,
     });
 
@@ -198,6 +200,7 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
             aspect_ratio: aspectRatio,
             video_style: videoStyle,
             caption_preset: captionPreset,
+            character_asset: characterAsset,
             ai_features: aiFeatures,
           },
         }),
@@ -444,6 +447,20 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-mono">
                     {enabledAiCount}/5
                   </span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("character")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+                    activeTab === "character"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                  )}
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Character</span>
                 </button>
               </div>
 
@@ -869,6 +886,56 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
                         className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-700 cursor-pointer"
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 5: Character Selection */}
+              {activeTab === "character" && (
+                <div className="space-y-2">
+                  <div className="text-[11px] text-slate-400">Choose the animated character style:</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* SVG Presenter */}
+                    <button
+                      type="button"
+                      onClick={() => setCharacterAsset("SvgCharacterPreview")}
+                      className={cn(
+                        "p-3 rounded-xl border text-left space-y-1.5 transition-all",
+                        characterAsset === "SvgCharacterPreview"
+                          ? "border-emerald-500 bg-emerald-950/30 text-white ring-1 ring-emerald-500 shadow-sm"
+                          : "border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          SVG Presenter (Recommended)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-tight">
+                        Fully animated SVG character with transparent background, blinking, talking, and arm gestures.
+                      </p>
+                    </button>
+
+                    {/* Rive Presenter */}
+                    <button
+                      type="button"
+                      onClick={() => setCharacterAsset("RiveCharacterPreview")}
+                      className={cn(
+                        "p-3 rounded-xl border text-left space-y-1.5 transition-all",
+                        characterAsset === "RiveCharacterPreview"
+                          ? "border-orange-500 bg-orange-950/30 text-white ring-1 ring-orange-500 shadow-sm"
+                          : "border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          Rive 3D Boy (Experimental)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-tight">
+                        Static 3D canvas boy with a background block. (Animations are currently not synced with Remotion).
+                      </p>
+                    </button>
                   </div>
                 </div>
               )}
