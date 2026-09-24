@@ -564,9 +564,26 @@ def render_video_pipeline(
             
         char_path = None
         if character_action:
+            char_props = {
+                "isTalking": True,
+                "isBlinking": True,
+                "expression": "neutral",
+                "gesture": "none"
+            }
+            
+            action_lower = character_action.lower()
+            if "surprised" in action_lower:
+                char_props["expression"] = "surprised"
+                char_props["gesture"] = "emphasize"
+            elif "point" in action_lower:
+                char_props["gesture"] = "pointRight"
+            elif "explain" in action_lower:
+                char_props["gesture"] = "present"
+                char_props["isNodding"] = True
+                
             char_path = _render_remotion_composition(
-                "RiveCharacterPreview", 
-                {"action": character_action},
+                "SvgCharacterPreview", 
+                char_props,
                 duration, source_fps, temp_dir, f"char_{seg['chunk_id']}"
             )
 
