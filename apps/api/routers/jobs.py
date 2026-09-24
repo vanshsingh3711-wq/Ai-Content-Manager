@@ -31,14 +31,16 @@ def get_celery_client():
                 redis_url = f"{redis_url}{delimiter}ssl_cert_reqs=CERT_NONE"
         _celery_client = Celery(
             "api_task_sender",
-            broker=redis_url,
+            broker="sqs://",
             backend=redis_url,
         )
         if broker_use_ssl:
             _celery_client.conf.update(
-                broker_use_ssl=broker_use_ssl,
                 redis_backend_use_ssl=broker_use_ssl,
             )
+        _celery_client.conf.broker_transport_options = {
+            "region": "eu-north-1"
+        }
     return _celery_client
 
 

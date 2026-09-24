@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
     ca-certificates \
+    libcurl4-openssl-dev \
+    libssl-dev \
     # Chromium dependencies for Remotion
     libnss3 libxss1 libasound2 libatk-bridge2.0-0 libgtk-3-0 libgbm1 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

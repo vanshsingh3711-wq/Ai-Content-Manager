@@ -11,16 +11,14 @@ if redis_url.startswith("rediss://") and "ssl_cert_reqs" not in redis_url:
 
 celery_app = Celery(
     "ai_video_worker",
-    broker=redis_url,
+    broker="sqs://",
     backend=redis_url,
     include=["tasks.video_pipeline"],
 )
 
 # Concurrency & Workload Optimization for heavy media processing
-broker_use_ssl = None
 redis_backend_use_ssl = None
 if redis_url.startswith("rediss://"):
-    broker_use_ssl = {"ssl_cert_reqs": ssl.CERT_NONE}
     redis_backend_use_ssl = {"ssl_cert_reqs": ssl.CERT_NONE}
 
 celery_app.conf.update(
@@ -30,16 +28,12 @@ celery_app.conf.update(
     task_acks_late=True,               # Ensure crash recovery
     task_reject_on_worker_lost=True,
     task_track_started=True,
-    broker_use_ssl=broker_use_ssl,
     redis_backend_use_ssl=redis_backend_use_ssl,
     result_expires=3600,
     broker_transport_options={
+        "region": "eu-north-1",
         "visibility_timeout": 3600,
-        "socket_timeout": 60,
-        "socket_connect_timeout": 60,
-        "socket_keepalive": True,
-        "retry_on_timeout": True,
-        "health_check_interval": 30,
+        "polling_interval": 1,
     },
     redis_socket_timeout=60,
     redis_socket_connect_timeout=60,
