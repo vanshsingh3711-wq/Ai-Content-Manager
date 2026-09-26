@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 3D Character Renderer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: transparent; }
+        canvas { display: block; }
+    </style>
+    <!-- Import Three.js and GLTFLoader from CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        let scene, camera, renderer, mixer, clock;
+        let characterModel;
+        
+        // This is called by Python (Playwright) once the model is ready
+        window.startRecording = async (characterPlan, durationSeconds) => {
+            console.log("[WebGL] Python injected the plan! Starting Recording...");
+            
+            // 1. Capture the Three.js Canvas Stream at 60 FPS
+            const stream = renderer.domElement.captureStream(60);
+            
+            // 2. Setup MediaRecorder for VP9 (Supports Alpha/Transparency perfectly)
+            const options = { mimeType: 'video/webm; codecs=vp9' };
+            const mediaRecorder = new MediaRecorder(stream, options);
+            const recordedChunks = [];
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            // 3. What happens when recording stops
+            mediaRecorder.onstop = () => {
+                console.log("[WebGL] Recording stopped. Preparing download...");
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                // Trigger an invisible download. Playwright intercepts this!
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = '3d_character_layer.webm';
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    console.log("[WebGL] Download triggered successfully.");
+                }, 100);
+            };
+
+            // START RECORDING
+            mediaRecorder.start();
+            
+            // -- Play Audio / Lip Sync Logic will go here -- //
+            
+            // Wait for the exact duration of the scene
+            setTimeout(() => {
+                mediaRecorder.stop();
+            }, durationSeconds * 1000);
+        };
+
+        function init() {
+            clock = new THREE.Clock();
+            scene = new THREE.Scene();
+
+            // Setup Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.5, 3); // Point at chest/face
+
+            // Setup Renderer (alpha: true is critical for transparency)
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 0); // Transparent Background!
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0);
+            directionalLight.position.set(1, 2, 3);
+            scene.add(directionalLight);
+
+            // Instead of downloading a GLB which failed due to your internet DNS,
+            // we will create a built-in 3D Torus Knot to prove the transparent video recording works!
+            const geometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+            const material = new THREE.MeshStandardMaterial({ color: 0x00ff00, metalness: 0.8, roughness: 0.2 });
+            characterModel = new THREE.Mesh(geometry, material);
+            scene.add(characterModel);
+            
+            console.log("[WebGL] 3D Test Object Created Successfully!");
+            
+            // Signal Python that the model is ready!
+            window.isModelLoaded = true;
+            if (window.onModelLoaded) window.onModelLoaded();
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+            if (characterModel) {
+                characterModel.rotation.x += 0.01;
+                characterModel.rotation.y += 0.01;
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
