@@ -227,6 +227,20 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 highlight_color=highlight_color,
             )
 
+        # --- STEP 7.5: 3D AVATAR RENDERING ---
+        with PipelineStep(7.5, 8, "3D AVATAR RENDERING", "Rendering headless WebGL character"):
+            import asyncio
+            from services.engine_3d.renderer import render_3d_character
+            character_webm_path = os.path.join(temp_job_dir, "character.webm")
+            
+            log_info(f"Rendering 3D character to {character_webm_path}...")
+            # We pass the validated_edits dictionary directly, and the total_duration
+            asyncio.run(render_3d_character(
+                ai_plan={"edits": validated_edits}, 
+                output_video_path=character_webm_path,
+                duration=total_duration
+            ))
+
         # --- STEP 8: FFMPEG COMPOSITOR & PUBLISHING ---
         with PipelineStep(8, 8, "FFMPEG RENDERING & PUBLISHING", "Assembly of final MP4 and social export"):
             set_job_status_rendering(job_uuid)
@@ -238,6 +252,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 edits=validated_edits,
                 timestamp_map=timestamp_map,
                 settings=job_settings,
+                character_video_path=character_webm_path,
             )
             
             set_job_status_publishing(job_uuid)

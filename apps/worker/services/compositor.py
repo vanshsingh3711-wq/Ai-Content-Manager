@@ -441,6 +441,7 @@ def render_video_pipeline(
     edits: Optional[List[Dict[str, Any]]] = None,
     timestamp_map: Optional[Dict[str, Any]] = None,
     settings: Optional[Dict[str, Any]] = None,
+    character_video_path: Optional[str] = None,
 ) -> str:
     """
     Composites the final video using a chunked rendering pipeline.
@@ -558,22 +559,6 @@ def render_video_pipeline(
                 mg_template, mg_props,
                 duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"
             )
-            
-        char_path = None
-        if character_action:
-            char_props = {"isTalking": True, "isBlinking": True, "expression": "neutral", "gesture": "none"}
-            action_lower = character_action.lower()
-            if "surprised" in action_lower: char_props.update({"expression": "surprised", "gesture": "emphasize"})
-            elif "point" in action_lower: char_props["gesture"] = "pointRight"
-            elif "explain" in action_lower: char_props.update({"gesture": "present", "isNodding": True})
-            
-            char_props.update(char_props_overrides)
-            
-            char_component = settings.get("character_asset", "SvgCharacterPreview")
-            char_path = _render_canvas_composition(
-                char_component, char_props,
-                duration, source_fps, target_w, target_h, temp_dir, f"char_{seg['chunk_id']}"
-            )
 
         broll_transition = None
         for a in seg["actions"]:
@@ -605,10 +590,19 @@ def render_video_pipeline(
             current_v = "[with_mg]"
             input_idx += 1
             
-        if char_path:
-            cmd.extend(["-i", char_path])
-            filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[char_v];")
-            filter_str.append(f"{current_v}[char_v]overlay=x=0:y=0:eof_action=pass[with_char];")
+        if character_video_path and os.path.exists(character_video_path):
+            cmd.extend(["-i", character_video_path])
+            char_idx = input_idx
+            # Trim the 3D character WebM exactly like the raw video so lip sync matches the cut segments
+            filter_str.append(f"[{char_idx}:v]trim=start={start_t:.3f}:end={end_t:.3f},setpts=PTS-STARTPTS[char_v_trim];")
+            
+            char_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+            if "zoom_in" in action_types:
+                zoom_w, zoom_h = int(target_w * 1.15), int(target_h * 1.15)
+                char_scale = f"scale={zoom_w}:{zoom_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                
+            filter_str.append(f"[char_v_trim]{char_scale}[char_v_scaled];")
+            filter_str.append(f"{current_v}[char_v_scaled]overlay=x=0:y=0:eof_action=pass[with_char];")
             current_v = "[with_char]"
             input_idx += 1
             

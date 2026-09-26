@@ -26,14 +26,50 @@
         let scene, camera, renderer, mixer, clock;
         let characterModel;
         
+        // Store the AI's timeline plan so the animation loop can read it
+        window.aiPlan = null;
+        window.simulationTime = 0;
+        
+        // Store audio analysis state globally
+        window.audioContext = null;
+        window.analyser = null;
+        window.dataArray = null;
+        window.currentVolume = 0;
+
         // This is called by Python (Playwright) once the model is ready
         window.startRecording = async (characterPlan, durationSeconds) => {
-            console.log("[WebGL] Python injected the plan! Starting Recording...");
+            console.log("[WebGL] Python injected the plan! Starting Recording...", characterPlan);
+            window.aiPlan = characterPlan;
+            window.simulationTime = 0; // Reset timeline
             
-            // 1. Capture the Three.js Canvas Stream at 60 FPS
+            // 1. Setup Audio Lip-Sync Engine
+            try {
+                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                window.analyser = window.audioContext.createAnalyser();
+                window.analyser.fftSize = 256;
+                const bufferLength = window.analyser.frequencyBinCount;
+                window.dataArray = new Uint8Array(bufferLength);
+                
+                // Fetch the audio file that Python injected (served by our virtual Playwright domain)
+                const response = await fetch('audio.mp3');
+                if (response.ok) {
+                    const arrayBuffer = await response.arrayBuffer();
+                    const audioBuffer = await window.audioContext.decodeAudioData(arrayBuffer);
+                    const source = window.audioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(window.analyser);
+                    window.analyser.connect(window.audioContext.destination);
+                    source.start(0);
+                    console.log("[WebGL] Lip-Sync Audio Engine Started!");
+                }
+            } catch (e) {
+                console.error("[WebGL] Audio setup failed (proceeding without audio):", e);
+            }
+
+            // 2. Capture the Three.js Canvas Stream at 60 FPS
             const stream = renderer.domElement.captureStream(60);
             
-            // 2. Setup MediaRecorder for VP9 (Supports Alpha/Transparency perfectly)
+            // 3. Setup MediaRecorder for VP9 (Supports Alpha/Transparency perfectly)
             const options = { mimeType: 'video/webm; codecs=vp9' };
             const mediaRecorder = new MediaRecorder(stream, options);
             const recordedChunks = [];
@@ -44,7 +80,7 @@
                 }
             };
 
-            // 3. What happens when recording stops
+            // 4. What happens when recording stops
             mediaRecorder.onstop = () => {
                 console.log("[WebGL] Recording stopped. Preparing download...");
                 const blob = new Blob(recordedChunks, { type: 'video/webm' });
@@ -69,13 +105,19 @@
             // START RECORDING
             mediaRecorder.start();
             
-            // -- Play Audio / Lip Sync Logic will go here -- //
-            
             // Wait for the exact duration of the scene
             setTimeout(() => {
                 mediaRecorder.stop();
+                if (window.audioContext) window.audioContext.close();
             }, durationSeconds * 1000);
         };
+
+        // Procedural Bone Animation Helper
+        function lerpRotation(bone, targetEuler, speed = 0.1) {
+            if (!bone) return;
+            const targetQuat = new THREE.Quaternion().setFromEuler(targetEuler);
+            bone.quaternion.slerp(targetQuat, speed);
+        }
 
         function init() {
             clock = new THREE.Clock();
@@ -98,18 +140,32 @@
             directionalLight.position.set(1, 2, 3);
             scene.add(directionalLight);
 
-            // Instead of downloading a GLB which failed due to your internet DNS,
-            // we will create a built-in 3D Torus Knot to prove the transparent video recording works!
-            const geometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
-            const material = new THREE.MeshStandardMaterial({ color: 0x00ff00, metalness: 0.8, roughness: 0.2 });
-            characterModel = new THREE.Mesh(geometry, material);
-            scene.add(characterModel);
-            
-            console.log("[WebGL] 3D Test Object Created Successfully!");
-            
-            // Signal Python that the model is ready!
-            window.isModelLoaded = true;
-            if (window.onModelLoaded) window.onModelLoaded();
+            // Load the downloaded local 3D character
+            const loader = new GLTFLoader();
+            loader.load('character.glb', (gltf) => {
+                characterModel = gltf.scene;
+                
+                // Make the robot slightly larger and lower it so it fits perfectly in the camera
+                characterModel.scale.set(0.5, 0.5, 0.5);
+                characterModel.position.set(0, -1, 0);
+                scene.add(characterModel);
+                
+                // Initialize the animation mixer
+                mixer = new THREE.AnimationMixer(characterModel);
+                console.log("[WebGL] 3D Model Loaded Successfully!");
+                
+                // Play the idle/default animation if it exists
+                if (gltf.animations && gltf.animations.length > 0) {
+                    const action = mixer.clipAction(gltf.animations[0]);
+                    action.play();
+                }
+                
+                // Signal Python that the model is fully loaded and ready
+                window.isModelLoaded = true;
+                if (window.onModelLoaded) window.onModelLoaded();
+            }, undefined, (error) => {
+                console.error("[WebGL] Error loading character.glb:", error);
+            });
 
             animate();
         }
@@ -118,10 +174,88 @@
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
             if (mixer) mixer.update(delta);
-            if (characterModel) {
-                characterModel.rotation.x += 0.01;
-                characterModel.rotation.y += 0.01;
+            
+            // --- Lip Sync Audio Processing ---
+            if (window.analyser && window.dataArray) {
+                window.analyser.getByteFrequencyData(window.dataArray);
+                let sum = 0;
+                // Calculate average volume in the vocal frequencies (roughly first 20-50 bins)
+                for (let i = 0; i < 50; i++) {
+                    sum += window.dataArray[i];
+                }
+                const average = sum / 50;
+                // Normalize volume from 0 to 1
+                window.currentVolume = Math.min(average / 100, 1.0); 
             }
+            
+            // Only run procedural animations if recording has started
+            if (window.aiPlan && characterModel) {
+                window.simulationTime += delta;
+                const time = window.simulationTime;
+                
+                // 1. Find standard bones (Mixamo / ReadyPlayerMe / VRM standard naming)
+                let rightArm = null;
+                let leftArm = null;
+                let spine = null;
+                let jaw = null;
+                
+                characterModel.traverse((child) => {
+                    if (child.isBone) {
+                        const name = child.name.toLowerCase();
+                        if (name.includes("rightarm") || name.includes("arm_r")) rightArm = child;
+                        if (name.includes("leftarm") || name.includes("arm_l")) leftArm = child;
+                        if (name.includes("spine") || name.includes("chest")) spine = child;
+                        if (name.includes("jaw")) jaw = child;
+                    }
+                });
+                
+                // 2. Base Idle Animation (Breathing)
+                if (spine) {
+                    const breatheOffset = Math.sin(time * 2) * 0.02;
+                    spine.rotation.x += breatheOffset * delta;
+                }
+
+                // 3. Audio Lip-Sync (Procedural Jaw Movement)
+                if (jaw) {
+                    // Open the jaw downwards on the X or Z axis depending on the model rigging
+                    // We map the normalized volume directly to the jaw rotation!
+                    // Jaw default is usually 0. We rotate it up to 0.4 radians when loud.
+                    const jawOpenAmount = window.currentVolume * 0.4;
+                    // Because different rigs use different axes for the jaw, we'll try X
+                    // If it rotates weirdly, we might need to adjust this
+                    lerpRotation(jaw, new THREE.Euler(jawOpenAmount, 0, 0), 0.5);
+                }
+
+                // 4. Determine current AI action from the Master Blueprint
+                let currentAction = "idle";
+                if (window.aiPlan.edits) {
+                    for (const edit of window.aiPlan.edits) {
+                        if (time >= edit.start && time <= edit.end) {
+                            if (edit.action === "character" || edit.character_action) {
+                                currentAction = (edit.character_action || edit.action).toLowerCase();
+                            }
+                        }
+                    }
+                }
+                if (window.aiPlan.action) currentAction = window.aiPlan.action.toLowerCase();
+
+                // 5. Procedurally rotate bones to perform the action!
+                const defaultPose = new THREE.Euler(0, 0, 0);
+                
+                if (currentAction.includes("point")) {
+                    lerpRotation(rightArm, new THREE.Euler(0, 0, 1.2), 0.05);
+                    lerpRotation(leftArm, defaultPose, 0.05);
+                } 
+                else if (currentAction.includes("explain") || currentAction.includes("surprised")) {
+                    lerpRotation(rightArm, new THREE.Euler(0, 0, 1.0), 0.05);
+                    lerpRotation(leftArm, new THREE.Euler(0, 0, -1.0), 0.05);
+                } 
+                else {
+                    lerpRotation(rightArm, new THREE.Euler(0, 0, 0.2), 0.05);
+                    lerpRotation(leftArm, new THREE.Euler(0, 0, -0.2), 0.05);
+                }
+            }
+            
             renderer.render(scene, camera);
         }
 

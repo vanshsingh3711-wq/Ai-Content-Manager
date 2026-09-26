@@ -3,10 +3,10 @@ import os
 import json
 from playwright.async_api import async_playwright
 
-async def render_3d_character(json_plan_path: str, output_video_path: str):
+async def render_3d_character(ai_plan: dict, output_video_path: str, duration: float = 5.0, audio_path: str = None):
     """
     Spins up a headless browser, loads the 3D scene, passes the AI's JSON plan,
-    and downloads the resulting WebM video with a transparent background.
+    injects the TTS audio, and downloads the resulting WebM video.
     """
     
     # Get the absolute path to our HTML file
@@ -37,8 +37,27 @@ async def render_3d_character(json_plan_path: str, output_video_path: str):
         # Route console logs to terminal so we can debug Three.js
         page.on("console", lambda msg: print(f"[WebGL]: {msg.text}"))
         
-        print(f"[3D RENDERER] Loading 3D Stage: {file_url}")
-        await page.goto(file_url)
+        # Serve local files via a fake domain to bypass Chrome's strict CORS rules on file://
+        file_dir = os.path.dirname(__file__)
+        async def route_intercept(route):
+            url = route.request.url
+            # Inject the real audio file when the browser asks for audio.mp3
+            if url == "http://local-3d-engine/audio.mp3" and audio_path and os.path.exists(audio_path):
+                await route.fulfill(path=os.path.abspath(audio_path))
+                return
+                
+            if url.startswith("http://local-3d-engine/"):
+                file_name = url.replace("http://local-3d-engine/", "")
+                file_path = os.path.join(file_dir, file_name)
+                if os.path.exists(file_path):
+                    await route.fulfill(path=file_path)
+                    return
+            await route.continue_()
+            
+        await page.route("**/*", route_intercept)
+        
+        print(f"[3D RENDERER] Loading 3D Stage on virtual domain...")
+        await page.goto("http://local-3d-engine/index.html")
 
         # Wait for the HTML/JS to shout that the model is fully loaded
         print("[3D RENDERER] Waiting for 3D model to load into memory...")
@@ -51,19 +70,12 @@ async def render_3d_character(json_plan_path: str, output_video_path: str):
         
         print("[3D RENDERER] Model Loaded! Injecting AI JSON Plan...")
         
-        # Read the JSON plan we want the character to act out
-        with open(json_plan_path, 'r') as f:
-            ai_plan = json.load(f)
-
         # Pass the data into the browser and tell it to start recording
-        # The JS will start the MediaRecorder and click a hidden <a download> link when done
-        
         async with page.expect_download(timeout=60000) as download_info:
             await page.evaluate(f"""
                 async () => {{
-                    // This function is inside our index.html
-                    // We pass 5 seconds as a dummy duration for the initial test
-                    await window.startRecording({json.dumps(ai_plan)}, 5);
+                    // We pass the exact duration so the recording knows when to stop
+                    await window.startRecording({json.dumps(ai_plan)}, {duration});
                 }}
             """)
             
@@ -77,10 +89,16 @@ async def render_3d_character(json_plan_path: str, output_video_path: str):
 
 if __name__ == "__main__":
     # Test script if run directly
-    dummy_plan_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "test_plan.json"))
-    with open(dummy_plan_path, "w") as f:
-        json.dump({"action": "point", "start": 0}, f)
-        
-    output_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "output.webm"))
+    dummy_plan = {
+        "edits": [
+            {"start": 0.0, "end": 2.0, "action": "character", "character_action": "point"},
+            {"start": 2.0, "end": 4.0, "action": "character", "character_action": "explain"},
+            {"start": 4.0, "end": 6.0, "action": "character", "character_action": "idle"}
+        ]
+    }
     
-    asyncio.run(render_3d_character(dummy_plan_path, output_path))
+    output_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "output.webm"))
+    audio_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "audio.mp3"))
+    
+    # Run the test for 6 seconds to see all transitions and lip sync
+    asyncio.run(render_3d_character(dummy_plan, output_path, duration=6.0, audio_path=audio_path))
