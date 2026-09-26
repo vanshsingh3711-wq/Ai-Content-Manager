@@ -12,7 +12,7 @@ def resolve_master_blueprint(
 ) -> EditList:
     """
     Acts as the Master Director. Takes the independent plans from the visual sub-agents
-    and resolves any conflicts based on the script context.
+    and intelligently resolves any conflicts, alters timestamps, and applies creative direction.
     """
     
     system_prompt = """You are the Master Blueprint Resolver for an AI video editing pipeline.
@@ -24,15 +24,16 @@ You will receive a unified analysis of a video (transcript and timing) AND three
 Your job is to merge these into a single, cohesive Edit Decision List.
 
 CONFLICT RESOLUTION RULES:
+- You have FULL creative control to adjust timestamps, modify transitions, or rewrite text to ensure the video flows perfectly.
 - A scene/chunk (`trigger_id`) CAN contain multiple visual beats (e.g., a character reacting, followed by a motion graphic).
-- However, if multiple distinct visual assets (e.g., B-roll and Motion Graphics) are scheduled to appear at the EXACT SAME timestamp, you MUST resolve the conflict.
-- Look at the transcript script for that chunk. If the script is highly visual and describes a real-world concept better suited for footage, keep the 'b_roll' and discard the others.
-- If the script highlights a specific statistic, quote, or textual point, keep the 'motion_graphics' and discard the others.
+- However, if multiple distinct visual assets (e.g., B-roll and Motion Graphics) are scheduled to appear at the EXACT SAME timestamp, you MUST resolve the conflict intelligently.
+- Look at the transcript script for that chunk. If the script is highly visual and describes a real-world concept better suited for footage, keep the 'b_roll'.
+- If the script highlights a specific statistic, quote, or textual point, keep the 'motion_graphics'.
 - Ensure visual continuity. Do not arbitrarily cut if the visual still supports the dialogue.
 - Allow complex visual beats within scenes. A 7-second scene could contain several coordinated animation events or text changes if the dialogue contains distinct ideas.
 
 OUTPUT FORMAT:
-Output ONLY a valid JSON object containing the finalized, merged "edits" array.
+Output ONLY a valid JSON object containing the finalized, merged "edits" array. Ensure the JSON is properly closed and formatted.
 """
 
     user_prompt = f"""--- UNIFIED ANALYSIS (Transcript & Context) ---
@@ -54,7 +55,7 @@ Please merge these plans, resolving conflicts based on the script, and output th
     print(f" -> Received B-Roll Plan: {len(broll_plan.edits)} events")
     print(f" -> Received Motion Graphics Plan: {len(mg_plan.edits)} events")
     print(f" -> Received Character Plan: {len(char_plan.edits)} events")
-    print(f" -> Master LLM is now analyzing the script to merge and resolve overlapping timestamps...")
+    print(f" -> Master LLM is now analyzing the script to merge, resolve overlapping timestamps, and optimize quality...")
 
     final_plan = _call_llm(system_prompt, user_prompt)
     

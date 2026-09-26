@@ -84,7 +84,7 @@ def _call_llm(system_prompt: str, user_prompt: str) -> EditList:
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.3,
-                max_tokens=5000,
+                max_tokens=8000,
             )
             break
         except Exception as e:
