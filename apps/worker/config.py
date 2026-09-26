@@ -3,6 +3,10 @@ import sys
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlmodel import Session, create_engine
+from dotenv import load_dotenv
+
+# Force load .env into os.environ so Celery/Boto3 can find AWS credentials
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 # Add apps/api to path so worker can reuse SQLModel models
 api_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api"))
@@ -32,6 +36,7 @@ class WorkerSettings(BaseSettings):
     OPENROUTER_API_KEY: str = ""
     DEEPSEEK_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    MISTRAL_API_KEY: str = ""
     PEXELS_API_KEY: str = ""
 
     # Media temporary processing folder

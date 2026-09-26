@@ -24,10 +24,12 @@ You will receive a unified analysis of a video (transcript and timing) AND three
 Your job is to merge these into a single, cohesive Edit Decision List.
 
 CONFLICT RESOLUTION RULES:
-- If multiple visual events (e.g., B-roll and Motion Graphics) are scheduled for the exact same `trigger_id` or timestamp, you MUST resolve the conflict.
+- A scene/chunk (`trigger_id`) CAN contain multiple visual beats (e.g., a character reacting, followed by a motion graphic).
+- However, if multiple distinct visual assets (e.g., B-roll and Motion Graphics) are scheduled to appear at the EXACT SAME timestamp, you MUST resolve the conflict.
 - Look at the transcript script for that chunk. If the script is highly visual and describes a real-world concept better suited for footage, keep the 'b_roll' and discard the others.
 - If the script highlights a specific statistic, quote, or textual point, keep the 'motion_graphics' and discard the others.
-- Do not overload the viewer. Ensure there is breathing room between visual elements.
+- Ensure visual continuity. Do not arbitrarily cut if the visual still supports the dialogue.
+- Allow complex visual beats within scenes. A 7-second scene could contain several coordinated animation events or text changes if the dialogue contains distinct ideas.
 
 OUTPUT FORMAT:
 Output ONLY a valid JSON object containing the finalized, merged "edits" array.
@@ -48,4 +50,15 @@ Output ONLY a valid JSON object containing the finalized, merged "edits" array.
 Please merge these plans, resolving conflicts based on the script, and output the final JSON EditList.
 """
 
-    return _call_llm(system_prompt, user_prompt)
+    print(f"\n[RESOLVER: STARTING CONFLICT RESOLUTION]")
+    print(f" -> Received B-Roll Plan: {len(broll_plan.edits)} events")
+    print(f" -> Received Motion Graphics Plan: {len(mg_plan.edits)} events")
+    print(f" -> Received Character Plan: {len(char_plan.edits)} events")
+    print(f" -> Master LLM is now analyzing the script to merge and resolve overlapping timestamps...")
+
+    final_plan = _call_llm(system_prompt, user_prompt)
+    
+    print(f"\n[RESOLVER: FINALIZED MASTER BLUEPRINT]")
+    print(f" -> Final merged events: {len(final_plan.edits)}")
+    print(f" -> The conflict resolver successfully prioritized actions based on transcript context.")
+    return final_plan

@@ -62,3 +62,4 @@ Thumbs.db
 *.swp
 *.swo
 .turbo
+packages/motion-components/chrome/

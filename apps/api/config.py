@@ -3,6 +3,11 @@ from typing import List, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
+import os
+from dotenv import load_dotenv
+
+# Force load .env into os.environ so Celery/Boto3 can find AWS credentials
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 
 class Settings(BaseSettings):

@@ -10,12 +10,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.526",
+    "@napi-rs/canvas": "^1.0.9",
     "@rive-app/react-canvas": "^4.34.3",
     "framer-motion": "^13.4.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "remotion": "^4.0.526"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",

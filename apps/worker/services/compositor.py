@@ -54,35 +54,33 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
         )
     return result
 
-def _render_remotion_composition(comp_id: str, props: dict, duration_sec: float, fps: float, temp_dir: str, prefix: str) -> Optional[str]:
-    """Spawns Remotion CLI to render a transparent WebM overlay."""
-    out_path = os.path.join(temp_dir, f"{prefix}.webm")
-    
-    # Calculate duration in frames
+def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, fps: float, width: int, height: int, temp_dir: str, prefix: str) -> Optional[str]:
+    """Spawns Node.js Canvas renderer to generate a transparent WebM overlay."""
+    out_path = os.path.join(temp_dir, f"{prefix}.mov")
     frames = int(duration_sec * fps)
-    frames_arg = f"0-{max(1, frames - 1)}"
     
+    # Add componentId to props so the Node script knows what to draw
+    props["componentId"] = comp_id
     props_json = json.dumps(props)
     
-    motion_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../packages/motion-components"))
+    motion_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../packages/motion-components"))
     if not os.path.exists(motion_dir):
-        # Fallback for docker container path
         motion_dir = "/app/packages/motion-components"
         
     cmd = [
-        "npx", "remotion", "render", "src/Root.tsx", comp_id,
+        "node", "render_canvas.js",
         out_path,
-        f"--props={props_json}",
-        f"--frames={frames_arg}",
-        "--pixel-format=yuva420p",
-        "--codec=vp8",
-        "--image-format=png"
+        str(frames),
+        str(int(fps)),
+        str(width),
+        str(height),
+        props_json
     ]
     
-    _log("REMOTION", f"Rendering {comp_id} to {out_path} ({frames} frames)")
+    _log("CANVAS", f"Rendering {comp_id} to {out_path} ({frames} frames @ {fps}fps)")
     result = subprocess.run(cmd, cwd=motion_dir, capture_output=True, text=True)
     if result.returncode != 0:
-        _log("REMOTION_ERR", result.stderr)
+        _log("CANVAS_ERR", result.stderr or result.stdout)
         return None
     return out_path
 
@@ -255,18 +253,17 @@ def _probe_streams(ffmpeg_bin: str, filepath: str) -> Dict[str, Any]:
 
 
 def _escape_ass_path_for_filter(filepath: str) -> str:
-    """
-    Properly escape a .ass file path for FFmpeg's subtitles filter on Windows.
-    Windows paths with spaces and colons need special escaping for libass.
-    """
-    abs_path = os.path.abspath(filepath)
-    # Replace backslashes with forward slashes
-    abs_path = abs_path.replace("\\", "/")
-    # Escape colons (C: -> C\\:) and special filter chars
-    abs_path = abs_path.replace(":", "\\\\:")
-    # Escape single quotes if any
-    abs_path = abs_path.replace("'", "\\'")
-    return abs_path
+    # Use relative path to avoid spaces from the root path
+    import os
+    try:
+        rel_path = os.path.relpath(filepath, os.getcwd())
+        # If it still has spaces, just use basename (assuming it's in the current dir)
+        if " " in rel_path:
+            return os.path.basename(filepath)
+        return rel_path.replace("\\\\", "/")
+    except Exception:
+        return os.path.basename(filepath)
+
 
 
 def _build_segment_timeline(
@@ -446,18 +443,8 @@ def render_video_pipeline(
     settings: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
-    Composites the final video by applying AI edit decisions:
-      1. Removes 'cut' segments
-      2. Overlays B-roll clips on 'b_roll' segments (VISUAL ONLY — original audio preserved)
-      3. Applies zoom on 'zoom_in' segments
-      4. Burns ASS subtitles
-      5. Encodes to 1080x1920 portrait MP4
-      6. Validates output has both video and audio streams
-
-    AUDIO OWNERSHIP: Original speech audio is ALWAYS the primary audio track.
-    B-roll insertion replaces ONLY the video. The original audio continues playing.
-
-    NEVER silently falls back. Raises RuntimeError on any failure.
+    Composites the final video using a chunked rendering pipeline.
+    This prevents Out-of-Memory (OOM) errors by rendering one segment at a time.
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_mp4_path)), exist_ok=True)
     ffmpeg_bin = get_ffmpeg_binary_path()
@@ -466,73 +453,73 @@ def render_video_pipeline(
     timestamp_map = timestamp_map or {}
     settings = settings or {}
 
+    target_aspect = settings.get("aspect_ratio", "9:16")
+    if target_aspect == "16:9": target_w, target_h = 1920, 1080
+    elif target_aspect == "1:1": target_w, target_h = 1080, 1080
+    elif target_aspect == "4:5": target_w, target_h = 1080, 1350
+    else: target_w, target_h = 1080, 1920
+
     _log("START", f"raw_video={raw_video_path}")
     _log("START", f"output={output_mp4_path}")
-    _log("START", f"edits={len(edits)} | broll_assets={len(broll_map)} | chunks={len(timestamp_map)}")
 
-    # ---- Validate input video ----
     if not os.path.exists(raw_video_path):
         raise FileNotFoundError(f"Raw video not found: {raw_video_path}")
 
     file_size = os.path.getsize(raw_video_path)
     if file_size < 1024:
-        raise ValueError(
-            f"Raw video is only {file_size} bytes — this is a stub/placeholder, not a real video. "
-            f"The upload or download step failed silently. Path: {raw_video_path}"
-        )
+        raise ValueError("Raw video is suspiciously small.")
 
-    _log("INPUT", f"Raw video size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
-
-    # ---- Probe video duration and streams ----
     total_duration = _probe_duration(ffmpeg_bin, raw_video_path)
-    _log("INPUT", f"Raw video duration: {total_duration:.2f}s")
     if total_duration <= 0:
-        raise ValueError(f"Could not determine video duration. FFmpeg probe failed for: {raw_video_path}")
+        raise ValueError("Could not determine video duration.")
 
     input_streams = _probe_streams(ffmpeg_bin, raw_video_path)
     source_has_audio = input_streams["has_audio"]
     source_fps = input_streams.get("fps", 30.0)
-    _log("AUDIO", f"Source has audio: {source_has_audio} | "
-         f"Audio duration: {input_streams['audio_duration']:.2f}s | FPS: {source_fps:.2f}")
 
-    # ---- Build segment timeline ----
     timeline = _build_segment_timeline(edits, timestamp_map, total_duration)
     kept_segments = [s for s in timeline if not s["is_cut"]]
-    cut_segments = [s for s in timeline if s["is_cut"]]
 
-    _log("TIMELINE", f"Total segments: {len(timeline)} | Kept: {len(kept_segments)} | Cut: {len(cut_segments)}")
-    for seg in timeline:
-        status = "CUT" if seg["is_cut"] else "KEEP"
-        action_names = [a["action"] for a in seg["actions"] if a["action"] != "cut"]
-        _log("TIMELINE", f"  {seg['chunk_id']} [{seg['start']:.2f}s - {seg['end']:.2f}s] "
-             f"-> {status} | effects: {action_names or 'none'}")
-
-    # ---- Use temp directory for intermediate files ----
     temp_dir = os.path.dirname(os.path.abspath(output_mp4_path))
 
     if not kept_segments:
-        _log("WARN", "All segments were cut! Using full video without cuts.")
-        kept_segments = [{
-            "start": 0.0, "end": total_duration, "chunk_id": "FULL",
-            "actions": [], "is_cut": False,
-        }]
+        kept_segments = [{"start": 0.0, "end": total_duration, "chunk_id": "FULL", "actions": [], "is_cut": False}]
 
-    # ---- Step A: Extract kept segments and apply per-segment effects ----
+    _log("RENDER", f"Chunked rendering of {len(kept_segments)} segments to prevent OOM...")
     segment_files = []
 
     for seg_idx, seg in enumerate(kept_segments):
-        seg_output = os.path.join(temp_dir, f"seg_{seg_idx:03d}.mp4")
-        start_t = max(0, seg["start"])  # Exact cut, no overlap/pre-roll to prevent stutter
+        start_t = max(0, seg["start"])
         end_t = min(total_duration, seg["end"])
         duration = end_t - start_t
-
         if duration <= 0.05:
-            _log("SKIP", f"Segment {seg['chunk_id']} too short ({duration:.3f}s), skipping")
             continue
-
+            
+        segment_mp4 = os.path.join(temp_dir, f"segment_{seg_idx:03d}.mp4")
+        
+        cmd = [ffmpeg_bin, "-y", "-i", raw_video_path]
+        input_idx = 1
+        
+        filter_str = []
         action_types = {a["action"] for a in seg["actions"]}
 
-        # Determine if this segment gets a B-roll overlay
+        filter_str.append(f"[0:v]trim=start={start_t:.3f}:end={end_t:.3f},setpts=PTS-STARTPTS[base_v];")
+        
+        if source_has_audio:
+            filter_str.append(f"[0:a]atrim=start={start_t:.3f}:end={end_t:.3f},asetpts=PTS-STARTPTS[base_a];")
+            current_a = "[base_a]"
+        else:
+            filter_str.append(f"anullsrc=d={duration:.3f}:r=44100:cl=stereo[base_a];")
+            current_a = "[base_a]"
+
+        base_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+        if "zoom_in" in action_types:
+            zoom_w, zoom_h = int(target_w * 1.15), int(target_h * 1.15)
+            base_scale = f"scale={zoom_w}:{zoom_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+            
+        filter_str.append(f"[base_v]{base_scale}[norm_v];")
+        current_v = "[norm_v]"
+
         broll_path = None
         if "b_roll" in action_types:
             for a in seg["actions"]:
@@ -545,259 +532,172 @@ def render_video_pipeline(
         motion_graphics_text = None
         character_action = None
         has_sfx = False
+        sfx_keyword = "pop"
 
         for a in seg["actions"]:
-            if a["action"] == "motion_graphics":
+            if a.get("action") == "motion_graphics" or a.get("motion_graphics_text"):
                 motion_graphics_text = a.get("motion_graphics_text")
                 mg_template = a.get("template", "MotionGraphicsPreview")
-            elif a["action"] == "character":
+                mg_props = {"text": motion_graphics_text}
+                if a.get("visual_beats"): mg_props["visual_beats"] = a.get("visual_beats")
+                if a.get("transition"): mg_props["transition"] = a.get("transition")
+            
+            if a.get("action") == "character" or a.get("character_action"):
                 character_action = a.get("character_action")
-            elif a["action"] == "sfx":
+                char_props_overrides = {}
+                if a.get("visual_beats"): char_props_overrides["visual_beats"] = a.get("visual_beats")
+                if a.get("transition"): char_props_overrides["transition"] = a.get("transition")
+            
+            if a.get("action") == "sfx" or a.get("sound_effect"):
                 has_sfx = True
                 sfx_keyword = a.get("sound_effect", "pop")
 
         mg_path = None
         if motion_graphics_text:
-            mg_path = _render_remotion_composition(
-                mg_template, 
-                {"text": motion_graphics_text},
-                duration, source_fps, temp_dir, f"mg_{seg['chunk_id']}"
+            mg_path = _render_canvas_composition(
+                mg_template, mg_props,
+                duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"
             )
             
         char_path = None
         if character_action:
-            char_props = {
-                "isTalking": True,
-                "isBlinking": True,
-                "expression": "neutral",
-                "gesture": "none"
-            }
-            
+            char_props = {"isTalking": True, "isBlinking": True, "expression": "neutral", "gesture": "none"}
             action_lower = character_action.lower()
-            if "surprised" in action_lower:
-                char_props["expression"] = "surprised"
-                char_props["gesture"] = "emphasize"
-            elif "point" in action_lower:
-                char_props["gesture"] = "pointRight"
-            elif "explain" in action_lower:
-                char_props["gesture"] = "present"
-                char_props["isNodding"] = True
-                
+            if "surprised" in action_lower: char_props.update({"expression": "surprised", "gesture": "emphasize"})
+            elif "point" in action_lower: char_props["gesture"] = "pointRight"
+            elif "explain" in action_lower: char_props.update({"gesture": "present", "isNodding": True})
+            
+            char_props.update(char_props_overrides)
+            
             char_component = settings.get("character_asset", "SvgCharacterPreview")
-            char_path = _render_remotion_composition(
-                char_component, 
-                char_props,
-                duration, source_fps, temp_dir, f"char_{seg['chunk_id']}"
+            char_path = _render_canvas_composition(
+                char_component, char_props,
+                duration, source_fps, target_w, target_h, temp_dir, f"char_{seg['chunk_id']}"
             )
 
-        cmd = [ffmpeg_bin, "-y", "-i", raw_video_path]
-        
-        input_idx = 1
-        video_filters = []
-        
-        base_scale = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
-        if "zoom_in" in action_types:
-            base_scale = "scale=1242:2208:force_original_aspect_ratio=increase,crop=1080:1920"
-            _log("ZOOM", f"Applying 1.15x crop zoom on {seg['chunk_id']}")
-            
-        video_filters.append(f"[0:v]{base_scale}[base_v];")
-        current_v = "[base_v]"
-        
+        broll_transition = None
+        for a in seg["actions"]:
+            if a["action"] == "b_roll" and a.get("transition"):
+                broll_transition = a.get("transition")
+                break
+
         if broll_path:
             cmd.extend(["-an", "-i", broll_path])
-            _log("BROLL", f"Overlaying B-roll for {seg['chunk_id']}: {os.path.basename(broll_path)}")
-            video_filters.append(
-                f"[{input_idx}:v]fps={source_fps},scale=1080:1920:force_original_aspect_ratio=increase,"
-                f"crop=1080:1920,setpts=PTS-STARTPTS+{start_t}/TB[broll_v];"
-                f"{current_v}[broll_v]overlay=x=0:y=0:eof_action=pass[with_broll];"
-            )
+            broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setpts=PTS-STARTPTS"
+            if broll_transition in ["fade", "crossfade", "morph"]:
+                broll_filter += ",fade=t=in:st=0:d=0.5"
+            broll_filter += f"[broll_v];"
+            filter_str.append(broll_filter)
+            
+            overlay_x = "0"
+            overlay_y = "0"
+            if broll_transition == "slide" or broll_transition == "push":
+                overlay_x = "if(lte(t,0.5), -w+(w/0.5)*t, 0)"
+                
+            filter_str.append(f"{current_v}[broll_v]overlay=x={overlay_x}:y={overlay_y}:eof_action=pass[with_broll];")
             current_v = "[with_broll]"
             input_idx += 1
             
         if mg_path:
             cmd.extend(["-i", mg_path])
-            _log("MG", f"Overlaying Motion Graphics for {seg['chunk_id']}")
-            video_filters.append(
-                f"[{input_idx}:v]setpts=PTS-STARTPTS+{start_t}/TB[mg_v];"
-                f"{current_v}[mg_v]overlay=x=0:y=0:eof_action=pass[with_mg];"
-            )
+            filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[mg_v];")
+            filter_str.append(f"{current_v}[mg_v]overlay=x=0:y=0:eof_action=pass[with_mg];")
             current_v = "[with_mg]"
             input_idx += 1
             
         if char_path:
             cmd.extend(["-i", char_path])
-            _log("CHAR", f"Overlaying Character for {seg['chunk_id']}")
-            video_filters.append(
-                f"[{input_idx}:v]scale=400:-1,setpts=PTS-STARTPTS+{start_t}/TB[char_v];"
-                f"{current_v}[char_v]overlay=x=50:y=H-h-150:eof_action=pass[with_char];"
-            )
+            filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[char_v];")
+            filter_str.append(f"{current_v}[char_v]overlay=x=0:y=0:eof_action=pass[with_char];")
             current_v = "[with_char]"
             input_idx += 1
             
-        current_a = "0:a"
         if has_sfx:
             sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
-            sfx_fetched = False
-            
-            if sfx_keyword:
-                _log("SFX", f"Fetching SFX for keyword: '{sfx_keyword}'...")
-                sfx_fetched = fetch_sfx(sfx_keyword, sfx_path)
-                
+            sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
             if not sfx_fetched:
-                # Fallback to local pop.wav
-                fallback_sfx = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../apps/web/public/assets/audio/pop.wav"))
-                if os.path.exists(fallback_sfx):
-                    sfx_path = fallback_sfx
-                    sfx_fetched = True
-                    
-            if sfx_fetched and os.path.exists(sfx_path):
+                sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../apps/web/public/assets/audio/pop.wav"))
+            if os.path.exists(sfx_path):
                 cmd.extend(["-i", sfx_path])
-                _log("SFX", f"Adding SFX for {seg['chunk_id']}")
-                video_filters.append(f"[0:a][{input_idx}:a]amix=inputs=2:duration=first:dropout_transition=2[sfx_a];")
-                current_a = "[sfx_a]"
+                filter_str.append(f"[{input_idx}:a]adelay=0|0[sfx_a];")
+                filter_str.append(f"{current_a}[sfx_a]amix=inputs=2:duration=first:dropout_transition=2[a_out_sfx];")
+                current_a = "[a_out_sfx]"
                 input_idx += 1
                 
-        video_filters.append(f"{current_v}format=yuv420p[vout]")
-        filter_str = "".join(video_filters)
+        filter_str.append(f"{current_v}format=yuv420p[vout]")
+        
+        filter_complex = "".join(filter_str)
+        filter_script_path = os.path.join(temp_dir, f"filter_{seg_idx}.txt")
+        with open(filter_script_path, "w", encoding="utf-8") as f:
+            f.write(filter_complex)
         
         cmd.extend([
-            "-filter_complex", filter_str,
+            "-filter_complex_script", filter_script_path,
             "-map", "[vout]",
             "-map", current_a,
-            "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
             "-r", str(source_fps),
             "-c:v", _get_video_codec(ffmpeg_bin), "-preset", "fast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "192k",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-video_track_timescale", "90000",
             "-pix_fmt", "yuv420p",
             "-shortest",
-            "-movflags", "+faststart",
-            seg_output,
+            segment_mp4
         ])
 
+        _log("FFMPEG", f"Rendering segment {seg_idx+1}/{len(kept_segments)}")
         try:
-            _run_ffmpeg(cmd, f"segment_{seg['chunk_id']}")
-            if os.path.exists(seg_output) and os.path.getsize(seg_output) > 0:
-                # Verify segment has audio if source has audio
-                if source_has_audio:
-                    seg_streams = _probe_streams(ffmpeg_bin, seg_output)
-                    if not seg_streams["has_audio"]:
-                        _log("AUDIO_FIX", f"Segment {seg['chunk_id']} missing audio — "
-                             f"adding silent track to prevent concat gaps")
-                        _fix_missing_audio(ffmpeg_bin, seg_output, duration, temp_dir, seg_idx)
-
-                segment_files.append(seg_output)
-                _log("OK", f"Segment {seg['chunk_id']}: {os.path.getsize(seg_output):,} bytes")
-            else:
-                _log("ERROR", f"Segment {seg['chunk_id']} produced empty output!")
-                raise RuntimeError(f"FFmpeg produced empty output for segment {seg['chunk_id']}")
+            _run_ffmpeg(cmd, f"render_segment_{seg_idx}")
+            segment_files.append(segment_mp4)
         except RuntimeError as e:
-            _log("ERROR", f"Segment {seg['chunk_id']} FAILED: {e}")
-            # For overlay failures, retry without overlays
-            if broll_path or mg_path or char_path or has_sfx:
-                _log("RETRY", f"Retrying {seg['chunk_id']} without any overlays...")
-                fallback_cmd = [
-                    ffmpeg_bin, "-y",
-                    "-i", raw_video_path,
-                    "-ss", f"{start_t:.3f}", "-t", f"{duration:.3f}",
-                    "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-                    "-r", str(source_fps),
-                    "-c:v", _get_video_codec(ffmpeg_bin), "-preset", "fast", "-crf", "23",
-                    "-c:a", "aac", "-b:a", "192k",
-                    "-pix_fmt", "yuv420p",
-                    seg_output,
-                ]
-                _run_ffmpeg(fallback_cmd, f"segment_{seg['chunk_id']}_fallback")
-                if os.path.exists(seg_output) and os.path.getsize(seg_output) > 0:
-                    segment_files.append(seg_output)
-                else:
-                    raise
-            else:
-                raise
+            _log("ERROR", f"Rendering segment {seg_idx} failed: {e}")
+            raise
 
-    if not segment_files:
-        raise RuntimeError("No video segments were produced! All FFmpeg segment extractions failed.")
+    _log("FFMPEG", "Concatenating segments...")
+    concat_txt_path = os.path.join(temp_dir, "concat.txt")
+    with open(concat_txt_path, "w", encoding="utf-8") as f:
+        for seg_file in segment_files:
+            escaped_file = seg_file.replace("'", "'\\''")
+            f.write(f"file '{escaped_file}'\n")
 
-    _log("SEGMENTS", f"Produced {len(segment_files)} segment files for concatenation")
+    cmd_concat = [
+        ffmpeg_bin, "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", concat_txt_path
+    ]
 
-    # ---- Step B: Concatenate all segments ----
-    if len(segment_files) == 1:
-        concat_output = segment_files[0]
-        _log("CONCAT", "Only 1 segment, skipping concatenation step")
-    else:
-        concat_list_path = os.path.join(temp_dir, "concat_list.txt")
-        with open(concat_list_path, "w", encoding="utf-8") as f:
-            for sf in segment_files:
-                # FFmpeg concat demuxer needs forward-slash paths, single-quoted
-                safe_path = os.path.abspath(sf).replace("\\", "/")
-                f.write(f"file '{safe_path}'\n")
-
-        concat_output = os.path.join(temp_dir, "concatenated.mp4")
-        concat_cmd = [
-            ffmpeg_bin, "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", concat_list_path,
-            "-c", "copy",
-            "-movflags", "+faststart",
-            concat_output,
-        ]
-        _run_ffmpeg(concat_cmd, "concatenate_segments")
-        _log("CONCAT", f"Concatenated {len(segment_files)} segments -> {os.path.getsize(concat_output):,} bytes")
-
-    # ---- Step C: Burn in subtitles ----
     if subtitle_ass_path and os.path.exists(subtitle_ass_path) and os.path.getsize(subtitle_ass_path) > 50:
-        _log("SUBTITLES", f"Burning in ASS subtitles: {subtitle_ass_path}")
-        sub_output = output_mp4_path  # Final output
-
         escaped_ass = _escape_ass_path_for_filter(subtitle_ass_path)
-        sub_filter = f"subtitles={escaped_ass}"
-
-        sub_cmd = [
-            ffmpeg_bin, "-y",
-            "-i", concat_output,
-            "-vf", sub_filter,
+        cmd_concat.extend([
+            "-vf", f"subtitles={escaped_ass}",
             "-c:v", _get_video_codec(ffmpeg_bin), "-preset", "fast", "-crf", "23",
             "-c:a", "copy",
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
-            sub_output,
-        ]
-
-        try:
-            _run_ffmpeg(sub_cmd, "burn_subtitles")
-            _log("SUBTITLES", f"Subtitles burned successfully: {os.path.getsize(sub_output):,} bytes")
-        except RuntimeError as e:
-            _log("WARN", f"Subtitle burn failed (path escaping issue?): {e}")
-            _log("WARN", "Proceeding WITHOUT subtitles — video content is preserved.")
-            # Copy the concat output as final (no subtitles but real video content)
-            if concat_output != output_mp4_path:
-                import shutil
-                shutil.copyfile(concat_output, output_mp4_path)
+        ])
     else:
-        _log("SUBTITLES", "No subtitle file provided or file is empty, skipping subtitle burn")
-        if concat_output != output_mp4_path:
-            import shutil
-            shutil.copyfile(concat_output, output_mp4_path)
+        cmd_concat.extend(["-c:v", "copy", "-c:a", "copy"])
 
-    # ---- Post-Render Validation ----
+    cmd_concat.extend([
+        "-movflags", "+faststart",
+        output_mp4_path
+    ])
+
+    _log("FFMPEG", "Executing final concatenation and subtitles")
+    try:
+        _run_ffmpeg(cmd_concat, "final_concat")
+    except RuntimeError as e:
+        _log("ERROR", f"Concatenation failed: {e}")
+        raise
+
     _validate_rendered_output(ffmpeg_bin, output_mp4_path, source_has_audio)
 
-    # ---- Cleanup intermediate segment files ----
-    for sf in segment_files:
-        try:
-            if sf != output_mp4_path:
-                os.remove(sf)
-        except OSError:
-            pass
-    for cleanup_file in ["concat_list.txt", "concatenated.mp4"]:
-        try:
-            p = os.path.join(temp_dir, cleanup_file)
-            if os.path.exists(p) and p != output_mp4_path:
-                os.remove(p)
-        except OSError:
-            pass
+    for root, dirs, files in os.walk(temp_dir):
+        for file in files:
+            if (file.endswith('.mov') and (file.startswith('char_') or file.startswith('mg_'))) or file.startswith('segment_') or file.startswith('filter_'):
+                try:
+                    os.remove(os.path.join(root, file))
+                except OSError:
+                    pass
 
     return output_mp4_path
-
 
 def _fix_missing_audio(
     ffmpeg_bin: str, segment_path: str, duration: float,

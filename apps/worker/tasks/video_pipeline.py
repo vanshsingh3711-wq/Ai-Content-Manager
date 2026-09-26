@@ -37,7 +37,7 @@ from services.blueprint_validator import validate_blueprint, format_validation_r
 from services.asset_manager import fetch_broll_assets
 from services.subtitle_generator import generate_ass_subtitles
 from services.compositor import render_video_pipeline, _probe_duration
-from services.publisher import upload_rendered_video_to_storage, publish_to_youtube_shorts
+from services.publisher import upload_rendered_video_to_storage, publish_to_youtube
 
 # Logger & Context
 from worker_logger import log_header, log_info, log_warning, log_error, log_summary, PipelineStep
@@ -72,14 +72,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         job_source_url = job.source_url
         job_id_str = str(job.id)
 
-        job_settings = {}
-        if job.edit_decision_list:
-            try:
-                parsed_init = json.loads(job.edit_decision_list)
-                if isinstance(parsed_init, dict) and "settings" in parsed_init:
-                    job_settings = parsed_init["settings"]
-            except Exception:
-                pass
+        job_settings = job.settings or {}
                 
         session.close() # Close DB before heavy work
 
@@ -111,7 +104,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             else:
                 log_info("Generating TTS Audio for Faceless Video...")
                 topic = job_settings.get("topic", job_title)
-                script = f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result."
+                script = job_settings.get("script", f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result.")
                 os.system(f'edge-tts --text "{script}" --write-media "{extracted_wav_path}"')
                 ffmpeg_bin = get_ffmpeg_binary_path()
                 total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
@@ -253,10 +246,12 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 job_id=job_id_str,
                 user_id=job_user_id,
             )
-            publish_to_youtube_shorts(
+            is_shorts = job_settings.get("aspect_ratio", "9:16") not in ["16:9"]
+            publish_to_youtube(
                 video_path=rendered_mp4_path,
                 title=job_title,
-                description=f"{job_title} #Shorts #AI #ContentCreator",
+                description=f"{job_title} #AI #ContentCreator",
+                is_shorts=is_shorts,
                 access_token=None,
             )
 
