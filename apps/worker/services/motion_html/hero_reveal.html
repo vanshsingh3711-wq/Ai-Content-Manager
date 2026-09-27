@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@700;900&display=swap');
+    
+    :root {
+      --primary: #ffffff;
+      --accent: #facc15;
+      --bg-glass: rgba(15, 15, 20, 0.65);
+      --border-glass: rgba(255, 255, 255, 0.15);
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1080px;
+      height: 1920px;
+      background: transparent; /* Must be transparent for video overlay */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      color: white;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #background {
+      position: absolute;
+      width: 900px;
+      height: 450px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(40px) saturate(150%);
+      -webkit-backdrop-filter: blur(40px) saturate(150%);
+      border-radius: 40px;
+      border: 1px solid var(--border-glass);
+      box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px;
+      box-sizing: border-box;
+      transform-origin: center;
+      will-change: transform, opacity, filter;
+    }
+
+    /* Clipping container for sliding text up from baseline */
+    .clip-mask {
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: top;
+      padding-bottom: 10px;
+    }
+
+    #label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 24px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 20px;
+      will-change: transform, opacity;
+      transform-origin: bottom center;
+    }
+
+    .title-row {
+      display: flex;
+      flex-direction: row;
+      align-items: baseline;
+      gap: 20px;
+    }
+
+    #headline, #accent {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 900;
+      font-size: 110px;
+      line-height: 1.1;
+      text-transform: uppercase;
+      will-change: transform, opacity, filter;
+      text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    #accent {
+      background: linear-gradient(135deg, #facc15, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    #supporting {
+      margin-top: 30px;
+      font-size: 32px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+      max-width: 80%;
+      line-height: 1.4;
+      will-change: transform, opacity;
+    }
+
+    /* Fallback styles for missing elements */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="background">
+    <div class="clip-mask">
+      <div id="label">LABEL</div>
+    </div>
+    
+    <div class="title-row">
+      <div class="clip-mask">
+         <div id="headline">HEADLINE</div>
+      </div>
+      <div class="clip-mask">
+         <div id="accent" class="hidden">ACCENT</div>
+      </div>
+    </div>
+
+    <div class="clip-mask">
+      <div id="supporting" class="hidden">Supporting text goes here</div>
+    </div>
+  </div>
+
+  <script>
+    // Tiny evaluator embedded directly in the HTML
+    const getSpringScale = (t, stiffness=150, damping=12, mass=0.5) => {
+        const omega0 = Math.sqrt(stiffness / mass);
+        const zeta = damping / (2 * Math.sqrt(stiffness * mass));
+        if (zeta >= 1) return 1.0;
+        const omega_d = omega0 * Math.sqrt(1 - zeta * zeta);
+        const envelope = Math.exp(-zeta * omega0 * t);
+        return 1 - envelope * (Math.cos(omega_d * t) + (zeta * omega0 / omega_d) * Math.sin(omega_d * t));
+    };
+
+    function evaluateTrack(track, currentFrame) {
+        if (!track.keyframes || track.keyframes.length === 0) return null;
+        if (track.keyframes.length === 1) return track.keyframes[0].value;
+
+        let left = track.keyframes[0];
+        let right = track.keyframes[track.keyframes.length - 1];
+
+        for (let i = 0; i < track.keyframes.length - 1; i++) {
+            if (currentFrame >= track.keyframes[i].frame && currentFrame < track.keyframes[i+1].frame) {
+                left = track.keyframes[i];
+                right = track.keyframes[i+1];
+                break;
+            }
+        }
+
+        if (currentFrame <= left.frame) return left.value;
+        if (currentFrame >= right.frame) {
+            // Spring overshoot?
+            if (right.easing === 'spring' && currentFrame > right.frame) {
+                const t = (currentFrame - right.frame) / 60; // assume 60fps
+                if (t < 1.5) {
+                    const diff = right.value - left.value;
+                    return left.value + diff * getSpringScale(t, 200, 15);
+                }
+            }
+            return right.value;
+        }
+
+        const progress = (currentFrame - left.frame) / (right.frame - left.frame);
+        
+        // Very basic easing fallbacks
+        let eased = progress;
+        if (left.easing === 'easeInOut') eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        if (left.easing === 'easeOut') eased = 1 - Math.pow(1 - progress, 3);
+        
+        return left.value + (right.value - left.value) * eased;
+    }
+
+    function applyMotionState(elementId, keyframes, frame) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        let scale = 1, opacity = 1, translateY = 0, blur = 0, translateX = 0;
+        let transformStr = "";
+
+        for (const track of keyframes) {
+            const val = evaluateTrack(track, frame);
+            if (val === null) continue;
+
+            if (track.property === 'opacity') opacity = val;
+            else if (track.property === 'scale') scale = val;
+            else if (track.property === 'translateY') translateY = val;
+            else if (track.property === 'translateX') translateX = val;
+            else if (track.property === 'blur') blur = val;
+        }
+
+        if (translateY !== 0 || translateX !== 0) transformStr += `translate(${translateX}px, ${translateY}px) `;
+        if (scale !== 1) transformStr += `scale(${scale}) `;
+
+        el.style.opacity = opacity;
+        el.style.transform = transformStr;
+        if (blur > 0) el.style.filter = `blur(${blur}px)`;
+        else el.style.filter = 'none';
+    }
+
+    // Called by Playwright
+    window.injectData = (targets, keyframesJson) => {
+        window.animationData = JSON.parse(keyframesJson);
+        
+        // Fill text based on targets dictionary
+        if (targets.headline) document.getElementById('headline').innerText = targets.headline;
+        
+        if (targets.label) document.getElementById('label').innerText = targets.label;
+        else document.getElementById('label').classList.add('hidden');
+        
+        if (targets.accent) {
+            document.getElementById('accent').innerText = targets.accent;
+            document.getElementById('accent').classList.remove('hidden');
+        }
+        
+        if (targets.supporting) {
+            document.getElementById('supporting').innerText = targets.supporting;
+            document.getElementById('supporting').classList.remove('hidden');
+        }
+    };
+
+    window.renderFrame = (frame) => {
+        if (!window.animationData) return;
+        for (const elData of window.animationData) {
+            applyMotionState(elData.id, elData.keyframes, frame);
+        }
+    };
+  </script>
+</body>
+</html>

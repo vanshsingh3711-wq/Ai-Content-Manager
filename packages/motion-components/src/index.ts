@@ -42,3 +42,4 @@ export * from './character/RiveCharacter';
 export * from './character/SvgCharacter';
 export * from './editor';
 export * from './project';
+export * from './motion';

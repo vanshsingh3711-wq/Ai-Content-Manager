@@ -43,6 +43,12 @@ export function evaluateKeyframeTrack(track: KeyframeTrack, currentFrame: number
         case 'easeInOut':
           easingFunc = Easing.inOut(Easing.ease);
           break;
+        case 'easeOutBack':
+          easingFunc = Easing.out(Easing.back(1.7));
+          break;
+        case 'spring':
+          easingFunc = Easing.out(Easing.back(2.5));
+          break;
         case 'linear':
         default:
           easingFunc = Easing.linear;

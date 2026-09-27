@@ -42,12 +42,29 @@ async def main():
     total_frames = total_duration_seconds * fps
     delta_time = 1.0 / fps
 
-    frames_dir = "/tmp/frames"
-    os.makedirs(frames_dir, exist_ok=True)
-    for f in os.listdir(frames_dir):
-        if f.endswith(".jpg"):
-            os.remove(os.path.join(frames_dir, f))
-
+    output_path = os.path.abspath('apps/worker/services/engine_3d/output.mp4')
+    if os.path.exists(output_path):
+        os.remove(output_path)
+        
+    print(f"[3D RENDERER] Starting Offline Rendering: {total_frames} frames at {fps} FPS (Piping to FFmpeg)...")
+    
+    # Spawn FFmpeg waiting for raw PNG data on stdin
+    ffmpeg_cmd = [
+        'ffmpeg', '-y',
+        '-f', 'image2pipe',
+        '-vcodec', 'png',
+        '-r', str(fps),
+        '-i', '-', # Read from stdin
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        '-crf', '18', # High quality
+        '-preset', 'fast',
+        output_path
+    ]
+    
+    process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+    
+    start_time = time.time()
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
@@ -63,7 +80,7 @@ async def main():
         
         page = await browser.new_page(
             viewport={'width': 1920, 'height': 1080},
-            device_scale_factor=1 # Changed from 2 to 1 to save RAM and prevent freezing
+            device_scale_factor=1
         )
         
         page.on("pageerror", lambda err: print(f"[WebGL Error]: {err}"))
@@ -79,43 +96,26 @@ async def main():
         print("[3D RENDERER] Model Loaded! Injecting AI JSON Plan & Preloading FBX...")
         await page.evaluate(f"window.prepareOfflineRender({json.dumps(ai_plan)})")
 
-        print(f"[3D RENDERER] Starting Offline Rendering: {total_frames} frames at {fps} FPS...")
-        start_time = time.time()
-        
         for i in range(total_frames):
             # 1. Advance simulation
             await page.evaluate(f"window.stepFrame({delta_time})")
             
-            # 2. Capture perfect frame
-            frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
-            await page.screenshot(path=frame_path, type="png")
+            # 2. Capture perfect frame directly to memory
+            frame_bytes = await page.screenshot(type="png")
+            
+            # 3. Stream immediately to FFmpeg
+            process.stdin.write(frame_bytes)
             
             if i % 100 == 0:
                 print(f"[3D RENDERER] Rendered frame {i}/{total_frames} ({(i/total_frames)*100:.1f}%)")
 
-        print(f"[3D RENDERER] Finished rendering {total_frames} frames in {time.time() - start_time:.1f} seconds!")
-        
         await browser.close()
         
-    print("[3D RENDERER] Compiling video with FFmpeg...")
+    print("[3D RENDERER] Finished rendering frames. Closing FFmpeg stream...")
+    process.stdin.close()
+    process.wait()
     
-    # We output an mp4 file since libx264 ensures excellent compatibility and speed
-    output_path = os.path.abspath('apps/worker/services/engine_3d/output.mp4')
-    if os.path.exists(output_path):
-        os.remove(output_path)
-        
-    subprocess.run([
-        'ffmpeg', '-y',
-        '-framerate', str(fps),
-        '-i', os.path.join(frames_dir, 'frame_%04d.png'),
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',
-        '-crf', '18', # High quality
-        '-preset', 'fast',
-        output_path
-    ], check=True)
-    
-    print(f"[3D RENDERER] Offline recording complete! Saved flawlessly to: {output_path}")
+    print(f"[3D RENDERER] Offline recording complete! Saved flawlessly in {time.time() - start_time:.1f} seconds to: {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(main())

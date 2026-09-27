@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Motion Composition Demo (Pure Data Driven)</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f1115;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        #scene {
+            position: relative;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #1a1e26 0%, #0a0b0e 100%);
+        }
+
+        /* Reusable UI Elements */
+        .layer {
+            position: absolute;
+            transform-origin: center center;
+            will-change: transform, opacity, filter;
+        }
+
+        #bg-1 {
+            width: 120%;
+            height: 120%;
+            top: -10%; left: -10%;
+            background: linear-gradient(135deg, rgba(255, 51, 102, 0.2), rgba(51, 153, 255, 0.2));
+            pointer-events: none;
+        }
+
+        .content-wrapper {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 24px;
+        }
+
+        #label-1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #FF3366;
+            margin-bottom: -10px;
+        }
+
+        #headline-1 {
+            font-size: 140px;
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -3px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #keyword-1 {
+            background: linear-gradient(to right, #00C6FF, #0072FF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: block;
+        }
+
+        #support-1 {
+            font-size: 36px;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.6);
+            max-width: 800px;
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="scene">
+        <div id="bg-1" class="layer"></div>
+        <div class="content-wrapper">
+            <div id="label-1" class="layer" style="position:relative">NEW SYSTEM</div>
+            <h1 id="headline-1" class="layer" style="position:relative">
+                <span>DETERMINISTIC</span>
+                <span id="keyword-1" class="layer" style="position:relative">MOTION ENGINE</span>
+            </h1>
+            <div id="support-1" class="layer" style="position:relative">
+                Generates 60fps Jitter-quality animations via pure JSON, independent of any front-end framework.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ----- MOTION COMPOSITION SYSTEM INTERPRETER -----
+        // Evaluates keyframes exactly like TS 'keyframes.evaluator.ts'
+        window.motionData = null;
+        
+        function interpolateLinear(progress, start, end) {
+            return start + (end - start) * Math.min(Math.max(progress, 0), 1);
+        }
+        
+        // Accurate approximations of Easing functions used in motion components
+        function easeOut(t) { return t * (2 - t); }
+        function easeInOut(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+        function easeOutBack(t) {
+            const c1 = 1.70158;
+            const c3 = c1 + 1;
+            return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+        }
+        function spring(t) {
+            const c1 = 2.5;
+            const c3 = c1 + 1;
+            return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+        }
+
+        function evaluateTrack(track, frame) {
+            const kfs = track.keyframes;
+            if (!kfs || kfs.length === 0) return 0;
+            if (kfs.length === 1) return kfs[0].value;
+            if (frame <= kfs[0].frame) return kfs[0].value;
+            const last = kfs[kfs.length - 1];
+            if (frame >= last.frame) return last.value;
+            
+            for (let i = 0; i < kfs.length - 1; i++) {
+                if (frame >= kfs[i].frame && frame <= kfs[i+1].frame) {
+                    const fStart = kfs[i].frame;
+                    const fEnd = kfs[i+1].frame;
+                    const vStart = kfs[i].value;
+                    const vEnd = kfs[i+1].value;
+                    let progress = (frame - fStart) / (fEnd - fStart);
+                    
+                    if (kfs[i].easing === 'easeOut') progress = easeOut(progress);
+                    else if (kfs[i].easing === 'easeInOut') progress = easeInOut(progress);
+                    else if (kfs[i].easing === 'easeOutBack') progress = easeOutBack(progress);
+                    else if (kfs[i].easing === 'spring') progress = spring(progress);
+                    
+                    return interpolateLinear(progress, vStart, vEnd);
+                }
+            }
+            return 0;
+        }
+
+        window.applyMotionState = function(time) {
+            if (!window.motionData) return;
+            const currentFrame = time * 60; // 60fps
+            
+            window.motionData.forEach(elData => {
+                const el = document.getElementById(elData.id);
+                if (!el || !elData.keyframes) return;
+                
+                // Read defaults from DOM if needed, but we'll assume standard ones
+                let scale = 1;
+                let ty = 0;
+                let tx = 0;
+                let blur = 0;
+                let opacity = 1;
+                
+                elData.keyframes.forEach(track => {
+                    const val = evaluateTrack(track, currentFrame);
+                    if (track.property === 'opacity') opacity = val;
+                    if (track.property === 'scale') scale = val;
+                    if (track.property === 'translateY') ty = val;
+                    if (track.property === 'translateX') tx = val;
+                    if (track.property === 'blur') blur = val;
+                });
+                
+                el.style.opacity = opacity;
+                el.style.transform = `scale(${scale}) translate(${tx}px, ${ty}px)`;
+                el.style.filter = `blur(${blur}px)`;
+            });
+        };
+
+        // Inject JSON
+        window.loadJSON = async () => {
+            const res = await fetch('hero_reveal_data.json');
+            window.motionData = await res.json();
+            window.applyMotionState(0);
+            window.isReady = true;
+        };
+
+        window.loadJSON();
+    </script>
+</body>
+</html>
