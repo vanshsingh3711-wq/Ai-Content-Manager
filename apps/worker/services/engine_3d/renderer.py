@@ -1,104 +1,121 @@
 import asyncio
 import os
 import json
+import time
+import subprocess
+import threading
+from http.server import SimpleHTTPRequestHandler
+import socketserver
 from playwright.async_api import async_playwright
 
-async def render_3d_character(ai_plan: dict, output_video_path: str, duration: float = 5.0, audio_path: str = None):
-    """
-    Spins up a headless browser, loads the 3D scene, passes the AI's JSON plan,
-    injects the TTS audio, and downloads the resulting WebM video.
-    """
+def start_server(port, directory):
+    class Handler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=directory, **kwargs)
+        # Suppress log messages
+        def log_message(self, format, *args):
+            pass
+
+    httpd = socketserver.TCPServer(("", port), Handler)
+    httpd.serve_forever()
+
+async def main():
+    print("[3D RENDERER] Booting Headless WebGL Engine (OFFLINE RENDERER)...")
     
-    # Get the absolute path to our HTML file
-    html_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html"))
-    file_url = f"file://{html_path}"
-
-    print(f"[3D RENDERER] Booting Headless WebGL Engine...")
+    # Start local HTTP server
+    port = 8081
+    server_dir = os.path.abspath('apps/worker/services/engine_3d')
+    server_thread = threading.Thread(target=start_server, args=(port, server_dir), daemon=True)
+    server_thread.start()
     
-    async with async_playwright() as p:
-        # Launch Chromium (Headless)
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                "--disable-web-security",  # Allows loading local assets
-                "--allow-file-access-from-files",
-                "--use-gl=swiftshader",    # Forces software rendering (safe for servers)
-                "--enable-unsafe-webgpu"
-            ]
-        )
-        
-        context = await browser.new_context(
-            accept_downloads=True, # Critical for saving the video!
-            viewport={"width": 1920, "height": 1080}
-        )
-        
-        page = await context.new_page()
-        
-        # Route console logs to terminal so we can debug Three.js
-        page.on("console", lambda msg: print(f"[WebGL]: {msg.text}"))
-        
-        # Serve local files via a fake domain to bypass Chrome's strict CORS rules on file://
-        file_dir = os.path.dirname(__file__)
-        async def route_intercept(route):
-            url = route.request.url
-            # Inject the real audio file when the browser asks for audio.mp3
-            if url == "http://local-3d-engine/audio.mp3" and audio_path and os.path.exists(audio_path):
-                await route.fulfill(path=os.path.abspath(audio_path))
-                return
-                
-            if url.startswith("http://local-3d-engine/"):
-                file_name = url.replace("http://local-3d-engine/", "")
-                file_path = os.path.join(file_dir, file_name)
-                if os.path.exists(file_path):
-                    await route.fulfill(path=file_path)
-                    return
-            await route.continue_()
-            
-        await page.route("**/*", route_intercept)
-        
-        print(f"[3D RENDERER] Loading 3D Stage on virtual domain...")
-        await page.goto("http://local-3d-engine/index.html")
-
-        # Wait for the HTML/JS to shout that the model is fully loaded
-        print("[3D RENDERER] Waiting for 3D model to load into memory...")
-        await page.evaluate("""
-            () => new Promise(resolve => {
-                if (window.isModelLoaded) { resolve(); }
-                else { window.onModelLoaded = resolve; }
-            })
-        """)
-        
-        print("[3D RENDERER] Model Loaded! Injecting AI JSON Plan...")
-        
-        # Pass the data into the browser and tell it to start recording
-        async with page.expect_download(timeout=60000) as download_info:
-            await page.evaluate(f"""
-                async () => {{
-                    // We pass the exact duration so the recording knows when to stop
-                    await window.startRecording({json.dumps(ai_plan)}, {duration});
-                }}
-            """)
-            
-            download = await download_info.value
-            
-            print(f"[3D RENDERER] Recording complete! Saving video to: {output_video_path}")
-            await download.save_as(output_video_path)
-            
-        await browser.close()
-        print("[3D RENDERER] Engine Shut Down successfully.")
-
-if __name__ == "__main__":
-    # Test script if run directly
-    dummy_plan = {
+    ai_plan = {
         "edits": [
-            {"start": 0.0, "end": 2.0, "action": "character", "character_action": "point"},
-            {"start": 2.0, "end": 4.0, "action": "character", "character_action": "explain"},
-            {"start": 4.0, "end": 6.0, "action": "character", "character_action": "idle"}
+            {"start": 0, "end": 2, "character_action": "idle"},
+            {"start": 2, "end": 5, "character_action": "pointing", "graphic": {"text": "Data-Driven Graphics!", "attach_to": "leftHand"}},
+            {"start": 5, "end": 8, "character_action": "talking-while-standing", "graphic": {"text": "Perfect Bone Tracking", "attach_to": "rightHand"}},
+            {"start": 8, "end": 10, "character_action": "happy-idle", "graphic": {"text": "Flawless Offline Render", "attach_to": "head"}}
         ]
     }
     
-    output_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "output.webm"))
-    audio_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "audio.mp3"))
+    total_duration_seconds = 10
+    fps = 60
+    total_frames = total_duration_seconds * fps
+    delta_time = 1.0 / fps
+
+    frames_dir = "/tmp/frames"
+    os.makedirs(frames_dir, exist_ok=True)
+    for f in os.listdir(frames_dir):
+        if f.endswith(".jpg"):
+            os.remove(os.path.join(frames_dir, f))
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--use-gl=swiftshader',
+                '--disable-dev-shm-usage',
+                '--enable-webgl',
+                '--ignore-gpu-blocklist',
+            ]
+        )
+        
+        page = await browser.new_page(
+            viewport={'width': 1920, 'height': 1080},
+            device_scale_factor=1 # Changed from 2 to 1 to save RAM and prevent freezing
+        )
+        
+        page.on("pageerror", lambda err: print(f"[WebGL Error]: {err}"))
+        page.on("console", lambda msg: print(f"[WebGL]: {msg.text}") if msg.type != "warning" else None)
+
+        file_url = f"http://localhost:{port}/index.html"
+        print("[3D RENDERER] Loading 3D Stage on virtual domain...")
+        await page.goto(file_url)
+
+        print("[3D RENDERER] Waiting for 3D model to load into memory...")
+        await page.wait_for_function("window.isModelLoaded === true", timeout=30000)
+
+        print("[3D RENDERER] Model Loaded! Injecting AI JSON Plan & Preloading FBX...")
+        await page.evaluate(f"window.prepareOfflineRender({json.dumps(ai_plan)})")
+
+        print(f"[3D RENDERER] Starting Offline Rendering: {total_frames} frames at {fps} FPS...")
+        start_time = time.time()
+        
+        for i in range(total_frames):
+            # 1. Advance simulation
+            await page.evaluate(f"window.stepFrame({delta_time})")
+            
+            # 2. Capture perfect frame
+            frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
+            await page.screenshot(path=frame_path, type="png")
+            
+            if i % 100 == 0:
+                print(f"[3D RENDERER] Rendered frame {i}/{total_frames} ({(i/total_frames)*100:.1f}%)")
+
+        print(f"[3D RENDERER] Finished rendering {total_frames} frames in {time.time() - start_time:.1f} seconds!")
+        
+        await browser.close()
+        
+    print("[3D RENDERER] Compiling video with FFmpeg...")
     
-    # Run the test for 6 seconds to see all transitions and lip sync
-    asyncio.run(render_3d_character(dummy_plan, output_path, duration=6.0, audio_path=audio_path))
+    # We output an mp4 file since libx264 ensures excellent compatibility and speed
+    output_path = os.path.abspath('apps/worker/services/engine_3d/output.mp4')
+    if os.path.exists(output_path):
+        os.remove(output_path)
+        
+    subprocess.run([
+        'ffmpeg', '-y',
+        '-framerate', str(fps),
+        '-i', os.path.join(frames_dir, 'frame_%04d.png'),
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        '-crf', '18', # High quality
+        '-preset', 'fast',
+        output_path
+    ], check=True)
+    
+    print(f"[3D RENDERER] Offline recording complete! Saved flawlessly to: {output_path}")
+
+if __name__ == "__main__":
+    asyncio.run(main())

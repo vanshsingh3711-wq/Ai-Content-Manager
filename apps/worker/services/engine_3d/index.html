@@ -2,261 +2,506 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 3D Character Renderer</title>
+    <title>3D Character Engine (Offline Render)</title>
+    <!-- GSAP for Lottie-level motion graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        // CRITICAL: Force GSAP into deterministic offline mode
+        window.customTime = 0;
+        window.performance.now = function() { return window.customTime; };
+        Date.now = function() { return window.customTime; };
+    </script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: transparent; }
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 10;
+        }
+        .motion-graphic {
+            position: absolute;
+            transform: translate(-50%, -50%) scale(1);
+            background: rgba(10, 15, 30, 0.85);
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 32px;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            opacity: 1;
+            backdrop-filter: blur(5px);
+            pointer-events: none;
+        }
     </style>
-    <!-- Import Three.js and GLTFLoader from CDN -->
     <script type="importmap">
         {
             "imports": {
                 "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3.0.0/lib/three-vrm.module.js"
             }
         }
     </script>
 </head>
 <body>
+    <div id="ui-layer"></div>
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+        import { loadMixamoAnimation } from './loadMixamoAnimation.js';
 
-        let scene, camera, renderer, mixer, clock;
-        let characterModel;
+        let scene, camera, renderer, mixer;
+        let currentVrm = null;
         
-        // Store the AI's timeline plan so the animation loop can read it
+        window.isModelLoaded = false;
         window.aiPlan = null;
         window.simulationTime = 0;
         
-        // Store audio analysis state globally
-        window.audioContext = null;
-        window.analyser = null;
-        window.dataArray = null;
-        window.currentVolume = 0;
+        const loadedAnimations = {};
+        let activeAction = null;
+        let activeActionName = "";
 
-        // This is called by Python (Playwright) once the model is ready
-        window.startRecording = async (characterPlan, durationSeconds) => {
-            console.log("[WebGL] Python injected the plan! Starting Recording...", characterPlan);
+        // Called by Python to inject the JSON plan and preload FBX animations
+        window.prepareOfflineRender = async (characterPlan) => {
+            console.log("[WebGL] Preparing offline render for plan:", characterPlan);
             window.aiPlan = characterPlan;
-            window.simulationTime = 0; // Reset timeline
+            window.simulationTime = 0;
             
-            // 1. Setup Audio Lip-Sync Engine
-            try {
-                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                window.analyser = window.audioContext.createAnalyser();
-                window.analyser.fftSize = 256;
-                const bufferLength = window.analyser.frequencyBinCount;
-                window.dataArray = new Uint8Array(bufferLength);
-                
-                // Fetch the audio file that Python injected (served by our virtual Playwright domain)
-                const response = await fetch('audio.mp3');
-                if (response.ok) {
-                    const arrayBuffer = await response.arrayBuffer();
-                    const audioBuffer = await window.audioContext.decodeAudioData(arrayBuffer);
-                    const source = window.audioContext.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.connect(window.analyser);
-                    window.analyser.connect(window.audioContext.destination);
-                    source.start(0);
-                    console.log("[WebGL] Lip-Sync Audio Engine Started!");
+            const requiredAnims = new Set();
+            requiredAnims.add('idle');
+            if (characterPlan.edits) {
+                for (const edit of characterPlan.edits) {
+                    if (edit.action === "character" || edit.character_action) {
+                        requiredAnims.add((edit.character_action || edit.action).toLowerCase());
+                    }
                 }
-            } catch (e) {
-                console.error("[WebGL] Audio setup failed (proceeding without audio):", e);
             }
-
-            // 2. Capture the Three.js Canvas Stream at 60 FPS
-            const stream = renderer.domElement.captureStream(60);
             
-            // 3. Setup MediaRecorder for VP9 (Supports Alpha/Transparency perfectly)
-            const options = { mimeType: 'video/webm; codecs=vp9' };
-            const mediaRecorder = new MediaRecorder(stream, options);
-            const recordedChunks = [];
-            
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    recordedChunks.push(event.data);
+            for (const animName of requiredAnims) {
+                if (!loadedAnimations[animName]) {
+                    try {
+                        console.log(`[WebGL] Loading Mixamo animation: ${animName}.fbx`);
+                        const retargetedClip = await loadMixamoAnimation(`animations/${animName}.fbx`, currentVrm);
+                        loadedAnimations[animName] = mixer.clipAction(retargetedClip);
+                        console.log(`[WebGL] Successfully loaded and retargeted ${animName}`);
+                    } catch (e) {
+                        console.error(`[WebGL] Failed to load animation: ${animName}.fbx`, e);
+                    }
                 }
-            };
-
-            // 4. What happens when recording stops
-            mediaRecorder.onstop = () => {
-                console.log("[WebGL] Recording stopped. Preparing download...");
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                
-                // Trigger an invisible download. Playwright intercepts this!
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = '3d_character_layer.webm';
-                document.body.appendChild(a);
-                a.click();
-                
-                // Cleanup
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    console.log("[WebGL] Download triggered successfully.");
-                }, 100);
-            };
-
-            // START RECORDING
-            mediaRecorder.start();
+            }
             
-            // Wait for the exact duration of the scene
-            setTimeout(() => {
-                mediaRecorder.stop();
-                if (window.audioContext) window.audioContext.close();
-            }, durationSeconds * 1000);
+            if (loadedAnimations['idle']) {
+                activeAction = loadedAnimations['idle'];
+                activeActionName = 'idle';
+                activeAction.play();
+            }
+            
+            // Force first frame render
+            renderer.render(scene, camera);
+            return true;
         };
 
-        // Procedural Bone Animation Helper
-        function lerpRotation(bone, targetEuler, speed = 0.1) {
-            if (!bone) return;
-            const targetQuat = new THREE.Quaternion().setFromEuler(targetEuler);
-            bone.quaternion.slerp(targetQuat, speed);
-        }
-
-        function init() {
-            clock = new THREE.Clock();
-            scene = new THREE.Scene();
-
-            // Setup Camera
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 1.5, 3); // Point at chest/face
-
-            // Setup Renderer (alpha: true is critical for transparency)
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(0x000000, 0); // Transparent Background!
-            document.body.appendChild(renderer.domElement);
-
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0);
-            directionalLight.position.set(1, 2, 3);
-            scene.add(directionalLight);
-
-            // Load the downloaded local 3D character
-            const loader = new GLTFLoader();
-            loader.load('character.glb', (gltf) => {
-                characterModel = gltf.scene;
-                
-                // Make the robot slightly larger and lower it so it fits perfectly in the camera
-                characterModel.scale.set(0.5, 0.5, 0.5);
-                characterModel.position.set(0, -1, 0);
-                scene.add(characterModel);
-                
-                // Initialize the animation mixer
-                mixer = new THREE.AnimationMixer(characterModel);
-                console.log("[WebGL] 3D Model Loaded Successfully!");
-                
-                // Play the idle/default animation if it exists
-                if (gltf.animations && gltf.animations.length > 0) {
-                    const action = mixer.clipAction(gltf.animations[0]);
-                    action.play();
-                }
-                
-                // Signal Python that the model is fully loaded and ready
-                window.isModelLoaded = true;
-                if (window.onModelLoaded) window.onModelLoaded();
-            }, undefined, (error) => {
-                console.error("[WebGL] Error loading character.glb:", error);
-            });
-
-            animate();
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            if (mixer) mixer.update(delta);
+        // Called by Python for exactly 1 frame advance (e.g. delta = 0.016666 for 60fps)
+        window.stepFrame = (delta) => {
+            if (!window.aiPlan || !currentVrm) return;
             
-            // --- Lip Sync Audio Processing ---
-            if (window.analyser && window.dataArray) {
-                window.analyser.getByteFrequencyData(window.dataArray);
-                let sum = 0;
-                // Calculate average volume in the vocal frequencies (roughly first 20-50 bins)
-                for (let i = 0; i < 50; i++) {
-                    sum += window.dataArray[i];
-                }
-                const average = sum / 50;
-                // Normalize volume from 0 to 1
-                window.currentVolume = Math.min(average / 100, 1.0); 
-            }
+            window.simulationTime += delta;
+            const time = window.simulationTime;
             
-            // Only run procedural animations if recording has started
-            if (window.aiPlan && characterModel) {
-                window.simulationTime += delta;
-                const time = window.simulationTime;
-                
-                // 1. Find standard bones (Mixamo / ReadyPlayerMe / VRM standard naming)
-                let rightArm = null;
-                let leftArm = null;
-                let spine = null;
-                let jaw = null;
-                
-                characterModel.traverse((child) => {
-                    if (child.isBone) {
-                        const name = child.name.toLowerCase();
-                        if (name.includes("rightarm") || name.includes("arm_r")) rightArm = child;
-                        if (name.includes("leftarm") || name.includes("arm_l")) leftArm = child;
-                        if (name.includes("spine") || name.includes("chest")) spine = child;
-                        if (name.includes("jaw")) jaw = child;
-                    }
-                });
-                
-                // 2. Base Idle Animation (Breathing)
-                if (spine) {
-                    const breatheOffset = Math.sin(time * 2) * 0.02;
-                    spine.rotation.x += breatheOffset * delta;
-                }
-
-                // 3. Audio Lip-Sync (Procedural Jaw Movement)
-                if (jaw) {
-                    // Open the jaw downwards on the X or Z axis depending on the model rigging
-                    // We map the normalized volume directly to the jaw rotation!
-                    // Jaw default is usually 0. We rotate it up to 0.4 radians when loud.
-                    const jawOpenAmount = window.currentVolume * 0.4;
-                    // Because different rigs use different axes for the jaw, we'll try X
-                    // If it rotates weirdly, we might need to adjust this
-                    lerpRotation(jaw, new THREE.Euler(jawOpenAmount, 0, 0), 0.5);
-                }
-
-                // 4. Determine current AI action from the Master Blueprint
-                let currentAction = "idle";
-                if (window.aiPlan.edits) {
-                    for (const edit of window.aiPlan.edits) {
-                        if (time >= edit.start && time <= edit.end) {
-                            if (edit.action === "character" || edit.character_action) {
-                                currentAction = (edit.character_action || edit.action).toLowerCase();
-                            }
+            let targetActionName = "idle";
+            let activeGraphic = null;
+            
+            if (window.aiPlan.edits) {
+                for (const edit of window.aiPlan.edits) {
+                    if (time >= edit.start && time <= edit.end) {
+                        if (edit.action === "character" || edit.character_action) {
+                            targetActionName = (edit.character_action || edit.action).toLowerCase();
+                        }
+                        if (edit.graphic) {
+                            activeGraphic = edit.graphic;
                         }
                     }
                 }
-                if (window.aiPlan.action) currentAction = window.aiPlan.action.toLowerCase();
-
-                // 5. Procedurally rotate bones to perform the action!
-                const defaultPose = new THREE.Euler(0, 0, 0);
+            }
+            
+            if (targetActionName !== activeActionName) {
+                let newAction = loadedAnimations[targetActionName];
+                if (!newAction) {
+                    newAction = loadedAnimations['idle'];
+                    targetActionName = 'idle';
+                }
                 
-                if (currentAction.includes("point")) {
-                    lerpRotation(rightArm, new THREE.Euler(0, 0, 1.2), 0.05);
-                    lerpRotation(leftArm, defaultPose, 0.05);
-                } 
-                else if (currentAction.includes("explain") || currentAction.includes("surprised")) {
-                    lerpRotation(rightArm, new THREE.Euler(0, 0, 1.0), 0.05);
-                    lerpRotation(leftArm, new THREE.Euler(0, 0, -1.0), 0.05);
-                } 
-                else {
-                    lerpRotation(rightArm, new THREE.Euler(0, 0, 0.2), 0.05);
-                    lerpRotation(leftArm, new THREE.Euler(0, 0, -0.2), 0.05);
+                if (newAction && newAction !== activeAction) {
+                    newAction.reset();
+                    newAction.play();
+                    if (activeAction) {
+                        newAction.crossFadeFrom(activeAction, 0.5, true);
+                    }
+                    activeAction = newAction;
+                    activeActionName = targetActionName;
                 }
             }
             
+            if (mixer) mixer.update(delta);
+
+            // Fake Lip-Sync: if action name contains talking, randomly flap jaw
+            let jawRotation = 0;
+            if (activeActionName.includes('talking')) {
+                jawRotation = (Math.random() * 0.6) + 0.1; 
+            }
+            if (currentVrm.humanoid) {
+                const jawNode = currentVrm.humanoid.getNormalizedBoneNode('jaw');
+                if (jawNode) {
+                    jawNode.rotation.x += (jawRotation - jawNode.rotation.x) * 0.5;
+                }
+            }
+            
+            if (currentVrm.update) currentVrm.update(delta);
             renderer.render(scene, camera);
+
+            // Motion Graphics Sync
+            const uiLayer = document.getElementById('ui-layer');
+            let graphicEl = document.getElementById('active-graphic');
+            
+            // Tick GSAP deterministically
+            if (window.gsap) {
+                window.gsap.ticker.tick();
+            }
+
+            if (activeGraphic) {
+                if (!graphicEl) {
+                    graphicEl = document.createElement('div');
+                    graphicEl.id = 'active-graphic';
+                    graphicEl.style.position = 'absolute';
+                    graphicEl.style.pointerEvents = 'none';
+                    graphicEl.dataset.spawnTime = time;
+                    
+                    // Ultra-Premium Glassmorphism Profile Card
+                    graphicEl.innerHTML = `
+                        <div class="gsap-card" style="
+                            background: rgba(255, 255, 255, 0.1);
+                            backdrop-filter: blur(16px);
+                            -webkit-backdrop-filter: blur(16px);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                            border-radius: 20px;
+                            padding: 20px;
+                            display: flex;
+                            align-items: center;
+                            gap: 20px;
+                            box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.2);
+                            opacity: 0;
+                            transform: scale(0.8) translateY(50px) rotateX(15deg);
+                            transform-origin: bottom center;
+                            perspective: 1000px;
+                        ">
+                            <!-- Avatar / Icon -->
+                            <div class="gsap-icon" style="
+                                width: 60px; height: 60px;
+                                border-radius: 50%;
+                                background: linear-gradient(135deg, #FF3366, #FF9933);
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                opacity: 0;
+                                transform: scale(0);
+                            ">
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                            </div>
+                            <!-- Text Column -->
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <div class="gsap-title" style="
+                                    font-family: 'Inter', sans-serif;
+                                    font-weight: 800;
+                                    font-size: 28px;
+                                    color: white;
+                                    opacity: 0;
+                                    transform: translateX(-20px);
+                                "></div>
+                                <div class="gsap-subtitle" style="
+                                    font-family: 'Inter', sans-serif;
+                                    font-weight: 500;
+                                    font-size: 16px;
+                                    color: rgba(255,255,255,0.7);
+                                    opacity: 0;
+                                    transform: translateX(-20px);
+                                ">AI GENERATED MOTION</div>
+                            </div>
+                        </div>
+                    `;
+                    uiLayer.appendChild(graphicEl);
+                    
+                    const titleEl = graphicEl.querySelector('.gsap-title');
+                    titleEl.innerText = activeGraphic.text;
+                    
+                    // GSAP Staggered Timeline Animation
+                    const tl = gsap.timeline();
+                    tl.to(graphicEl.querySelector('.gsap-card'), {
+                        opacity: 1,
+                        scale: 1,
+                        y: 0,
+                        rotateX: 0,
+                        duration: 0.6,
+                        ease: "back.out(1.5)"
+                    })
+                    .to(graphicEl.querySelector('.gsap-icon'), {
+                        opacity: 1,
+                        scale: 1,
+                        duration: 0.4,
+                        ease: "back.out(2)"
+                    }, "-=0.3")
+                    .to(graphicEl.querySelector('.gsap-title'), {
+                        opacity: 1,
+                        x: 0,
+                        duration: 0.4,
+                        ease: "power2.out"
+                    }, "-=0.2")
+                    .to(graphicEl.querySelector('.gsap-subtitle'), {
+                        opacity: 1,
+                        x: 0,
+                        duration: 0.4,
+                        ease: "power2.out"
+                    }, "-=0.2");
+                }
+                
+                // Track 3D position
+                if (currentVrm.humanoid && activeGraphic.attach_to) {
+                    const boneNode = currentVrm.humanoid.getNormalizedBoneNode(activeGraphic.attach_to);
+                    if (boneNode) {
+                        const vector = new THREE.Vector3();
+                        boneNode.getWorldPosition(vector);
+                        vector.y += 0.2; 
+                        
+                        vector.project(camera);
+                        
+                        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                        const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+                        
+                        graphicEl.style.left = `${x}px`;
+                        graphicEl.style.top = `${y}px`;
+                        graphicEl.style.transform = `translate(-50%, -100%)`; 
+                    }
+                }
+            } else {
+                if (graphicEl) {
+                    if (!graphicEl.dataset.dying) {
+                        graphicEl.dataset.dying = time;
+                        // Trigger GSAP exit animation
+                        gsap.to(graphicEl.querySelector('.gsap-card'), {
+                            opacity: 0,
+                            scale: 0.8,
+                            y: 20,
+                            duration: 0.3,
+                            ease: "power2.in"
+                        });
+                    }
+                    const dieAge = time - parseFloat(graphicEl.dataset.dying);
+                    if (dieAge > 0.3) {
+                        if (graphicEl.parentNode) graphicEl.parentNode.removeChild(graphicEl);
+                    }
+                }
+            }
+        };
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+            scene.fog = new THREE.Fog(0x1a1a1a, 10, 50);
+
+            camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.2, 4.0); 
+            camera.lookAt(0, 0.9, 0);
+
+            // preserveDrawingBuffer is CRITICAL for page.screenshot() to work without capturing a black square!
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(1); 
+            renderer.outputColorSpace = THREE.SRGBColorSpace; 
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Cinematic Room Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Darker ambient for mood
+            scene.add(ambientLight);
+            
+            // Main Key Light (Soft warm lamp casting from front-right)
+            const keyLight = new THREE.DirectionalLight(0xffddaa, 1.5);
+            keyLight.position.set(3, 4, 3);
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.width = 2048;
+            keyLight.shadow.mapSize.height = 2048;
+            keyLight.shadow.camera.near = 0.5;
+            keyLight.shadow.camera.far = 15;
+            keyLight.shadow.camera.left = -5;
+            keyLight.shadow.camera.right = 5;
+            keyLight.shadow.camera.top = 5;
+            keyLight.shadow.camera.bottom = -5;
+            keyLight.shadow.bias = -0.001;
+            scene.add(keyLight);
+            
+            // Build the procedural YouTuber Room
+            function buildRoom() {
+                // 1. Dark Hardwood Floor
+                const floorGeo = new THREE.PlaneGeometry(20, 20);
+                const floorMat = new THREE.MeshStandardMaterial({ color: 0x15100c, roughness: 0.2, metalness: 0.1 });
+                const floor = new THREE.Mesh(floorGeo, floorMat);
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                scene.add(floor);
+
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.9 });
+                
+                // 2. Back Wall with Acoustic Foam styling
+                const backWallGeo = new THREE.BoxGeometry(20, 10, 1);
+                const backWall = new THREE.Mesh(backWallGeo, wallMat);
+                backWall.position.set(0, 5, -5);
+                backWall.receiveShadow = true;
+                scene.add(backWall);
+                
+                // Acoustic foam panels on back wall
+                const foamMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0 });
+                for(let x = -4; x <= 4; x+=1.2) {
+                    for(let y = 1; y <= 5; y+=1.2) {
+                        const foam = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.1), foamMat);
+                        foam.position.set(x, y, -4.45);
+                        scene.add(foam);
+                    }
+                }
+                
+                // Side walls
+                const sideWallGeo = new THREE.BoxGeometry(1, 10, 20);
+                const sideWallRight = new THREE.Mesh(sideWallGeo, wallMat);
+                sideWallRight.position.set(6, 5, 0);
+                sideWallRight.receiveShadow = true;
+                scene.add(sideWallRight);
+
+                const sideWallLeft = new THREE.Mesh(sideWallGeo, wallMat);
+                sideWallLeft.position.set(-6, 5, 0);
+                sideWallLeft.receiveShadow = true;
+                scene.add(sideWallLeft);
+
+                // 3. YouTuber Desk (Left side background)
+                const deskGeo = new THREE.BoxGeometry(3, 0.05, 1.5);
+                const deskMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.8 });
+                const desk = new THREE.Mesh(deskGeo, deskMat);
+                desk.position.set(-3.5, 0.8, -3);
+                desk.castShadow = true;
+                desk.receiveShadow = true;
+                scene.add(desk);
+                
+                const deskLeg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 1.4), new THREE.MeshStandardMaterial({color:0x111111}));
+                deskLeg.position.set(-4.9, 0.4, -3);
+                scene.add(deskLeg);
+                
+                const deskLeg2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 1.4), new THREE.MeshStandardMaterial({color:0x111111}));
+                deskLeg2.position.set(-2.1, 0.4, -3);
+                scene.add(deskLeg2);
+
+                // 4. Glowing PC Monitors
+                const monitorGeo = new THREE.BoxGeometry(1.2, 0.7, 0.05);
+                const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x00aaff, emissiveIntensity: 0.8 });
+                
+                const monitor1 = new THREE.Mesh(monitorGeo, screenMat);
+                monitor1.position.set(-4.0, 1.3, -3.2);
+                monitor1.rotation.y = Math.PI / 8;
+                scene.add(monitor1);
+
+                const monitor2 = new THREE.Mesh(monitorGeo, screenMat);
+                monitor2.position.set(-2.7, 1.3, -3.2);
+                monitor2.rotation.y = -Math.PI / 8;
+                scene.add(monitor2);
+                
+                // Monitor light casting into room
+                const pcLight = new THREE.PointLight(0x00aaff, 2.5, 8);
+                pcLight.position.set(-3.5, 1.5, -2);
+                scene.add(pcLight);
+
+                // 5. Bookshelf (Right side background)
+                const shelfGeo = new THREE.BoxGeometry(1.5, 3.5, 1);
+                const shelfMat = new THREE.MeshStandardMaterial({ color: 0x2b1c10, roughness: 0.9 });
+                const shelf = new THREE.Mesh(shelfGeo, shelfMat);
+                shelf.position.set(3.5, 1.75, -4);
+                shelf.castShadow = true;
+                shelf.receiveShadow = true;
+                scene.add(shelf);
+                
+                // Books
+                const bookColors = [0x882222, 0x228822, 0x222288, 0x888822, 0x228888, 0x882288];
+                for (let i = 0; i < 8; i++) {
+                    const bColor = bookColors[Math.floor(Math.random() * bookColors.length)];
+                    const book = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.35), new THREE.MeshStandardMaterial({ color: bColor }));
+                    book.position.set(2.9 + i*0.15, 1.4, -3.8);
+                    book.castShadow = true;
+                    scene.add(book);
+                }
+                for (let i = 0; i < 6; i++) {
+                    const bColor = bookColors[Math.floor(Math.random() * bookColors.length)];
+                    const book = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, 0.35), new THREE.MeshStandardMaterial({ color: bColor }));
+                    book.position.set(3.1 + i*0.17, 2.3, -3.8);
+                    book.castShadow = true;
+                    scene.add(book);
+                }
+
+                // 6. Neon LED Strip on Back Wall
+                const ledGeo = new THREE.BoxGeometry(6, 0.05, 0.05);
+                const ledMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+                const led = new THREE.Mesh(ledGeo, ledMat);
+                led.position.set(0, 3.5, -4.49);
+                scene.add(led);
+
+                const neonLight = new THREE.PointLight(0xff0055, 4, 10);
+                neonLight.position.set(0, 3.5, -4.3);
+                scene.add(neonLight);
+                
+                // 7. Area Rug
+                const rugGeo = new THREE.PlaneGeometry(6, 4);
+                const rugMat = new THREE.MeshStandardMaterial({ color: 0x3a253b, roughness: 1.0 });
+                const rug = new THREE.Mesh(rugGeo, rugMat);
+                rug.rotation.x = -Math.PI / 2;
+                rug.position.set(0, 0.01, -1);
+                rug.receiveShadow = true;
+                scene.add(rug);
+            }
+            
+            buildRoom();
+
+            const loader = new GLTFLoader();
+            loader.register((parser) => {
+                return new VRMLoaderPlugin(parser);
+            });
+            
+            loader.load('anime-boy.vrm', (gltf) => {
+                const vrm = gltf.userData.vrm;
+                currentVrm = vrm;
+                scene.add(vrm.scene);
+                
+                vrm.scene.traverse((obj) => {
+                    if (obj.isMesh) {
+                        obj.castShadow = true;
+                        obj.receiveShadow = true;
+                    }
+                });
+                
+                vrm.scene.rotation.y = Math.PI;
+                mixer = new THREE.AnimationMixer(vrm.scene);
+                console.log("[WebGL] VRM Model Loaded Successfully!");
+                
+                window.isModelLoaded = true;
+            }, undefined, (error) => {
+                console.error("[WebGL] Error loading VRM:", error);
+            });
+            
+            // NOTE: No requestAnimationFrame! Driven entirely by Python!
         }
 
         init();
