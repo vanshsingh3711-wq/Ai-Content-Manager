@@ -1,1 +1,0 @@
-[0:v]trim=start=45.940:end=46.900,setpts=PTS-STARTPTS[base_v];[0:a]atrim=start=45.940:end=46.900,asetpts=PTS-STARTPTS[base_a];[base_v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[norm_v];[norm_v]format=yuv420p[vout]

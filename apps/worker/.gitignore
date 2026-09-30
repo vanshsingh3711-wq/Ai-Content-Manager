@@ -2,3 +2,14 @@ real_job_fixture.json
 sample_edits.json
 fixture_*.json
 output_*.json
+filter_*.txt
+concat.txt
+frame_from_mg.jpg
+new_run.log
+old_run.log
+new_plan.json
+old_plan.json
+generate_plans.py
+overlay_frames/
+assets_real/
+mg_pre_*.mov
