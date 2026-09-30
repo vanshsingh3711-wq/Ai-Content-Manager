@@ -123,6 +123,122 @@ async function renderMotionGraphics(frame, time, progress) {
     ctx.restore();
 }
 
+// ─── Per-template renderers ───────────────────────────────────────────────────
+
+function drawBeforeAfter(ctx, w, h, p, progress) {
+    const slideIn = Math.min(1, progress * 3);
+    ctx.fillStyle = 'rgba(10,10,20,0.92)';
+    ctx.fillRect(-w/2, -h/2, w, h);
+    // Title
+    ctx.font = 'bold 54px sans-serif';
+    ctx.fillStyle = '#facc15';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText((p.beforeLabel || 'Before') + ' vs ' + (p.afterLabel || 'After'), 0, -h * 0.20);
+    const pW = w * 0.43, pH = h * 0.28, pY = -pH / 2, gap = w * 0.03;
+    // Left panel slides from left
+    const lx = (-w/2 + gap + pW/2) - (1 - slideIn) * w * 0.6;
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath(); ctx.roundRect(lx - pW/2, pY, pW, pH, [20]); ctx.fill();
+    ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = '#fff';
+    ctx.fillText(p.beforeLabel || 'Before', lx, pY + 48);
+    ctx.font = '44px sans-serif'; ctx.fillStyle = '#ffe4e4';
+    ctx.fillText(p.before || '', lx, pY + pH/2 + 10);
+    // Right panel slides from right
+    const rx = (w/2 - gap - pW/2) + (1 - slideIn) * w * 0.6;
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath(); ctx.roundRect(rx - pW/2, pY, pW, pH, [20]); ctx.fill();
+    ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = '#fff';
+    ctx.fillText(p.afterLabel || 'After', rx, pY + 48);
+    ctx.font = '44px sans-serif'; ctx.fillStyle = '#f0fff4';
+    ctx.fillText(p.after || '', rx, pY + pH/2 + 10);
+}
+
+function drawHeroReveal(ctx, w, h, p, progress, scale) {
+    const alpha = Math.min(1, progress * 4);
+    ctx.fillStyle = `rgba(10,10,20,${alpha * 0.88})`;
+    ctx.fillRect(-w/2, -h/2, w, h);
+    ctx.fillStyle = '#6366f1';
+    ctx.fillRect(-w/2, -30, w * Math.min(1, progress * 5), 8);
+    const headline = p.headline || p.quote || p.text || '';
+    ctx.font = `bold ${Math.round(68 * scale)}px sans-serif`;
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const words = headline.split(' ');
+    let line = '', lines = [];
+    for (const word of words) {
+        const test = line ? line + ' ' + word : word;
+        if (ctx.measureText(test).width > w * 0.88 && line) { lines.push(line); line = word; }
+        else line = test;
+    }
+    if (line) lines.push(line);
+    lines.forEach((l, i) => ctx.fillText(l, 0, (i - (lines.length-1)/2) * 82));
+    if (p.supporting) { ctx.font = '38px sans-serif'; ctx.fillStyle = '#c4b5fd'; ctx.fillText(p.supporting, 0, h * 0.14); }
+}
+
+function drawQuoteReveal(ctx, w, h, p, progress) {
+    const alpha = Math.min(1, progress * 3);
+    ctx.fillStyle = `rgba(10,10,20,${alpha * 0.9})`;
+    ctx.fillRect(-w/2, -h/2, w, h);
+    ctx.font = 'bold 180px sans-serif'; ctx.fillStyle = 'rgba(99,102,241,0.4)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('\u201c', 0, -h * 0.16);
+    const quote = p.quote || p.text || '';
+    ctx.font = 'bold 52px sans-serif'; ctx.fillStyle = '#ffffff';
+    const words = quote.split(' ');
+    let line = '', lines = [];
+    for (const word of words) {
+        const test = line ? line + ' ' + word : word;
+        if (ctx.measureText(test).width > w * 0.82 && line) { lines.push(line); line = word; }
+        else line = test;
+    }
+    if (line) lines.push(line);
+    lines.forEach((l, i) => ctx.fillText(l, 0, (i - (lines.length-1)/2) * 66));
+    if (p.author) { ctx.font = '36px sans-serif'; ctx.fillStyle = '#a78bfa'; ctx.fillText('\u2014 ' + p.author, 0, h * 0.18); }
+}
+
+function drawStepSequence(ctx, w, h, p, progress) {
+    ctx.fillStyle = 'rgba(10,10,20,0.92)'; ctx.fillRect(-w/2, -h/2, w, h);
+    ctx.font = 'bold 52px sans-serif'; ctx.fillStyle = '#facc15';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.title || '', 0, -h * 0.22);
+    const steps = [];
+    for (let i = 1; i <= 5; i++) { if (p[`step${i}`]) steps.push(p[`step${i}`]); }
+    const total = steps.length;
+    const reveal = Math.ceil(progress * total);
+    steps.forEach((step, idx) => {
+        if (idx >= reveal) return;
+        const y = (idx - (total-1)/2) * 140;
+        ctx.fillStyle = '#6366f1';
+        ctx.beginPath(); ctx.arc(-w * 0.3, y, 34, 0, Math.PI*2); ctx.fill();
+        ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center'; ctx.fillText(String(idx+1), -w*0.3, y);
+        ctx.font = '44px sans-serif'; ctx.fillStyle = '#e2e8f0';
+        ctx.textAlign = 'left'; ctx.fillText(step, -w*0.2, y+4);
+        ctx.textAlign = 'center';
+    });
+}
+
+async function renderTemplate(frame, time, progress) {
+    const transition = props.transition || 'none';
+    ctx.save();
+    if (transition === 'fade' && time < 0.5) ctx.globalAlpha = time / 0.5;
+    else if ((transition === 'slide' || transition === 'push') && time < 0.5) ctx.translate(-width + (width*(time/0.5)), 0);
+    ctx.translate(width/2, height/2);
+    const sc = getSpringScale(frame, fps);
+    switch (componentId) {
+        case 'before_after':   drawBeforeAfter(ctx, width, height, props, progress); break;
+        case 'hero_reveal':    drawHeroReveal(ctx, width, height, props, progress, sc); break;
+        case 'quote_reveal':   drawQuoteReveal(ctx, width, height, props, progress); break;
+        case 'step_sequence':  drawStepSequence(ctx, width, height, props, progress); break;
+        default:
+            ctx.restore();
+            // Unknown template — fail loudly so callers know to add a draw function
+            console.error(`[CanvasRenderer] ERROR: No draw function for componentId='${componentId}'. Add a draw function to render_canvas.js. Known templates: before_after, hero_reveal, quote_reveal, step_sequence.`);
+            process.exit(1);
+    }
+    ctx.restore();
+}
+
 async function renderCharacter(frame, time, progress) {
     const beats = props.visual_beats || [];
     let currentBeat = null;
@@ -323,7 +439,7 @@ async function renderFrames() {
     if (componentId === 'SvgCharacterPreview' || componentId.startsWith('char_')) {
         await renderCharacter(frame, time, progress);
     } else {
-        await renderMotionGraphics(frame, time, progress);
+        await renderTemplate(frame, time, progress);
     }
     
     const buffer = canvas.data();
