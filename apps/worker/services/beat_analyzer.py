@@ -369,7 +369,7 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
         
         # We find the beat based on the edit's trigger_id if available
         trigger_id = getattr(edit, "trigger_id", "")
-        target_beat = next((b for b in beats if str(b["id"]) == trigger_id.replace("beat_", "").replace("ID_", "")), None)
+        target_beat = next((b for b in beats if f"beat_{b['id']}" == str(trigger_id)), None)
         
         if not target_beat:
             # Fallback to closest start time
@@ -394,16 +394,18 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
             
             # Duration min 2.0s, max 6.0s
             duration = target_beat["end"] - edit.start
-            if duration < 2.0:
-                duration = 2.0
             if duration > 6.0:
                 duration = 6.0
                 
             edit.end = edit.start + duration
-            # Bound by beat end (unless beat is shorter than 2s, in which case it might bleed, which is fine, 
-            # but user says "within the beat", let's bind it if beat is longer than 2s).
-            if edit.end > target_beat["end"] and (target_beat["end"] - edit.start >= 2.0):
+            
+            # Clamp to min(beat end, total_duration) - assuming beat end is effectively bounded by total_duration already
+            if edit.end > target_beat["end"]:
                 edit.end = target_beat["end"]
+                
+            # If after clamping duration is < 2.0s, extend backward inside the beat
+            if edit.end - edit.start < 2.0:
+                edit.start = max(target_beat["start"], edit.end - 2.0)
         else:
             # B-roll snaps to beat boundaries
             edit.start = target_beat["start"]

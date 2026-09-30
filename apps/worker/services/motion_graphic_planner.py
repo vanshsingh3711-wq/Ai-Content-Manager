@@ -29,7 +29,7 @@ OUTPUT SCHEMA (JSON):
   "edits": [
     {
       "action": "motion_graphics",
-      "trigger_id": "ID_01",
+      "trigger_id": "beat_1",
       "start": 0.0,
       "end": 3.75,
       "motion_graphics_type": "metric_reveal",
@@ -84,7 +84,7 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
                     # Find beat
                     beat = None
                     for b in beat_sheet.get("beats", []):
-                        if edit.trigger_id and str(b.get("id")) == str(edit.trigger_id).replace("beat_", "").replace("ID_", ""):
+                        if edit.trigger_id and f"beat_{b.get('id')}" == str(edit.trigger_id):
                             beat = b
                             break
                     if beat:

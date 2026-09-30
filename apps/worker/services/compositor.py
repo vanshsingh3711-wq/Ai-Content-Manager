@@ -551,9 +551,13 @@ def render_video_pipeline(
                 dur = e_end - e_start
                 if dur <= 0.05: continue
                 
-                motion_graphics_text = edit.get("motion_graphics_text")
-                mg_template = edit.get("template", "MotionGraphicsPreview")
-                mg_props = {"text": motion_graphics_text}
+                if edit.get("motion_graphics_type"):
+                    mg_template = edit.get("motion_graphics_type")
+                    mg_props = edit.get("motion_graphics_targets", {})
+                else:
+                    mg_template = edit.get("template", "MotionGraphicsPreview")
+                    mg_props = {"text": edit.get("motion_graphics_text")}
+                
                 if edit.get("visual_beats"): mg_props["visual_beats"] = edit.get("visual_beats")
                 if edit.get("transition"): mg_props["transition"] = edit.get("transition")
                 

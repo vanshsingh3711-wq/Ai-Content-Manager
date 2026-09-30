@@ -18,7 +18,7 @@ OUTPUT SCHEMA (JSON):
   "edits": [
     {
       "action": "cut | b_roll",
-      "trigger_id": "ID_01 (Required for b_roll)",
+      "trigger_id": "beat_1 (Required for b_roll)",
       "start": 0.0, "end": 3.75,
       "search_query": "B-roll keywords",
       "transition": "fade",
