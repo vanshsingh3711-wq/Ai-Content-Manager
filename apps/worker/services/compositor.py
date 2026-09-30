@@ -569,6 +569,19 @@ def render_video_pipeline(
                 )
                 edit["_pre_mg_path"] = mg_path
 
+        # Propagate _pre_mg_path from original edits into the shallow-copied
+        # action clones inside each segment (build_segment_timeline clones before
+        # pre-render runs, so the clones miss _pre_mg_path without this step).
+        for seg in kept_segments:
+            for a in seg.get("actions", []):
+                if a.get("_pre_mg_path"):
+                    continue  # already set (shouldn't happen, but be safe)
+                tid = a.get("trigger_id")
+                for edit in edits:
+                    if edit.get("trigger_id") == tid and edit.get("_pre_mg_path"):
+                        a["_pre_mg_path"] = edit["_pre_mg_path"]
+                        break
+
     _log("RENDER", f"Chunked rendering of {len(kept_segments)} segments to prevent OOM...")
     segment_files = []
 
