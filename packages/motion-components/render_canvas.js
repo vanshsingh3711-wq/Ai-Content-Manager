@@ -127,7 +127,7 @@ async function renderMotionGraphics(frame, time, progress) {
 
 function drawBeforeAfter(ctx, w, h, p, progress) {
     const slideIn = Math.min(1, progress * 3);
-    ctx.fillStyle = 'rgba(10,10,20,0.92)';
+    ctx.fillStyle = 'rgb(10,10,20)';
     ctx.fillRect(-w/2, -h/2, w, h);
     // Title
     ctx.font = 'bold 54px sans-serif';
@@ -156,7 +156,7 @@ function drawBeforeAfter(ctx, w, h, p, progress) {
 
 function drawHeroReveal(ctx, w, h, p, progress, scale) {
     const alpha = Math.min(1, progress * 4);
-    ctx.fillStyle = `rgba(10,10,20,${alpha * 0.88})`;
+    ctx.fillStyle = 'rgb(10,10,20)';
     ctx.fillRect(-w/2, -h/2, w, h);
     ctx.fillStyle = '#6366f1';
     ctx.fillRect(-w/2, -30, w * Math.min(1, progress * 5), 8);
@@ -177,7 +177,7 @@ function drawHeroReveal(ctx, w, h, p, progress, scale) {
 
 function drawQuoteReveal(ctx, w, h, p, progress) {
     const alpha = Math.min(1, progress * 3);
-    ctx.fillStyle = `rgba(10,10,20,${alpha * 0.9})`;
+    ctx.fillStyle = 'rgb(10,10,20)';
     ctx.fillRect(-w/2, -h/2, w, h);
     ctx.font = 'bold 180px sans-serif'; ctx.fillStyle = 'rgba(99,102,241,0.4)';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -197,7 +197,7 @@ function drawQuoteReveal(ctx, w, h, p, progress) {
 }
 
 function drawStepSequence(ctx, w, h, p, progress) {
-    ctx.fillStyle = 'rgba(10,10,20,0.92)'; ctx.fillRect(-w/2, -h/2, w, h);
+    ctx.fillStyle = 'rgb(10,10,20)'; ctx.fillRect(-w/2, -h/2, w, h);
     ctx.font = 'bold 52px sans-serif'; ctx.fillStyle = '#facc15';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(p.title || '', 0, -h * 0.22);
