@@ -270,6 +270,7 @@ def _build_segment_timeline(
     edits: List[Dict[str, Any]],
     timestamp_map: Dict[str, Any],
     total_duration: float,
+    settings: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Build an ordered timeline of segments from the transcript chunks and edit decisions.
@@ -426,6 +427,52 @@ def _build_segment_timeline(
                     "is_cut": True
                 })
 
+    use_granular = settings.get("USE_GRANULAR_OVERLAYS", False) if settings else False
+
+    if use_granular:
+        # Clear legacy actions
+        for seg in timeline:
+            seg["actions"] = []
+            
+        non_cut_edits = [e for e in edits if e.get("action") != "cut"]
+        for edit in non_cut_edits:
+            e_start = edit.get("start")
+            e_end = edit.get("end")
+            
+            if e_start is None or e_end is None:
+                tid = edit.get("trigger_id")
+                if tid and tid in timestamp_map:
+                    e_start = timestamp_map[tid].get("start", 0.0)
+                    e_end = timestamp_map[tid].get("end", total_duration)
+                else:
+                    e_start, e_end = 0.0, total_duration
+                    
+            dur = e_end - e_start
+            
+            for seg in timeline:
+                if seg.get("is_cut"):
+                    continue
+                
+                seg_start = seg["start"]
+                seg_end = seg["end"]
+                
+                # An overlap occurs if the edit starts before the segment ends AND ends after the segment starts.
+                if e_start < seg_end and e_end > seg_start:
+                    overlap_start = max(seg_start, e_start)
+                    overlap_end = min(seg_end, e_end)
+                    frag_dur = overlap_end - overlap_start
+                    
+                    min_frag_dur = settings.get("MIN_FRAGMENT_DURATION", 1.0) if settings else 1.0
+                    if frag_dur < min_frag_dur and dur >= min_frag_dur:
+                        continue
+                        
+                    cloned = dict(edit)
+                    cloned["original_start"] = e_start
+                    cloned["original_end"] = e_end
+                    cloned["seg_overlap_start"] = overlap_start
+                    cloned["seg_overlap_end"] = overlap_end
+                    seg["actions"].append(cloned)
+                    
     return timeline
 
 
@@ -441,6 +488,7 @@ def render_video_pipeline(
     edits: Optional[List[Dict[str, Any]]] = None,
     timestamp_map: Optional[Dict[str, Any]] = None,
     settings: Optional[Dict[str, Any]] = None,
+    character_video_path: Optional[str] = None,
 ) -> str:
     """
     Composites the final video using a chunked rendering pipeline.
@@ -477,13 +525,45 @@ def render_video_pipeline(
     source_has_audio = input_streams["has_audio"]
     source_fps = input_streams.get("fps", 30.0)
 
-    timeline = _build_segment_timeline(edits, timestamp_map, total_duration)
+    timeline = _build_segment_timeline(edits, timestamp_map, total_duration, settings)
     kept_segments = [s for s in timeline if not s["is_cut"]]
 
     temp_dir = os.path.dirname(os.path.abspath(output_mp4_path))
 
     if not kept_segments:
         kept_segments = [{"start": 0.0, "end": total_duration, "chunk_id": "FULL", "actions": [], "is_cut": False}]
+
+    use_granular = settings.get("USE_GRANULAR_OVERLAYS", False)
+
+    # Pre-render MG overlays if using granular overlays
+    if use_granular:
+        for edit in edits:
+            if edit.get("action") == "motion_graphics" or edit.get("motion_graphics_text"):
+                e_start = edit.get("start")
+                e_end = edit.get("end")
+                if e_start is None or e_end is None:
+                    tid = edit.get("trigger_id")
+                    if tid and tid in timestamp_map:
+                        e_start = timestamp_map[tid].get("start", 0.0)
+                        e_end = timestamp_map[tid].get("end", total_duration)
+                    else:
+                        e_start, e_end = 0.0, total_duration
+                dur = e_end - e_start
+                if dur <= 0.05: continue
+                
+                motion_graphics_text = edit.get("motion_graphics_text")
+                mg_template = edit.get("template", "MotionGraphicsPreview")
+                mg_props = {"text": motion_graphics_text}
+                if edit.get("visual_beats"): mg_props["visual_beats"] = edit.get("visual_beats")
+                if edit.get("transition"): mg_props["transition"] = edit.get("transition")
+                
+                import uuid
+                mg_id = str(uuid.uuid4())[:8]
+                mg_path = _render_canvas_composition(
+                    mg_template, mg_props,
+                    dur, source_fps, target_w, target_h, temp_dir, f"mg_pre_{mg_id}"
+                )
+                edit["_pre_mg_path"] = mg_path
 
     _log("RENDER", f"Chunked rendering of {len(kept_segments)} segments to prevent OOM...")
     segment_files = []
@@ -520,28 +600,83 @@ def render_video_pipeline(
         filter_str.append(f"[base_v]{base_scale}[norm_v];")
         current_v = "[norm_v]"
 
-        broll_path = None
-        if "b_roll" in action_types:
-            for a in seg["actions"]:
-                if a["action"] == "b_roll" and a.get("trigger_id") in broll_map:
-                    candidate = broll_map[a["trigger_id"]]
-                    if os.path.exists(candidate) and os.path.getsize(candidate) > 1024:
-                        broll_path = candidate
-                        break
+        if use_granular:
+            mg_count = 0
+            broll_count = 0
+            actions_sorted = sorted(seg["actions"], key=lambda x: x.get("seg_overlap_start", seg["start"]))
+            
+            for a in actions_sorted:
+                action_type = a.get("action")
+                rel_start = a.get("seg_overlap_start", seg["start"]) - seg["start"]
+                rel_end = a.get("seg_overlap_end", seg["end"]) - seg["start"]
+                
+                if action_type == "motion_graphics" or a.get("motion_graphics_text"):
+                    mg_path = a.get("_pre_mg_path")
+                    if mg_path and os.path.exists(mg_path):
+                        offset = a.get("seg_overlap_start", seg["start"]) - a.get("original_start", seg["start"])
+                        cmd.extend(["-ss", str(max(0, offset)), "-t", str(rel_end - rel_start), "-i", mg_path])
+                        
+                        mg_v = f"[mg_{mg_count}_v]"
+                        filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{mg_v};")
+                        filter_str.append(f"{current_v}{mg_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_mg_{mg_count}];")
+                        current_v = f"[with_mg_{mg_count}]"
+                        input_idx += 1
+                        mg_count += 1
+                        
+                elif action_type == "b_roll":
+                    tid = a.get("trigger_id")
+                    if tid and tid in broll_map:
+                        broll_path_a = broll_map[tid]
+                        if os.path.exists(broll_path_a) and os.path.getsize(broll_path_a) > 1024:
+                            cmd.extend(["-an", "-i", broll_path_a])
+                            bv = f"[broll_{broll_count}_v]"
+                            broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setpts=PTS-STARTPTS+{rel_start}/TB{bv};"
+                            filter_str.append(broll_filter)
+                            
+                            broll_transition = a.get("transition")
+                            overlay_x, overlay_y = "0", "0"
+                            if broll_transition == "slide" or broll_transition == "push":
+                                overlay_x = f"'if(lte(t,{rel_start}+0.5), -w+(w/0.5)*(t-{rel_start}), 0)'"
+                                
+                            filter_str.append(f"{current_v}{bv}overlay=x={overlay_x}:y={overlay_y}:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_broll_{broll_count}];")
+                            current_v = f"[with_broll_{broll_count}]"
+                            input_idx += 1
+                            broll_count += 1
+                            
+            # To ensure the legacy block doesn't trigger when using granular overlays:
+            broll_path = None
+            mg_path = None
+        else:
+            broll_path = None
+            if "b_roll" in action_types:
+                for a in seg["actions"]:
+                    if a["action"] == "b_roll" and a.get("trigger_id") in broll_map:
+                        candidate = broll_map[a["trigger_id"]]
+                        if os.path.exists(candidate) and os.path.getsize(candidate) > 1024:
+                            broll_path = candidate
+                            break
 
-        motion_graphics_text = None
+            motion_graphics_text = None
+            for a in seg["actions"]:
+                if a.get("action") == "motion_graphics" or a.get("motion_graphics_text"):
+                    motion_graphics_text = a.get("motion_graphics_text")
+                    mg_template = a.get("template", "MotionGraphicsPreview")
+                    mg_props = {"text": motion_graphics_text}
+                    if a.get("visual_beats"): mg_props["visual_beats"] = a.get("visual_beats")
+                    if a.get("transition"): mg_props["transition"] = a.get("transition")
+            
+            mg_path = None
+            if motion_graphics_text:
+                mg_path = _render_canvas_composition(
+                    mg_template, mg_props,
+                    duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"
+                )
+
         character_action = None
         has_sfx = False
         sfx_keyword = "pop"
 
         for a in seg["actions"]:
-            if a.get("action") == "motion_graphics" or a.get("motion_graphics_text"):
-                motion_graphics_text = a.get("motion_graphics_text")
-                mg_template = a.get("template", "MotionGraphicsPreview")
-                mg_props = {"text": motion_graphics_text}
-                if a.get("visual_beats"): mg_props["visual_beats"] = a.get("visual_beats")
-                if a.get("transition"): mg_props["transition"] = a.get("transition")
-            
             if a.get("action") == "character" or a.get("character_action"):
                 character_action = a.get("character_action")
                 char_props_overrides = {}
@@ -551,29 +686,6 @@ def render_video_pipeline(
             if a.get("action") == "sfx" or a.get("sound_effect"):
                 has_sfx = True
                 sfx_keyword = a.get("sound_effect", "pop")
-
-        mg_path = None
-        if motion_graphics_text:
-            mg_path = _render_canvas_composition(
-                mg_template, mg_props,
-                duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"
-            )
-            
-        char_path = None
-        if character_action:
-            char_props = {"isTalking": True, "isBlinking": True, "expression": "neutral", "gesture": "none"}
-            action_lower = character_action.lower()
-            if "surprised" in action_lower: char_props.update({"expression": "surprised", "gesture": "emphasize"})
-            elif "point" in action_lower: char_props["gesture"] = "pointRight"
-            elif "explain" in action_lower: char_props.update({"gesture": "present", "isNodding": True})
-            
-            char_props.update(char_props_overrides)
-            
-            char_component = settings.get("character_asset", "SvgCharacterPreview")
-            char_path = _render_canvas_composition(
-                char_component, char_props,
-                duration, source_fps, target_w, target_h, temp_dir, f"char_{seg['chunk_id']}"
-            )
 
         broll_transition = None
         for a in seg["actions"]:
@@ -592,7 +704,7 @@ def render_video_pipeline(
             overlay_x = "0"
             overlay_y = "0"
             if broll_transition == "slide" or broll_transition == "push":
-                overlay_x = "if(lte(t,0.5), -w+(w/0.5)*t, 0)"
+                overlay_x = "'if(lte(t,0.5), -w+(w/0.5)*t, 0)'"
                 
             filter_str.append(f"{current_v}[broll_v]overlay=x={overlay_x}:y={overlay_y}:eof_action=pass[with_broll];")
             current_v = "[with_broll]"
@@ -605,10 +717,19 @@ def render_video_pipeline(
             current_v = "[with_mg]"
             input_idx += 1
             
-        if char_path:
-            cmd.extend(["-i", char_path])
-            filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[char_v];")
-            filter_str.append(f"{current_v}[char_v]overlay=x=0:y=0:eof_action=pass[with_char];")
+        if character_video_path and os.path.exists(character_video_path):
+            cmd.extend(["-i", character_video_path])
+            char_idx = input_idx
+            # Trim the 3D character WebM exactly like the raw video so lip sync matches the cut segments
+            filter_str.append(f"[{char_idx}:v]trim=start={start_t:.3f}:end={end_t:.3f},setpts=PTS-STARTPTS[char_v_trim];")
+            
+            char_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+            if "zoom_in" in action_types:
+                zoom_w, zoom_h = int(target_w * 1.15), int(target_h * 1.15)
+                char_scale = f"scale={zoom_w}:{zoom_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                
+            filter_str.append(f"[char_v_trim]{char_scale}[char_v_scaled];")
+            filter_str.append(f"{current_v}[char_v_scaled]overlay=x=0:y=0:eof_action=pass[with_char];")
             current_v = "[with_char]"
             input_idx += 1
             
@@ -693,7 +814,8 @@ def render_video_pipeline(
         for file in files:
             if (file.endswith('.mov') and (file.startswith('char_') or file.startswith('mg_'))) or file.startswith('segment_') or file.startswith('filter_'):
                 try:
-                    os.remove(os.path.join(root, file))
+                    # os.remove(os.path.join(root, file))
+                    pass
                 except OSError:
                     pass
 

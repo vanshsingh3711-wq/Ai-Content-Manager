@@ -31,6 +31,8 @@ from services.visual_analysis import analyze_visual_context, UnifiedAnalysis
 from services.broll_planner import generate_broll_plan
 from services.motion_graphic_planner import generate_motion_graphics_plan
 from services.character_planner import generate_character_plan
+from services.beat_analyzer import analyze_script
+from services.treatment_assigner import assign_visual_treatments
 from services.blueprint_resolver import resolve_master_blueprint
 from services.sfx_planner import generate_sfx_plan
 from services.blueprint_validator import validate_blueprint, format_validation_report
@@ -91,6 +93,9 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             set_job_status_downloading(job_uuid)
             if job_video_type != VideoType.FACELESS_SHORT:
                 stage_raw_video(job_source_url, raw_video_path, settings.TEMP_DIR)
+            elif job_settings.get("audio_url"):
+                log_info("Faceless video with uploaded audio. Downloading audio...")
+                stage_raw_video(job_settings["audio_url"], raw_video_path, settings.TEMP_DIR)
             else:
                 log_info("Faceless video detected. Skipping raw video download.")
 
@@ -102,19 +107,37 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 ffmpeg_bin = get_ffmpeg_binary_path()
                 total_duration = _probe_duration(ffmpeg_bin, raw_video_path)
             else:
-                log_info("Generating TTS Audio for Faceless Video...")
-                topic = job_settings.get("topic", job_title)
-                script = job_settings.get("script", f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result.")
-                os.system(f'edge-tts --text "{script}" --write-media "{extracted_wav_path}"')
-                ffmpeg_bin = get_ffmpeg_binary_path()
-                total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
-                
-                log_info("Generating blank base video with TTS audio for compositor...")
-                os.system(
-                    f'{ffmpeg_bin} -y -f lavfi -i color=c=black:s=1080x1920:d={total_duration} '
-                    f'-i "{extracted_wav_path}" '
-                    f'-c:v libx264 -preset ultrafast -c:a aac -shortest "{raw_video_path}"'
-                )
+                if job_settings.get("audio_url"):
+                    log_info("Using uploaded audio for Faceless Video. Extracting and converting to WAV...")
+                    extract_audio_track(raw_video_path, extracted_wav_path, sample_rate=16000, channels=1)
+                    
+                    ffmpeg_bin = get_ffmpeg_binary_path()
+                    total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
+                    
+                    log_info("Generating blank base video with uploaded audio for compositor...")
+                    # We need a temporary intermediate path because raw_video_path is currently our audio file
+                    temp_base_video = os.path.join(temp_job_dir, "base_video.mp4")
+                    os.system(
+                        f'{ffmpeg_bin} -y -f lavfi -i color=c=black:s=1080x1920:d={total_duration} '
+                        f'-i "{extracted_wav_path}" '
+                        f'-c:v libx264 -preset ultrafast -c:a aac -shortest "{temp_base_video}"'
+                    )
+                    # Overwrite the raw uploaded file with the generated video base
+                    os.rename(temp_base_video, raw_video_path)
+                else:
+                    log_info("Generating TTS Audio for Faceless Video...")
+                    topic = job_settings.get("topic", job_title)
+                    script = job_settings.get("script", f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result.")
+                    os.system(f'edge-tts --text "{script}" --write-media "{extracted_wav_path}"')
+                    ffmpeg_bin = get_ffmpeg_binary_path()
+                    total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
+                    
+                    log_info("Generating blank base video with TTS audio for compositor...")
+                    os.system(
+                        f'{ffmpeg_bin} -y -f lavfi -i color=c=black:s=1080x1920:d={total_duration} '
+                        f'-i "{extracted_wav_path}" '
+                        f'-c:v libx264 -preset ultrafast -c:a aac -shortest "{raw_video_path}"'
+                    )
 
             bracketed_transcript, timestamp_map = transcribe_and_compress(
                 audio_path=extracted_wav_path,
@@ -150,24 +173,59 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 )
             else:
                 visual_timeline = {"video_id": job_id_str, "scenes": [], "subjects": [], "safe_regions": []}
+            use_beat_sheet = os.getenv("USE_BEAT_SHEET", "false").lower() == "true"
+            beat_sheet_dict = {}
+            if use_beat_sheet:
+                log_info("USE_BEAT_SHEET is true. Generating Beat Sheet...")
+                try:
+                    words_for_beat = []
+                    sorted_chunks = sorted(timestamp_map.values(), key=lambda x: x.get("start", 0))
+                    for chunk in sorted_chunks:
+                        for w in chunk.get("words", []):
+                            words_for_beat.append({"word": w["word"], "start": w["start"], "end": w["end"]})
+                    if words_for_beat:
+                        beat_sheet_obj = analyze_script(words_for_beat, bracketed_transcript)
+                        beat_sheet_dict = beat_sheet_obj.model_dump()
+                        
+                        # Assign treatments
+                        treatment_settings = {
+                            "MAX_OVERLAYS_PER_MIN": 8,
+                            "MIN_OVERLAY_DURATION": 2.0,
+                            "MAX_OVERLAY_DURATION": 6.0
+                        }
+                        updated_sheet, log_table = assign_visual_treatments(beat_sheet_dict, total_duration, treatment_settings)
+                        beat_sheet_dict = updated_sheet
+                        
+                        log_info(f"Generated {len(beat_sheet_dict.get('beats', []))} beats with treatments assigned.")
+                except Exception as e:
+                    log_warning(f"Beat analyzer failed: {e}")
+
             unified_analysis = UnifiedAnalysis(
                 transcript=bracketed_transcript,
                 audio_analysis={"regions": unified_audio_regions},
-                visual_analysis=visual_timeline
+                visual_analysis=visual_timeline,
+                beat_sheet=beat_sheet_dict
             )
             unified_json_str = unified_analysis.model_dump_json()
 
         # --- STEP 4: MULTI-AGENT AI DIRECTORS ---
         with PipelineStep(4, 8, "MULTI-AGENT AI DIRECTORS", "Parallel execution of B-Roll, Motion Graphics, and Character Planners"):
             set_job_status_ai_directing(job_uuid)
+            ai_model_pref = job_settings.get("ai_model", "Claude Sonnet 5")
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                future_broll = executor.submit(generate_broll_plan, unified_json_str)
-                future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str)
-                future_char = executor.submit(generate_character_plan, unified_json_str)
+                future_broll = executor.submit(generate_broll_plan, unified_json_str, ai_model_pref)
+                future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, ai_model_pref)
+                future_char = executor.submit(generate_character_plan, unified_json_str, ai_model_pref)
 
                 broll_plan = future_broll.result()
                 mg_plan = future_mg.result()
                 char_plan = future_char.result()
+                
+            # Save the plans for debugging/comparison
+            with open(os.path.join(assets_dir, "broll_plan.json"), "w") as f:
+                f.write(broll_plan.model_dump_json(indent=2))
+            with open(os.path.join(assets_dir, "mg_plan.json"), "w") as f:
+                f.write(mg_plan.model_dump_json(indent=2))
 
         # --- STEP 5: MASTER BLUEPRINT RESOLVER & SFX PLANNER ---
         with PipelineStep(5, 8, "MASTER BLUEPRINT RESOLVER & SFX PLANNER", "Merging plans, resolving conflicts, adding sound"):
@@ -175,11 +233,13 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 unified_analysis_json=unified_json_str,
                 broll_plan=broll_plan,
                 mg_plan=mg_plan,
-                char_plan=char_plan
+                char_plan=char_plan,
+                ai_model_pref=ai_model_pref
             )
             edit_decision_list = generate_sfx_plan(
                 unified_analysis_json=unified_json_str,
-                resolved_visual_blueprint=resolved_visual_blueprint
+                resolved_visual_blueprint=resolved_visual_blueprint,
+                ai_model_pref=ai_model_pref
             )
 
         # --- STEP 6: BLUEPRINT VALIDATION ---
@@ -227,6 +287,20 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 highlight_color=highlight_color,
             )
 
+        # --- STEP 7.5: 3D AVATAR RENDERING ---
+        with PipelineStep(7.5, 8, "3D AVATAR RENDERING", "Rendering headless WebGL character"):
+            import asyncio
+            from services.engine_3d.renderer import render_3d_character
+            character_webm_path = os.path.join(temp_job_dir, "character.mov")
+            
+            log_info(f"Rendering 3D character to {character_webm_path}...")
+            # We pass the validated_edits dictionary directly, and the total_duration
+            asyncio.run(render_3d_character(
+                ai_plan={"edits": validated_edits}, 
+                output_video_path=character_webm_path,
+                duration=total_duration
+            ))
+
         # --- STEP 8: FFMPEG COMPOSITOR & PUBLISHING ---
         with PipelineStep(8, 8, "FFMPEG RENDERING & PUBLISHING", "Assembly of final MP4 and social export"):
             set_job_status_rendering(job_uuid)
@@ -238,6 +312,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 edits=validated_edits,
                 timestamp_map=timestamp_map,
                 settings=job_settings,
+                character_video_path=character_webm_path,
             )
             
             set_job_status_publishing(job_uuid)

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Opus WebGL Base</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #0b0f19;
+    }
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    /* We can overlay HTML text on top of the WebGL canvas, or render text onto canvas */
+    #ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+  <!-- Load Three.js and GSAP from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+  <canvas id="webgl-canvas"></canvas>
+  <div id="ui-layer">
+    <!-- UI elements will be dynamically injected here -->
+  </div>
+
+  <script>
+    // --- Phase 1: WebGL Foundation ---
+    
+    // 1. Scene Setup
+    const canvas = document.getElementById('webgl-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    const scene = new THREE.Scene();
+    
+    // 2. Camera Setup
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.z = 1000;
+
+    // --- Phase 2: Procedural Cinematic Shaders ---
+
+    // 1. Fluid Background Shader
+    const bgVertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    const bgFragmentShader = `
+      uniform float uTime;
+      varying vec2 vUv;
+
+      // Simplex 2D noise
+      vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+      float snoise(vec2 v){
+        const vec4 C = vec4(0.211324865, 0.366025404, -0.577350269, 0.0243902439);
+        vec2 i  = floor(v + dot(v, C.yy) );
+        vec2 x0 = v -   i + dot(i, C.xx);
+        vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+        vec4 x12 = x0.xyxy + C.xxzz;
+        x12.xy -= i1;
+        i = mod(i, 289.0);
+        vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+        vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+        m = m*m ;
+        m = m*m ;
+        vec3 x = 2.0 * fract(p * C.www) - 1.0;
+        vec3 h = abs(x) - 0.5;
+        vec3 ox = floor(x + 0.5);
+        vec3 a0 = x - ox;
+        m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+        vec3 g;
+        g.x  = a0.x  * x0.x  + h.x  * x0.y;
+        g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+        return 130.0 * dot(m, g);
+      }
+
+      void main() {
+        vec2 uv = vUv;
+        float t = uTime * 0.3;
+        
+        // Fluid noise fields
+        float n1 = snoise(uv * 1.5 + vec2(t * 0.5, t * 0.2));
+        float n2 = snoise(uv * 3.0 - vec2(t * 0.3, t * 0.4));
+        
+        // Opus Colors
+        vec3 colorDark = vec3(0.04, 0.06, 0.10);  // #0b0f19
+        vec3 colorMid = vec3(0.10, 0.12, 0.21);   // #1a2035
+        vec3 colorGlow = vec3(0.15, 0.11, 0.25);  // subtle violet
+        
+        float mixVal = smoothstep(-0.8, 0.8, n1 + n2 * 0.5);
+        vec3 finalColor = mix(colorDark, colorMid, mixVal);
+        
+        // Vignette & Center Glow
+        float dist = distance(uv, vec2(0.5));
+        finalColor = mix(finalColor, colorGlow, (1.0 - dist) * 0.3 * (n2 * 0.5 + 0.5));
+        finalColor = mix(finalColor, vec3(0.0), dist * 0.5); // darken edges
+        
+        // Subtle film grain
+        float grain = fract(sin(dot(uv.xy + t, vec2(12.9898,78.233))) * 43758.5453);
+        finalColor += (grain - 0.5) * 0.02;
+        
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    const bgGeometry = new THREE.PlaneGeometry(window.innerWidth * 2, window.innerHeight * 2);
+    const bgUniforms = { uTime: { value: 0.0 } };
+    const bgMaterial = new THREE.ShaderMaterial({
+      vertexShader: bgVertexShader,
+      fragmentShader: bgFragmentShader,
+      uniforms: bgUniforms,
+      depthWrite: false
+    });
+    const backgroundPlane = new THREE.Mesh(bgGeometry, bgMaterial);
+    // Push background far away
+    backgroundPlane.position.z = -1000;
+    scene.add(backgroundPlane);
+
+    // 2. Glass Material Prototype (Will be applied to UI cards in Phase 3)
+    // For now, we create a placeholder card to show the refraction
+    const glassGeometry = new THREE.PlaneGeometry(400, 300);
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      transmission: 0.8, // glass refraction
+      opacity: 1,
+      metalness: 0,
+      roughness: 0.1,
+      ior: 1.5,
+      thickness: 2.0,
+      specularIntensity: 1.0,
+      specularColor: 0xffffff,
+      envMapIntensity: 1.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1
+    });
+    
+    // Add ambient lighting to illuminate the glass
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(100, 100, 200);
+    scene.add(dirLight);
+
+    const glassCard = new THREE.Mesh(glassGeometry, glassMaterial);
+    scene.add(glassCard);
+
+    // --- Phase 3: The Physics Engine (GSAP) ---
+
+    // Master timeline, paused so we can manually scrub it per frame
+    let masterTl = gsap.timeline({ paused: true });
+    
+    // We keep a dictionary of our 3D elements to animate
+    const meshes = {
+      'card': glassCard,
+      'background': backgroundPlane
+    };
+
+    window.animationData = {};
+    
+    window.injectData = (targets, keyframesJson) => {
+        window.animationData = JSON.parse(keyframesJson);
+        const uiLayer = document.getElementById('ui-layer');
+        uiLayer.innerHTML = ''; // Clear old
+
+        // 1. Build the UI DOM Elements
+        for (const [id, label] of Object.entries(targets)) {
+            if (id === 'card' || id === 'background') continue; // Handled in WebGL
+            
+            const el = document.createElement('div');
+            el.id = id;
+            el.innerText = label;
+            el.style.position = 'absolute';
+            el.style.fontSize = id.includes('title') ? '64px' : '48px';
+            el.style.fontWeight = id.includes('title') ? 'bold' : 'normal';
+            el.style.textShadow = '0px 10px 30px rgba(0,0,0,0.5)';
+            // Start hidden/scaled down
+            el.style.opacity = 0; 
+            el.style.transform = 'scale(0.8)';
+            uiLayer.appendChild(el);
+            
+            meshes[id] = el; // Store reference
+        }
+
+        // 2. Map Keyframes to GSAP Spring Physics
+        for (const [elementId, tracks] of Object.entries(window.animationData)) {
+            const target = meshes[elementId];
+            if (!target) continue;
+
+            const isWebGL = (elementId === 'card' || elementId === 'background');
+
+            // We group by property
+            const propMap = {};
+            for (const track of tracks) {
+                if (!propMap[track.property]) propMap[track.property] = [];
+                propMap[track.property].push(track);
+            }
+
+            for (const [prop, kfs] of Object.entries(propMap)) {
+                // Sort by frame
+                kfs.sort((a, b) => a.frame - b.frame);
+                
+                // Map to GSAP
+                for (let i = 0; i < kfs.length - 1; i++) {
+                    const start = kfs[i];
+                    const end = kfs[i+1];
+                    const durationSec = (end.frame - start.frame) / 30.0;
+                    const startTime = start.frame / 30.0;
+
+                    let ease = "power2.inOut";
+                    if (end.easing === 'spring') ease = "elastic.out(1, 0.5)";
+                    else if (end.easing === 'easeOut') ease = "power3.out";
+                    else if (end.easing === 'easeOutBack') ease = "back.out(1.7)";
+
+                    let targetProp = prop;
+                    let targetObj = target;
+                    
+                    // Remap properties for WebGL vs DOM
+                    if (isWebGL) {
+                        if (prop === 'scale') {
+                            targetObj = target.scale;
+                            targetProp = ['x', 'y', 'z']; // Scale all axes uniformly
+                        } else if (prop === 'translateY') {
+                            targetObj = target.position;
+                            targetProp = 'y';
+                            end.value = -end.value; // Invert Y for 3D coords
+                        } else if (prop === 'translateX') {
+                            targetObj = target.position;
+                            targetProp = 'x';
+                        }
+                    } else {
+                        // DOM elements use standard CSS
+                        if (prop === 'translateY') targetProp = 'y';
+                        if (prop === 'translateX') targetProp = 'x';
+                    }
+
+                    const tweenVars = {
+                        duration: durationSec,
+                        ease: ease
+                    };
+                    
+                    if (Array.isArray(targetProp)) {
+                        for (const p of targetProp) tweenVars[p] = end.value;
+                    } else {
+                        tweenVars[targetProp] = end.value;
+                    }
+
+                    masterTl.to(targetObj, tweenVars, startTime);
+                }
+            }
+        }
+    };
+
+    window.renderFrame = (frame) => {
+        const time = frame / 30.0;
+        
+        // Scrub the physics engine to the exact frame!
+        masterTl.time(time);
+        
+        // Update Shader Time for fluid backgrounds
+        bgUniforms.uTime.value = time;
+
+        // Continuous floating motion
+        glassCard.position.y += Math.sin(time * 2.0) * 0.5; // Add additive drift
+        glassCard.rotation.x = Math.sin(time) * 0.1;
+        glassCard.rotation.y = Math.cos(time) * 0.1;
+
+        renderer.render(scene, camera);
+    };
+
+    renderer.render(scene, camera);
+  </script>
+</body>
+</html>

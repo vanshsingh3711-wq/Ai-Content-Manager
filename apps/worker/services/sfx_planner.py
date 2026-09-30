@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from services.ai_director import EditList, _call_llm, _wait_for_internet_retry
 
 @_wait_for_internet_retry
-def generate_sfx_plan(unified_analysis_json: str, resolved_visual_blueprint: EditList) -> EditList:
+def generate_sfx_plan(unified_analysis_json: str, resolved_visual_blueprint: EditList, ai_model_pref: str = "Claude Opus 5.5") -> EditList:
     """
     Acts as the Foley Artist / SFX Planner. 
     It runs sequentially AFTER the Master Blueprint Resolver.
@@ -45,7 +45,8 @@ Please output the list of SFX edits to accompany these visuals.
 """
     
     # We get just the SFX back
-    sfx_only_plan = _call_llm(system_prompt, user_prompt)
+    print(f"\n[SFX PLANNER] Asking LLM ({ai_model_pref}) to plan sound effects...")
+    sfx_only_plan = _call_llm(system_prompt, user_prompt, ai_model_pref)
     
     # We must combine the resolved visual blueprint with the new SFX plan
     combined_edits = resolved_visual_blueprint.edits + sfx_only_plan.edits

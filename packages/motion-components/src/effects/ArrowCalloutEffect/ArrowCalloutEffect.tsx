@@ -45,7 +45,7 @@ export const ArrowCalloutEffect: React.FC<ArrowCalloutEffectProps> = ({
     currentOpacity = fadeProgress * opacity;
   }
 
-  if (currentFrame < delayInFrames || currentFrame >= endFrame) {
+  if (currentFrame < delayInFrames || currentFrame > endFrame) {
     return null;
   }
 

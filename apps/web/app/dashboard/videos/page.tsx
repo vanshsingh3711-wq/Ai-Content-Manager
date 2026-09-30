@@ -88,8 +88,11 @@ export default function VideosPage() {
     character: "sarah",
     niche: "Education",
     theme: "dark" as "dark" | "light",
-    ratio: "9:16" as "9:16" | "16:9" | "1:1",
+    ratio: "9:16" as "9:16" | "1:1" | "16:9",
     mood: "Energetic",
+    audioFile: null as File | null,
+    audioUrl: "",
+    aiModel: "Claude Sonnet 5",
   });
 
   // Upload creation state
@@ -147,8 +150,8 @@ export default function VideosPage() {
   }
 
   async function handleCreateFaceless() {
-    if (!facelessForm.topic && !facelessForm.script) {
-      alert("Please provide a topic or a script.");
+    if (!facelessForm.topic && !facelessForm.script && !facelessForm.audioFile) {
+      alert("Please provide a topic, a script, or an audio file.");
       return;
     }
     
@@ -156,11 +159,38 @@ export default function VideosPage() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     
     try {
+      let uploadedAudioUrl = "";
+      if (facelessForm.audioFile) {
+        // Upload audio file first
+        const presignRes = await fetch(`${apiUrl}/api/v1/storage/presigned-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: facelessForm.audioFile.name,
+            content_type: facelessForm.audioFile.type || "audio/mpeg",
+            file_size_bytes: facelessForm.audioFile.size,
+            user_id: "default_user",
+          }),
+        });
+
+        if (!presignRes.ok) throw new Error("Failed to get presigned URL for audio.");
+        const { upload_url, source_url } = await presignRes.json();
+
+        const uploadRes = await fetch(upload_url, {
+          method: "PUT",
+          headers: { "Content-Type": facelessForm.audioFile.type || "audio/mpeg" },
+          body: facelessForm.audioFile,
+        });
+
+        if (!uploadRes.ok) throw new Error("Failed to upload audio file.");
+        uploadedAudioUrl = source_url;
+      }
+
       const res = await fetch(`${apiUrl}/api/v1/videos/create-job`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: facelessForm.topic || "Faceless AI Video",
+          title: facelessForm.topic || facelessForm.audioFile?.name || "Faceless AI Video",
           source_url: "",
           video_type: "faceless_short",
           clerk_id: "user_default",
@@ -173,6 +203,8 @@ export default function VideosPage() {
             theme: facelessForm.theme,
             aspect_ratio: facelessForm.ratio,
             mood: facelessForm.mood,
+            audio_url: uploadedAudioUrl,
+            ai_model: facelessForm.aiModel,
           },
         }),
       });
@@ -187,7 +219,7 @@ export default function VideosPage() {
       }
     } catch (err) {
       console.error(err);
-      alert("Network error. Is the backend running?");
+      alert("Error: " + (err instanceof Error ? err.message : "Network error."));
     } finally {
       setIsSubmitting(false);
     }
@@ -303,6 +335,16 @@ export default function VideosPage() {
                     className="w-full h-64 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 text-sm text-white placeholder:text-neutral-700 focus:border-neutral-600 outline-none transition-colors resize-none font-mono leading-relaxed"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Or Upload Audio Recording</label>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={e => setFacelessForm(p => ({ ...p, audioFile: e.target.files?.[0] || null }))}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-white file:text-black hover:file:bg-neutral-200 transition-colors"
+                  />
+                  {facelessForm.audioFile && <p className="text-xs text-neutral-500 mt-2">Selected: {facelessForm.audioFile.name}</p>}
+                </div>
               </div>
 
               {/* Right: Options */}
@@ -332,6 +374,35 @@ export default function VideosPage() {
                           <div className="text-sm font-medium">{c.name}</div>
                           <div className="text-[11px] text-neutral-600">{c.desc}</div>
                         </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI Model */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">AI Director Model</label>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { id: "Claude Opus 5.5", label: "Claude Opus 5.5 (Best Quality)", desc: "Deepest psychological understanding & pacing" },
+                      { id: "Claude Sonnet 5", label: "Claude Sonnet 5 (Recommended)", desc: "High quality, extremely fast, perfectly balanced" },
+                      { id: "DeepSeek-Chat", label: "DeepSeek V3", desc: "Great logic, extremely cheap" },
+                      { id: "Gemini 1.5 Flash", label: "Gemini 1.5 Flash", desc: "Fastest option, good for simple videos" }
+                    ].map(model => (
+                      <button
+                        key={model.id}
+                        onClick={() => setFacelessForm(p => ({ ...p, aiModel: model.id }))}
+                        className={cn(
+                          "w-full text-left p-3 rounded-lg border transition-all flex flex-col gap-1",
+                          facelessForm.aiModel === model.id
+                            ? "border-white bg-white/5"
+                            : "border-neutral-800 text-neutral-400 hover:border-neutral-700 hover:bg-neutral-900/50"
+                        )}
+                      >
+                        <span className={cn("text-sm font-medium", facelessForm.aiModel === model.id ? "text-white" : "text-neutral-300")}>
+                          {model.label}
+                        </span>
+                        <span className="text-xs text-neutral-500">{model.desc}</span>
                       </button>
                     ))}
                   </div>

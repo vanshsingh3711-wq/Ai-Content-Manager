@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+    
+    :root {
+      --bg: #030303;
+      --fg: #ffffff;
+      --muted: rgba(255, 255, 255, 0.4);
+      --grid: rgba(255, 255, 255, 0.03);
+      --accent: #ffffff;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      color: var(--fg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Minimalist Grid Background */
+    .bg-grid {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+    }
+
+    /* Motion Graphics UI Frame */
+    .ui-frame {
+      position: absolute;
+      width: 1200px;
+      height: 700px;
+      z-index: 1;
+    }
+
+    .ui-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1.5;
+    }
+
+    /* Content Layout */
+    #content-container {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 1000px;
+      padding-left: 100px;
+    }
+
+    /* Clipping Masks for Premium Text Reveal */
+    .mask {
+      overflow: hidden;
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .word {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity;
+    }
+
+    #label {
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: 6px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 30px;
+    }
+
+    #headline {
+      font-weight: 300;
+      font-size: 140px;
+      line-height: 1.1;
+      letter-spacing: -4px;
+    }
+
+    #accent {
+      font-weight: 800;
+      font-size: 140px;
+      line-height: 1.1;
+      letter-spacing: -4px;
+      color: transparent;
+      -webkit-text-stroke: 2px rgba(255,255,255,0.9);
+    }
+
+    #supporting {
+      font-weight: 400;
+      font-size: 24px;
+      color: var(--muted);
+      margin-top: 40px;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- The Animated Background Grid -->
+  <svg class="bg-grid" width="100%" height="100%">
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="var(--grid)" stroke-width="1"/>
+    </pattern>
+    <rect width="100%" height="100%" fill="url(#grid)" />
+    <!-- A subtle glowing radial gradient masking the grid so it fades at the edges -->
+    <radialGradient id="grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#030303" stop-opacity="0" />
+      <stop offset="100%" stop-color="#030303" stop-opacity="1" />
+    </radialGradient>
+    <rect width="100%" height="100%" fill="url(#grad)" />
+  </svg>
+
+  <!-- The Vector Motion Graphics -->
+  <svg class="ui-frame" viewBox="0 0 1200 700">
+    <!-- Frame border -->
+    <rect id="frame-border" x="0" y="0" width="1200" height="700" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+    
+    <!-- Animated corner brackets -->
+    <path class="ui-path corner" d="M 0 40 L 0 0 L 40 0" />
+    <path class="ui-path corner" d="M 1160 0 L 1200 0 L 1200 40" />
+    <path class="ui-path corner" d="M 1200 660 L 1200 700 L 1160 700" />
+    <path class="ui-path corner" d="M 40 700 L 0 700 L 0 660" />
+
+    <!-- Animated Data Lines -->
+    <path class="ui-path data-line" d="M 100 0 L 100 700" stroke="rgba(255,255,255,0.05)"/>
+    <path class="ui-path data-line" d="M 0 150 L 1200 150" stroke="rgba(255,255,255,0.05)"/>
+    
+    <!-- Accent crosses -->
+    <path class="ui-path cross" d="M 95 150 L 105 150 M 100 145 L 100 155" />
+    <path class="ui-path cross" d="M 1095 150 L 1105 150 M 1100 145 L 1100 155" />
+  </svg>
+
+  <div id="content-container">
+    <div id="label" class="mask"></div>
+    <div id="headline" class="mask"></div>
+    <div id="accent" class="mask"></div>
+    <div id="supporting" class="mask"></div>
+  </div>
+
+  <script>
+    // Utility to split text into word spans for smooth staggered animations
+    function splitText(text) {
+      if (!text) return '';
+      return text.split(' ').map(word => `<span class="word">${word} </span>`).join('');
+    }
+
+    let masterTl = gsap.timeline({ paused: true });
+
+    window.animationData = {};
+
+    window.injectData = (targets, keyframesJson) => {
+        window.animationData = JSON.parse(keyframesJson);
+
+        // 1. Populate HTML with split words
+        for (const [id, text] of Object.entries(targets)) {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = splitText(text);
+        }
+
+        // 2. Animate the SVG Vector Graphics
+        const corners = document.querySelectorAll('.corner');
+        const crosses = document.querySelectorAll('.cross');
+        const lines = document.querySelectorAll('.data-line');
+        
+        // Setup SVGs for drawing (stroke-dasharray)
+        corners.forEach(p => { const l = p.getTotalLength(); p.style.strokeDasharray = l; p.style.strokeDashoffset = l; });
+        lines.forEach(p => { const l = p.getTotalLength(); p.style.strokeDasharray = l; p.style.strokeDashoffset = l; });
+        
+        // At frame 0, start drawing UI lines
+        masterTl.to(lines, { strokeDashoffset: 0, duration: 1.5, ease: "power3.inOut", stagger: 0.2 }, 0);
+        masterTl.to(corners, { strokeDashoffset: 0, duration: 1.0, ease: "power2.out", stagger: 0.1 }, 0.5);
+        
+        // Crosses fade and scale in
+        masterTl.fromTo(crosses, { opacity: 0, scale: 0, transformOrigin: "center" }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 1.0);
+
+        // 3. Animate the Text (using GSAP stagger on the words)
+        const elementIds = ['label', 'headline', 'accent', 'supporting'];
+        
+        // We will build the timeline based on the keyframes from Python. 
+        // We look for the main intro frame for each element.
+        elementIds.forEach((id) => {
+            const tracks = window.animationData[id];
+            if (!tracks) return;
+
+            const opacityTrack = tracks.filter(t => t.property === 'opacity');
+            if (opacityTrack.length > 1) {
+                // Sort by frame
+                opacityTrack.sort((a, b) => a.frame - b.frame);
+                const startFrame = opacityTrack[0].frame;
+                const endFrame = opacityTrack[1].frame;
+                const startTime = startFrame / 30.0;
+                const duration = (endFrame - startFrame) / 30.0;
+
+                const words = document.querySelectorAll(`#${id} .word`);
+                
+                // Set initial state
+                gsap.set(words, { y: 100, opacity: 0, rotationX: 45 });
+                
+                // Advanced Text Stagger Animation
+                masterTl.to(words, {
+                    y: 0,
+                    opacity: 1,
+                    rotationX: 0,
+                    duration: duration,
+                    ease: "power4.out",
+                    stagger: 0.05
+                }, startTime);
+            }
+        });
+    };
+
+    window.renderFrame = (frame) => {
+        const time = frame / 30.0;
+        masterTl.time(time);
+    };
+  </script>
+</body>
+</html>

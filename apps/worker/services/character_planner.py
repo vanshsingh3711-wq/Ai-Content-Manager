@@ -1,7 +1,7 @@
 from services.ai_director import EditList, _call_llm, _wait_for_internet_retry
 
 @_wait_for_internet_retry
-def generate_character_plan(unified_analysis_json: str) -> EditList:
+def generate_character_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5") -> EditList:
     system_prompt = """You are the 2D Character Planner for a video editing pipeline.
 You only focus on one action: 'character' (placing a 2D character reaction/animation on screen).
 Do NOT output any other actions.
@@ -29,7 +29,7 @@ OUTPUT SCHEMA (JSON):
   ]
 }
 """
-    print("\n[CHARACTER PLANNER] Asking LLM to plan character emotions and gestures...")
-    result = _call_llm(system_prompt, f"Context:\n{unified_analysis_json}")
+    print(f"\n[CHARACTER PLANNER] Asking LLM ({ai_model_pref}) to plan character emotions and gestures...")
+    result = _call_llm(system_prompt, f"Context:\n{unified_analysis_json}", ai_model_pref)
     print(f"[CHARACTER PLANNER] LLM proposed {len(result.edits)} character reaction events.")
     return result

@@ -24,7 +24,9 @@ class EditDecision(BaseModel):
     end: Optional[float] = Field(None, description="End timestamp for cuts.")
     search_query: Optional[str] = Field(None, description="Keywords for Pexels B-roll video search if action is 'b_roll'.")
     sound_effect: Optional[str] = Field(None, description="Sound effect name (e.g. 'whoosh', 'pop', 'ding') if action is 'sfx'.")
-    motion_graphics_text: Optional[str] = Field(None, description="Text to display if action is 'motion_graphics'.")
+    motion_graphics_type: Optional[str] = Field(None, description="Type of motion composition (e.g. hero_reveal, metric_reveal, step_sequence, quote_reveal)")
+    motion_graphics_targets: Optional[dict] = Field(None, description="Dictionary of targets for the composition (e.g. {'headline': 'DATA-DRIVEN', 'label': 'NEW SYSTEM'})")
+    motion_graphics_personality: Optional[str] = Field(None, description="Physics personality (e.g. energetic, premium, technical)")
     character_action: Optional[str] = Field(None, description="Action for 2D character (e.g., 'pointing', 'surprised', 'explaining') if action is 'character'.")
     transition: Optional[str] = Field(None, description="Transition type from previous scene (e.g., 'fade', 'slide', 'wipe', 'morph'). Leave null for a clean cut.")
     visual_beats: Optional[List[VisualBeat]] = Field(None, description="List of visual beats/animation changes within this scene. A scene should have multiple beats if the dialogue changes topics.")
@@ -48,48 +50,49 @@ def _wait_for_internet_retry(func):
     return wrapper
 
 
-def _call_llm(system_prompt: str, user_prompt: str) -> EditList:
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    openrouter_key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY")
+def _call_llm(system_prompt: str, user_prompt: str, ai_model_pref: str = "DeepSeek V3", raw_output: bool = False):
     deepseek_key = settings.DEEPSEEK_API_KEY or os.getenv("DEEPSEEK_API_KEY")
-    mistral_key = settings.MISTRAL_API_KEY or os.getenv("MISTRAL_API_KEY")
 
     configs = []
-    if mistral_key:
-        configs.append({"key": mistral_key, "url": "https://api.mistral.ai/v1", "model": "mistral-large-latest"})
-    if gemini_key:
-        configs.append({"key": gemini_key, "url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "gemini-3.5-flash"})
-        configs.append({"key": gemini_key, "url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "gemini-3.6-flash"})
-    if openrouter_key:
-        configs.append({"key": openrouter_key, "url": "https://openrouter.ai/api/v1", "model": "google/gemini-3.5-flash"})
-        configs.append({"key": openrouter_key, "url": "https://openrouter.ai/api/v1", "model": "google/gemini-3.6-flash"})
     if deepseek_key:
         configs.append({"key": deepseek_key, "url": "https://api.deepseek.com/v1", "model": "deepseek-chat"})
-
-    if not configs:
-        raise ValueError("[!] No API keys provided for LLM.")
+    else:
+        raise ValueError("[!] No DEEPSEEK_API_KEY provided.")
 
     last_error = None
     response = None
 
+    # Use OpenAI-compatible endpoint for DeepSeek
+    import time
     for config in configs:
-        client = OpenAI(api_key=config["key"], base_url=config["url"])
-        try:
-            print(f"[*] Attempting LLM call with model: {config['model']}")
-            response = client.chat.completions.create(
-                model=config["model"],
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.3,
-                max_tokens=8000,
-            )
-            break
-        except Exception as e:
-            print(f"[!] Failed with {config['model']} - Error: {type(e).__name__}")
-            last_error = e
+        client = OpenAI(api_key=config["key"], base_url=config["url"], timeout=45.0)
+        
+        for attempt in range(3):
+            try:
+                print(f"[*] Attempting LLM call with model: {config['model']} (Attempt {attempt+1}/3)")
+                response = client.chat.completions.create(
+                    model=config["model"],
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=8000,
+                )
+                
+                if not hasattr(response, 'choices') or not response.choices:
+                    raise ValueError(f"LLM Response missing choices: {response}")
+                    
+                break # Success
+            except Exception as e:
+                print(f"[!] Failed with {config['model']} - Error: {type(e).__name__}")
+                last_error = e
+                response = None # Reset response on failure
+                time.sleep(2)
+                
+        if response is not None:
+            break # Success across all configs
 
     if response is None:
         raise last_error
@@ -101,6 +104,9 @@ def _call_llm(system_prompt: str, user_prompt: str) -> EditList:
         match = re.search(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL | re.IGNORECASE)
         if match:
             content = match.group(1).strip()
+            
+        if raw_output:
+            return content
             
         try:
             parsed_json = json.loads(content)
@@ -141,8 +147,23 @@ def generate_edit_decisions(unified_analysis_json: str) -> EditList:
     print("[*] Generating Motion Graphics Plan...")
     mg_plan = generate_motion_graphics_plan(unified_analysis_json)
     
-    print("[*] Generating Character Plan...")
-    char_plan = generate_character_plan(unified_analysis_json)
+    # Check if the user requested a faceless documentary style
+    is_faceless = False
+    try:
+        analysis_data = json.loads(unified_analysis_json)
+        # Look for faceless hints in style or metadata
+        if "faceless" in str(analysis_data).lower() or "documentary" in str(analysis_data).lower():
+            is_faceless = True
+    except Exception:
+        pass
+        
+    if is_faceless:
+        print("[*] 'Faceless' mode detected. Skipping Character Plan...")
+        from services.ai_director import EditList
+        char_plan = EditList(edits=[])
+    else:
+        print("[*] Generating Character Plan...")
+        char_plan = generate_character_plan(unified_analysis_json)
     
     print("[*] Resolving Master Blueprint...")
     final_plan = resolve_master_blueprint(

@@ -1,10 +1,10 @@
-export type AnimatableProperty = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'width' | 'height';
+export type AnimatableProperty = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'width' | 'height' | 'blur' | 'translateX' | 'translateY' | 'translateZ' | 'rotateX' | 'rotateY';
 
 export interface Keyframe<T = number> {
   id: string;
   frame: number;
   value: T;
-  easing?: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  easing?: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'easeOutBack' | 'spring';
 }
 
 export interface KeyframeTrack<T = number> {

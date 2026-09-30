@@ -1,0 +1,64 @@
+{
+  "beats": [
+    {
+      "id": 1,
+      "start": 0.0,
+      "end": 3.12,
+      "text": "Here is a brand new faceless video about faceless video.",
+      "role": "hook",
+      "energy": "high",
+      "key_entities": [
+        "faceless video"
+      ],
+      "emphasis_words": [
+        "brand",
+        "new",
+        "faceless",
+        "video"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A sleek, modern video thumbnail with a play button and the text 'Faceless Video'",
+      "importance": 5
+    },
+    {
+      "id": 2,
+      "start": 3.12,
+      "end": 6.14,
+      "text": "We are currently generating this completely with AI.",
+      "role": "claim",
+      "energy": "medium",
+      "key_entities": [
+        "AI"
+      ],
+      "emphasis_words": [
+        "completely",
+        "AI"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A computer screen showing AI code or a neural network visualization generating video frames",
+      "importance": 4
+    },
+    {
+      "id": 3,
+      "start": 6.14,
+      "end": 8.6,
+      "text": "Stay tuned for the final result.",
+      "role": "cta",
+      "energy": "medium",
+      "key_entities": [
+        "final result"
+      ],
+      "emphasis_words": [
+        "Stay",
+        "tuned",
+        "final",
+        "result"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A countdown timer or a teaser clip of the final video with a 'Coming Soon' overlay",
+      "importance": 3
+    }
+  ],
+  "total_duration": 8.6,
+  "language": "en"
+}

@@ -1,0 +1,799 @@
+{
+  "ID_01": {
+    "start": 0.0,
+    "end": 4.18,
+    "text": "Welcome to a quick explainer on how artificial intelligence actually learns.",
+    "words": [
+      {
+        "word": "Welcome",
+        "start": 0.0,
+        "end": 0.44,
+        "probability": 0.88
+      },
+      {
+        "word": "to",
+        "start": 0.44,
+        "end": 0.74,
+        "probability": 0.99
+      },
+      {
+        "word": "a",
+        "start": 0.74,
+        "end": 0.88,
+        "probability": 0.9
+      },
+      {
+        "word": "quick",
+        "start": 0.88,
+        "end": 1.08,
+        "probability": 0.96
+      },
+      {
+        "word": "explainer",
+        "start": 1.08,
+        "end": 1.74,
+        "probability": 0.96
+      },
+      {
+        "word": "on",
+        "start": 1.74,
+        "end": 1.9,
+        "probability": 0.99
+      },
+      {
+        "word": "how",
+        "start": 1.9,
+        "end": 2.1,
+        "probability": 0.98
+      },
+      {
+        "word": "artificial",
+        "start": 2.1,
+        "end": 2.54,
+        "probability": 0.8
+      },
+      {
+        "word": "intelligence",
+        "start": 2.54,
+        "end": 3.3,
+        "probability": 0.99
+      },
+      {
+        "word": "actually",
+        "start": 3.3,
+        "end": 3.76,
+        "probability": 1.0
+      },
+      {
+        "word": "learns.",
+        "start": 3.76,
+        "end": 4.18,
+        "probability": 0.99
+      }
+    ]
+  },
+  "ID_02": {
+    "start": 5.3,
+    "end": 7.26,
+    "text": "You've probably heard of neural networks.",
+    "words": [
+      {
+        "word": "You've",
+        "start": 5.3,
+        "end": 5.56,
+        "probability": 0.97
+      },
+      {
+        "word": "probably",
+        "start": 5.56,
+        "end": 5.9,
+        "probability": 1.0
+      },
+      {
+        "word": "heard",
+        "start": 5.9,
+        "end": 6.2,
+        "probability": 1.0
+      },
+      {
+        "word": "of",
+        "start": 6.2,
+        "end": 6.36,
+        "probability": 1.0
+      },
+      {
+        "word": "neural",
+        "start": 6.36,
+        "end": 6.64,
+        "probability": 0.89
+      },
+      {
+        "word": "networks.",
+        "start": 6.64,
+        "end": 7.26,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_03": {
+    "start": 8.32,
+    "end": 11.72,
+    "text": "They are mathematical models loosely inspired by the human brain.",
+    "words": [
+      {
+        "word": "They",
+        "start": 8.32,
+        "end": 8.52,
+        "probability": 0.99
+      },
+      {
+        "word": "are",
+        "start": 8.52,
+        "end": 8.64,
+        "probability": 0.98
+      },
+      {
+        "word": "mathematical",
+        "start": 8.64,
+        "end": 9.02,
+        "probability": 1.0
+      },
+      {
+        "word": "models",
+        "start": 9.02,
+        "end": 9.7,
+        "probability": 1.0
+      },
+      {
+        "word": "loosely",
+        "start": 9.7,
+        "end": 10.06,
+        "probability": 0.98
+      },
+      {
+        "word": "inspired",
+        "start": 10.06,
+        "end": 10.62,
+        "probability": 1.0
+      },
+      {
+        "word": "by",
+        "start": 10.62,
+        "end": 10.94,
+        "probability": 1.0
+      },
+      {
+        "word": "the",
+        "start": 10.94,
+        "end": 11.08,
+        "probability": 1.0
+      },
+      {
+        "word": "human",
+        "start": 11.08,
+        "end": 11.36,
+        "probability": 0.99
+      },
+      {
+        "word": "brain.",
+        "start": 11.36,
+        "end": 11.72,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_04": {
+    "start": 12.72,
+    "end": 17.08,
+    "text": "Instead of being programmed with explicit rules, they learn by looking at examples.",
+    "words": [
+      {
+        "word": "Instead",
+        "start": 12.72,
+        "end": 13.12,
+        "probability": 0.99
+      },
+      {
+        "word": "of",
+        "start": 13.12,
+        "end": 13.34,
+        "probability": 1.0
+      },
+      {
+        "word": "being",
+        "start": 13.34,
+        "end": 13.54,
+        "probability": 1.0
+      },
+      {
+        "word": "programmed",
+        "start": 13.54,
+        "end": 13.98,
+        "probability": 0.99
+      },
+      {
+        "word": "with",
+        "start": 13.98,
+        "end": 14.24,
+        "probability": 1.0
+      },
+      {
+        "word": "explicit",
+        "start": 14.24,
+        "end": 14.62,
+        "probability": 1.0
+      },
+      {
+        "word": "rules,",
+        "start": 14.62,
+        "end": 15.06,
+        "probability": 1.0
+      },
+      {
+        "word": "they",
+        "start": 15.5,
+        "end": 15.64,
+        "probability": 1.0
+      },
+      {
+        "word": "learn",
+        "start": 15.64,
+        "end": 15.9,
+        "probability": 0.98
+      },
+      {
+        "word": "by",
+        "start": 15.9,
+        "end": 16.14,
+        "probability": 1.0
+      },
+      {
+        "word": "looking",
+        "start": 16.14,
+        "end": 16.38,
+        "probability": 1.0
+      },
+      {
+        "word": "at",
+        "start": 16.38,
+        "end": 16.62,
+        "probability": 1.0
+      },
+      {
+        "word": "examples.",
+        "start": 16.62,
+        "end": 17.08,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_05": {
+    "start": 18.22,
+    "end": 21.7,
+    "text": "Imagine showing a toddler thousands of pictures of cats and dogs.",
+    "words": [
+      {
+        "word": "Imagine",
+        "start": 18.22,
+        "end": 18.66,
+        "probability": 0.99
+      },
+      {
+        "word": "showing",
+        "start": 18.66,
+        "end": 19.08,
+        "probability": 1.0
+      },
+      {
+        "word": "a",
+        "start": 19.08,
+        "end": 19.3,
+        "probability": 0.96
+      },
+      {
+        "word": "toddler",
+        "start": 19.3,
+        "end": 19.6,
+        "probability": 0.98
+      },
+      {
+        "word": "thousands",
+        "start": 19.6,
+        "end": 20.08,
+        "probability": 0.99
+      },
+      {
+        "word": "of",
+        "start": 20.08,
+        "end": 20.32,
+        "probability": 1.0
+      },
+      {
+        "word": "pictures",
+        "start": 20.32,
+        "end": 20.56,
+        "probability": 1.0
+      },
+      {
+        "word": "of",
+        "start": 20.56,
+        "end": 20.86,
+        "probability": 1.0
+      },
+      {
+        "word": "cats",
+        "start": 20.86,
+        "end": 21.1,
+        "probability": 1.0
+      },
+      {
+        "word": "and",
+        "start": 21.1,
+        "end": 21.36,
+        "probability": 1.0
+      },
+      {
+        "word": "dogs.",
+        "start": 21.36,
+        "end": 21.7,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_06": {
+    "start": 22.66,
+    "end": 25.5,
+    "text": "Over time, the toddler learns the subtle differences.",
+    "words": [
+      {
+        "word": "Over",
+        "start": 22.66,
+        "end": 23.06,
+        "probability": 0.93
+      },
+      {
+        "word": "time,",
+        "start": 23.06,
+        "end": 23.44,
+        "probability": 1.0
+      },
+      {
+        "word": "the",
+        "start": 23.76,
+        "end": 23.86,
+        "probability": 1.0
+      },
+      {
+        "word": "toddler",
+        "start": 23.86,
+        "end": 24.18,
+        "probability": 1.0
+      },
+      {
+        "word": "learns",
+        "start": 24.18,
+        "end": 24.58,
+        "probability": 1.0
+      },
+      {
+        "word": "the",
+        "start": 24.58,
+        "end": 24.78,
+        "probability": 1.0
+      },
+      {
+        "word": "subtle",
+        "start": 24.78,
+        "end": 25.06,
+        "probability": 1.0
+      },
+      {
+        "word": "differences.",
+        "start": 25.06,
+        "end": 25.5,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_07": {
+    "start": 26.34,
+    "end": 32.5,
+    "text": "AI does the exact same thing, but it uses massive amounts of data and adjusts numbers called weights.",
+    "words": [
+      {
+        "word": "AI",
+        "start": 26.34,
+        "end": 26.92,
+        "probability": 0.73
+      },
+      {
+        "word": "does",
+        "start": 26.92,
+        "end": 27.36,
+        "probability": 0.98
+      },
+      {
+        "word": "the",
+        "start": 27.36,
+        "end": 27.54,
+        "probability": 1.0
+      },
+      {
+        "word": "exact",
+        "start": 27.54,
+        "end": 27.98,
+        "probability": 0.99
+      },
+      {
+        "word": "same",
+        "start": 27.98,
+        "end": 28.26,
+        "probability": 1.0
+      },
+      {
+        "word": "thing,",
+        "start": 28.26,
+        "end": 28.56,
+        "probability": 1.0
+      },
+      {
+        "word": "but",
+        "start": 28.96,
+        "end": 29.1,
+        "probability": 0.99
+      },
+      {
+        "word": "it",
+        "start": 29.1,
+        "end": 29.22,
+        "probability": 0.99
+      },
+      {
+        "word": "uses",
+        "start": 29.22,
+        "end": 29.48,
+        "probability": 1.0
+      },
+      {
+        "word": "massive",
+        "start": 29.48,
+        "end": 29.92,
+        "probability": 0.99
+      },
+      {
+        "word": "amounts",
+        "start": 29.92,
+        "end": 30.24,
+        "probability": 1.0
+      },
+      {
+        "word": "of",
+        "start": 30.24,
+        "end": 30.5,
+        "probability": 1.0
+      },
+      {
+        "word": "data",
+        "start": 30.5,
+        "end": 30.76,
+        "probability": 1.0
+      },
+      {
+        "word": "and",
+        "start": 30.76,
+        "end": 31.02,
+        "probability": 0.98
+      },
+      {
+        "word": "adjusts",
+        "start": 31.02,
+        "end": 31.5,
+        "probability": 0.99
+      },
+      {
+        "word": "numbers",
+        "start": 31.5,
+        "end": 31.76,
+        "probability": 1.0
+      },
+      {
+        "word": "called",
+        "start": 31.76,
+        "end": 32.12,
+        "probability": 0.99
+      },
+      {
+        "word": "weights.",
+        "start": 32.12,
+        "end": 32.5,
+        "probability": 0.91
+      }
+    ]
+  },
+  "ID_08": {
+    "start": 33.54,
+    "end": 38.82,
+    "text": "When it makes a mistake, an algorithm called back propagation tweaks those weights so it does better next",
+    "words": [
+      {
+        "word": "When",
+        "start": 33.54,
+        "end": 33.74,
+        "probability": 0.99
+      },
+      {
+        "word": "it",
+        "start": 33.74,
+        "end": 33.86,
+        "probability": 1.0
+      },
+      {
+        "word": "makes",
+        "start": 33.86,
+        "end": 34.06,
+        "probability": 1.0
+      },
+      {
+        "word": "a",
+        "start": 34.06,
+        "end": 34.2,
+        "probability": 1.0
+      },
+      {
+        "word": "mistake,",
+        "start": 34.2,
+        "end": 34.52,
+        "probability": 1.0
+      },
+      {
+        "word": "an",
+        "start": 34.96,
+        "end": 35.06,
+        "probability": 1.0
+      },
+      {
+        "word": "algorithm",
+        "start": 35.06,
+        "end": 35.5,
+        "probability": 0.99
+      },
+      {
+        "word": "called",
+        "start": 35.5,
+        "end": 35.94,
+        "probability": 0.99
+      },
+      {
+        "word": "back",
+        "start": 35.94,
+        "end": 36.22,
+        "probability": 0.81
+      },
+      {
+        "word": "propagation",
+        "start": 36.22,
+        "end": 36.68,
+        "probability": 0.41
+      },
+      {
+        "word": "tweaks",
+        "start": 36.68,
+        "end": 37.2,
+        "probability": 0.97
+      },
+      {
+        "word": "those",
+        "start": 37.2,
+        "end": 37.48,
+        "probability": 1.0
+      },
+      {
+        "word": "weights",
+        "start": 37.48,
+        "end": 37.86,
+        "probability": 0.99
+      },
+      {
+        "word": "so",
+        "start": 37.86,
+        "end": 38.06,
+        "probability": 0.91
+      },
+      {
+        "word": "it",
+        "start": 38.06,
+        "end": 38.2,
+        "probability": 1.0
+      },
+      {
+        "word": "does",
+        "start": 38.2,
+        "end": 38.36,
+        "probability": 1.0
+      },
+      {
+        "word": "better",
+        "start": 38.36,
+        "end": 38.6,
+        "probability": 1.0
+      },
+      {
+        "word": "next",
+        "start": 38.6,
+        "end": 38.82,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_09": {
+    "start": 38.82,
+    "end": 39.18,
+    "text": "time.",
+    "words": [
+      {
+        "word": "time.",
+        "start": 38.82,
+        "end": 39.18,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_10": {
+    "start": 40.0,
+    "end": 45.94,
+    "text": "After millions of cycles, the AI can recognize a cat, write a poem, or even drive a car.",
+    "words": [
+      {
+        "word": "After",
+        "start": 40.0,
+        "end": 40.46,
+        "probability": 0.99
+      },
+      {
+        "word": "millions",
+        "start": 40.46,
+        "end": 40.8,
+        "probability": 1.0
+      },
+      {
+        "word": "of",
+        "start": 40.8,
+        "end": 41.06,
+        "probability": 1.0
+      },
+      {
+        "word": "cycles,",
+        "start": 41.06,
+        "end": 41.44,
+        "probability": 1.0
+      },
+      {
+        "word": "the",
+        "start": 41.88,
+        "end": 42.0,
+        "probability": 1.0
+      },
+      {
+        "word": "AI",
+        "start": 42.0,
+        "end": 42.3,
+        "probability": 1.0
+      },
+      {
+        "word": "can",
+        "start": 42.3,
+        "end": 42.66,
+        "probability": 1.0
+      },
+      {
+        "word": "recognize",
+        "start": 42.66,
+        "end": 43.08,
+        "probability": 0.97
+      },
+      {
+        "word": "a",
+        "start": 43.08,
+        "end": 43.32,
+        "probability": 1.0
+      },
+      {
+        "word": "cat,",
+        "start": 43.32,
+        "end": 43.58,
+        "probability": 0.99
+      },
+      {
+        "word": "write",
+        "start": 43.98,
+        "end": 44.14,
+        "probability": 0.93
+      },
+      {
+        "word": "a",
+        "start": 44.14,
+        "end": 44.3,
+        "probability": 1.0
+      },
+      {
+        "word": "poem,",
+        "start": 44.3,
+        "end": 44.58,
+        "probability": 1.0
+      },
+      {
+        "word": "or",
+        "start": 44.92,
+        "end": 45.0,
+        "probability": 1.0
+      },
+      {
+        "word": "even",
+        "start": 45.0,
+        "end": 45.24,
+        "probability": 1.0
+      },
+      {
+        "word": "drive",
+        "start": 45.24,
+        "end": 45.5,
+        "probability": 1.0
+      },
+      {
+        "word": "a",
+        "start": 45.5,
+        "end": 45.66,
+        "probability": 1.0
+      },
+      {
+        "word": "car.",
+        "start": 45.66,
+        "end": 45.94,
+        "probability": 1.0
+      }
+    ]
+  },
+  "ID_11": {
+    "start": 46.9,
+    "end": 48.64,
+    "text": "That's the magic of machine learning.",
+    "words": [
+      {
+        "word": "That's",
+        "start": 46.9,
+        "end": 47.32,
+        "probability": 0.99
+      },
+      {
+        "word": "the",
+        "start": 47.32,
+        "end": 47.44,
+        "probability": 0.99
+      },
+      {
+        "word": "magic",
+        "start": 47.44,
+        "end": 47.74,
+        "probability": 0.98
+      },
+      {
+        "word": "of",
+        "start": 47.74,
+        "end": 47.96,
+        "probability": 1.0
+      },
+      {
+        "word": "machine",
+        "start": 47.96,
+        "end": 48.3,
+        "probability": 0.98
+      },
+      {
+        "word": "learning.",
+        "start": 48.3,
+        "end": 48.64,
+        "probability": 0.99
+      }
+    ]
+  }
+}

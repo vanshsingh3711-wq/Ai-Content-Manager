@@ -8,7 +8,8 @@ def resolve_master_blueprint(
     unified_analysis_json: str,
     broll_plan: EditList,
     mg_plan: EditList,
-    char_plan: EditList
+    char_plan: EditList,
+    ai_model_pref: str = "Claude Opus 5.5"
 ) -> EditList:
     """
     Acts as the Master Director. Takes the independent plans from the visual sub-agents
@@ -55,9 +56,9 @@ Please merge these plans, resolving conflicts based on the script, and output th
     print(f" -> Received B-Roll Plan: {len(broll_plan.edits)} events")
     print(f" -> Received Motion Graphics Plan: {len(mg_plan.edits)} events")
     print(f" -> Received Character Plan: {len(char_plan.edits)} events")
-    print(f" -> Master LLM is now analyzing the script to merge, resolve overlapping timestamps, and optimize quality...")
+    print(f" -> Master LLM ({ai_model_pref}) is now analyzing the script to merge, resolve overlapping timestamps, and optimize quality...")
 
-    final_plan = _call_llm(system_prompt, user_prompt)
+    final_plan = _call_llm(system_prompt, user_prompt, ai_model_pref)
     
     print(f"\n[RESOLVER: FINALIZED MASTER BLUEPRINT]")
     print(f" -> Final merged events: {len(final_plan.edits)}")
