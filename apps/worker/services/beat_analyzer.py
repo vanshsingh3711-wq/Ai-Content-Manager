@@ -347,6 +347,26 @@ FEW-SHOT EXAMPLES:
             
     raise RuntimeError("Failed to generate valid beat sheet after retries.")
 
+MAX_UNTREATED_GAP_SEC = 9.0
+
+def _apply_window_logic(edit, target_beat, action):
+    old_start = getattr(edit, "start", 0)
+    old_end = getattr(edit, "end", 0)
+    if action == "motion_graphics":
+        edit.start = target_beat.get("focus_start", target_beat["start"])
+        duration = target_beat["end"] - edit.start
+        if duration > 6.0:
+            duration = 6.0
+        edit.end = edit.start + duration
+        if edit.end > target_beat["end"]:
+            edit.end = target_beat["end"]
+        if edit.end - edit.start < 2.0:
+            edit.start = max(target_beat["start"], edit.end - 2.0)
+    else:
+        edit.start = target_beat["start"]
+        edit.end = target_beat["end"]
+    return old_start != edit.start or old_end != edit.end
+
 def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, planner_name: str) -> list:
     if not beat_sheet_dict or not beat_sheet_dict.get("beats"):
         return result_edits
@@ -360,6 +380,9 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
     dropped = 0
     snapped_count = 0
     
+    # Track which beats got treated
+    treated_beat_ids = set()
+    
     for edit in result_edits:
         if getattr(edit, "action", "") == "cut":
             valid_edits.append(edit)
@@ -367,12 +390,10 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
             
         total_proposed += 1
         
-        # We find the beat based on the edit's trigger_id if available
         trigger_id = getattr(edit, "trigger_id", "")
         target_beat = next((b for b in beats if f"beat_{b['id']}" == str(trigger_id)), None)
         
         if not target_beat:
-            # Fallback to closest start time
             edit_start = getattr(edit, "start", None)
             if edit_start is None:
                 dropped += 1
@@ -383,44 +404,105 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
             dropped += 1
             continue
             
+        action = getattr(edit, "action", "")
         old_start = edit.start
         old_end = edit.end
         
-        action = getattr(edit, "action", "")
-        if action == "motion_graphics":
-            # Focus window logic
-            # Start at focus phrase start
-            edit.start = target_beat.get("focus_start", target_beat["start"])
-            
-            # Duration min 2.0s, max 6.0s
-            duration = target_beat["end"] - edit.start
-            if duration > 6.0:
-                duration = 6.0
-                
-            edit.end = edit.start + duration
-            
-            # Clamp to min(beat end, total_duration) - assuming beat end is effectively bounded by total_duration already
-            if edit.end > target_beat["end"]:
-                edit.end = target_beat["end"]
-                
-            # If after clamping duration is < 2.0s, extend backward inside the beat
-            if edit.end - edit.start < 2.0:
-                edit.start = max(target_beat["start"], edit.end - 2.0)
-        else:
-            # B-roll snaps to beat boundaries
-            edit.start = target_beat["start"]
-            edit.end = target_beat["end"]
-            
-        print(f"[{planner_name}] Enforced {action} for {trigger_id}: start {old_start:.2f}->{edit.start:.2f}, end {old_end:.2f}->{edit.end:.2f}")
-            
-        snapped = False
-        if old_start != edit.start or old_end != edit.end:
-            snapped = True
-            
+        snapped = _apply_window_logic(edit, target_beat, action)
         if snapped:
             snapped_count += 1
             
+        # Bind the beat ID for later logic
+        setattr(edit, "_beat_id", target_beat["id"])
+        treated_beat_ids.add(target_beat["id"])
         valid_edits.append(edit)
+
+    # Sort valid edits (excluding cuts) to compute gaps
+    overlays = [e for e in valid_edits if getattr(e, "action", "") != "cut"]
+    overlays.sort(key=lambda e: e.start)
+    
+    # GAP LOGIC
+    # We find gaps between the end of one overlay and the start of the next.
+    # The first gap is from 0 to the first overlay.
+    # The last gap is from the last overlay to total_duration.
+    total_duration = beat_sheet_dict.get("total_duration", 0)
+    
+    def get_gaps():
+        gaps = []
+        last_end = 0.0
+        for ov in overlays:
+            if ov.start - last_end > 0:
+                gaps.append((last_end, ov.start))
+            last_end = max(last_end, ov.end)
+        if total_duration - last_end > 0:
+            gaps.append((last_end, total_duration))
+        return gaps
+
+    def promote_beat_in_gap(gap_start, gap_end):
+        # find untreated beats inside gap
+        # beat must start inside the gap
+        candidates = [b for b in beats if b["id"] not in treated_beat_ids and b["start"] >= gap_start and b["start"] < gap_end and b.get("importance", 5) > 1]
+        if not candidates:
+            return False
+            
+        candidates.sort(key=lambda b: (-b.get("importance", 5), b["start"]))
+        chosen = candidates[0]
         
-    print(f"[{planner_name} STATS] Pre-enforcement returned: {total_proposed} overlays. Dropped: {dropped}. Snapped: {snapped_count}. Post-enforcement: {total_proposed - dropped}.")
+        from services.ai_director import EditDecision
+        # Use simplest option: hero_reveal
+        print(f"[{planner_name}] GAP PROMOTION: Promoting beat {chosen['id']} inside gap ({gap_start:.1f}-{gap_end:.1f}) using simplest option 'hero_reveal'")
+        new_edit = EditDecision(
+            action="motion_graphics" if planner_name == "MOTION GRAPHICS PLANNER" else "broll",
+            trigger_id=f"beat_{chosen['id']}",
+            start=chosen["start"],
+            end=chosen["end"],
+            motion_graphics_type="hero_reveal",
+            motion_graphics_targets={"text": chosen["text"][:30]}
+        )
+        
+        _apply_window_logic(new_edit, chosen, getattr(new_edit, "action"))
+        setattr(new_edit, "_beat_id", chosen["id"])
+        overlays.append(new_edit)
+        overlays.sort(key=lambda e: e.start)
+        treated_beat_ids.add(chosen["id"])
+        valid_edits.append(new_edit)
+        return True
+
+    while True:
+        current_gaps = get_gaps()
+        promoted_any = False
+        for gs, ge in current_gaps:
+            if ge - gs > MAX_UNTREATED_GAP_SEC:
+                if promote_beat_in_gap(gs, ge):
+                    promoted_any = True
+                    break # Recompute gaps
+        if not promoted_any:
+            break
+
+    # MAX CONSECUTIVE RULE
+    # Find consecutive treated beats
+    sorted_beats = sorted(beats, key=lambda b: b["start"])
+    consecutive = 0
+    conflict_reported = False
+    for b in sorted_beats:
+        if b["id"] in treated_beat_ids:
+            consecutive += 1
+            if consecutive > 2:
+                print(f"[{planner_name}] CONFLICT: gap rule and max-2-consecutive rule conflict at beat {b['id']}")
+                conflict_reported = True
+        else:
+            consecutive = 0
+
+    # Print Table
+    print(f"\n[{planner_name}] FINAL TABLE:")
+    print("OVERLAY | BEAT | TEMPLATE | START | END")
+    for ov in overlays:
+        tmpl = getattr(ov, "motion_graphics_type", "N/A")
+        print(f"{ov.action} | {getattr(ov, '_beat_id', 'N/A')} | {tmpl} | {ov.start:.2f} | {ov.end:.2f}")
+    
+    print("GAPS (sec):")
+    for gs, ge in get_gaps():
+        print(f" - {ge - gs:.2f}s ({gs:.2f} to {ge:.2f})")
+    
+    print(f"[{planner_name} STATS] Pre-enforcement returned: {total_proposed} overlays. Dropped: {dropped}. Snapped: {snapped_count}. Post-enforcement: {len(overlays)}.")
     return valid_edits
