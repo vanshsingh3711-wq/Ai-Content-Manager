@@ -7,6 +7,13 @@ ALLOWED_TEMPLATES = {
     "step_sequence",
     "quote_reveal",
     "before_after",
+    "metric_reveal",
+    "chart_reveal",
+    "keyword_emphasis",
+    "cta_reveal",
+    "icon_reveal",
+    "media_reveal",
+    "code_reveal",
 }
 
 def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5") -> EditList:
@@ -24,6 +31,13 @@ RULES:
    - "step_sequence"    (targets: 'title', 'step1', 'step2', 'step3')
    - "quote_reveal"     (targets: 'quote', 'author')
    - "before_after"     (targets: 'beforeLabel', 'before', 'afterLabel', 'after')
+   - "metric_reveal"    (targets: 'label', 'metric', 'delta')
+   - "chart_reveal"     (targets: 'title', 'dataPoint1', 'dataPoint2')
+   - "keyword_emphasis" (targets: 'text', 'highlight')
+   - "cta_reveal"       (targets: 'callToAction', 'website')
+   - "icon_reveal"      (targets: 'concept', 'label')
+   - "media_reveal"     (targets: 'caption')
+   - "code_reveal"      (targets: 'language', 'code')
      * ONLY use before_after when the beat explicitly contrasts two named things (e.g. 'X vs Y', 'A but B').
      * Do NOT use it for generic explanations; prefer hero_reveal or quote_reveal instead.
 4. For 'motion_graphics_personality', pick one of: ["premium", "energetic", "technical"].

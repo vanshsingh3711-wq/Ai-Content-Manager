@@ -83,6 +83,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         # Prepare workspace paths
         os.makedirs(temp_job_dir, exist_ok=True)
         assets_dir = os.path.join(temp_job_dir, "assets")
+        os.makedirs(assets_dir, exist_ok=True)
         raw_video_path = os.path.join(temp_job_dir, "raw_source.mp4")
         extracted_wav_path = os.path.join(temp_job_dir, "extracted_audio.wav")
         subtitle_ass_path = os.path.join(temp_job_dir, "subtitles.ass")

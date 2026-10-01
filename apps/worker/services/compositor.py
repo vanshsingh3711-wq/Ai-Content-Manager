@@ -1,23 +1,10 @@
-"""
-Video Compositor Service — Phase 5
-Applies AI edit decisions to the raw video using FFmpeg:
-  - Removes segments marked as 'cut'
-  - Overlays B-roll clips on 'b_roll' segments (visual only — audio ownership preserved)
-  - Applies zoom keyframes on 'zoom_in' segments
-  - Burns in ASS subtitles
-  - Encodes to 1080x1920 vertical MP4
-
-AUDIO OWNERSHIP RULE:
-  The original/enhanced speech audio is the PRIMARY audio timeline.
-  B-roll insertion affects ONLY the visual layer.
-  B-roll audio is ALWAYS discarded unless explicitly requested.
-"""
 
 import os
 import shutil
 import subprocess
 import tempfile
 import json
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 from services.media_extractor import get_ffmpeg_binary_path
 from services.editing_config import EDITING_CONFIG
@@ -55,20 +42,21 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     return result
 
 def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, fps: float, width: int, height: int, temp_dir: str, prefix: str) -> Optional[str]:
-    """Spawns Node.js Canvas renderer to generate a transparent WebM overlay."""
+    """Spawns Python Playwright HTML renderer to generate a transparent WebM/MOV overlay."""
     out_path = os.path.join(temp_dir, f"{prefix}.mov")
     frames = int(duration_sec * fps)
     
-    # Add componentId to props so the Node script knows what to draw
-    props["componentId"] = comp_id
-    props_json = json.dumps(props)
+    # Format for HTML render
+    html_props = {
+        "type": comp_id,
+        "targets": {k: v for k, v in props.items() if k != "componentId"}
+    }
+    props_json = json.dumps(html_props)
     
-    motion_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../packages/motion-components"))
-    if not os.path.exists(motion_dir):
-        motion_dir = "/app/packages/motion-components"
-        
+    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "motion_html/render_html_motion.py"))
+    
     cmd = [
-        "node", "render_canvas.js",
+        sys.executable, script_path,
         out_path,
         str(frames),
         str(int(fps)),
@@ -77,8 +65,8 @@ def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, f
         props_json
     ]
     
-    _log("CANVAS", f"Rendering {comp_id} to {out_path} ({frames} frames @ {fps}fps)")
-    result = subprocess.run(cmd, cwd=motion_dir, capture_output=True, text=True)
+    _log("CANVAS", f"Rendering HTML {comp_id} to {out_path} ({frames} frames @ {fps}fps)")
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         _log("CANVAS_ERR", result.stderr or result.stdout)
         return None
@@ -528,7 +516,8 @@ def render_video_pipeline(
     timeline = _build_segment_timeline(edits, timestamp_map, total_duration, settings)
     kept_segments = [s for s in timeline if not s["is_cut"]]
 
-    temp_dir = os.path.dirname(os.path.abspath(output_mp4_path))
+    import tempfile
+    temp_dir = tempfile.mkdtemp(prefix="ai_compositor_")
 
     if not kept_segments:
         kept_segments = [{"start": 0.0, "end": total_duration, "chunk_id": "FULL", "actions": [], "is_cut": False}]
@@ -673,17 +662,24 @@ def render_video_pipeline(
                             broll_path = candidate
                             break
 
-            motion_graphics_text = None
-            for a in seg["actions"]:
-                if a.get("action") == "motion_graphics" or a.get("motion_graphics_text"):
-                    motion_graphics_text = a.get("motion_graphics_text")
-                    mg_template = a.get("template", "MotionGraphicsPreview")
-                    mg_props = {"text": motion_graphics_text}
-                    if a.get("visual_beats"): mg_props["visual_beats"] = a.get("visual_beats")
-                    if a.get("transition"): mg_props["transition"] = a.get("transition")
-            
             mg_path = None
-            if motion_graphics_text:
+            mg_action = None
+            for a in seg["actions"]:
+                if a.get("action") == "motion_graphics" or a.get("motion_graphics_text") or a.get("motion_graphics_type"):
+                    mg_action = a
+                    break
+            
+            if mg_action:
+                if mg_action.get("motion_graphics_type"):
+                    mg_template = mg_action.get("motion_graphics_type")
+                    mg_props = mg_action.get("motion_graphics_targets", {})
+                else:
+                    mg_template = mg_action.get("template", "MotionGraphicsPreview")
+                    mg_props = {"text": mg_action.get("motion_graphics_text")}
+                
+                if mg_action.get("visual_beats"): mg_props["visual_beats"] = mg_action.get("visual_beats")
+                if mg_action.get("transition"): mg_props["transition"] = mg_action.get("transition")
+                
                 mg_path = _render_canvas_composition(
                     mg_template, mg_props,
                     duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"

@@ -132,6 +132,15 @@ async def main():
             }
         ''')
 
+        print("[HTMLRender] Forcing transparent background...")
+        await page.add_style_tag(content="""
+            body, html { background: transparent !important; background-color: transparent !important; }
+            .bg-grid { display: none !important; }
+            canvas#webgl-canvas { display: none !important; }
+            svg > rect[fill='url(#grad)'] { display: none !important; }
+            svg > rect[fill='url(#grid)'] { display: none !important; }
+        """)
+
         for i in range(frames):
             await page.evaluate(f"window.renderFrame({i})")
             

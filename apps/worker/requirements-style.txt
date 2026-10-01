@@ -1,0 +1,8 @@
+yt-dlp
+scenedetect
+librosa
+scikit-learn
+opencv-python-headless
+Pillow
+tiktoken
+openai
