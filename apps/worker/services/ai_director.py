@@ -49,6 +49,13 @@ def _wait_for_internet_retry(func):
                 attempt += 1
     return wrapper
 
+def _load_style_profile(style_pref: str) -> str:
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    knowledge_path = os.path.join(base_dir, "data", "styles", "knowledge", f"{style_pref}.md")
+    if os.path.exists(knowledge_path):
+        with open(knowledge_path, "r") as f:
+            return f.read()
+    return "No explicit style profile provided. Default to a fast-paced viral style."
 
 def _call_llm(system_prompt: str, user_prompt: str, ai_model_pref: str = "DeepSeek V3", raw_output: bool = False):
     deepseek_key = settings.DEEPSEEK_API_KEY or os.getenv("DEEPSEEK_API_KEY")

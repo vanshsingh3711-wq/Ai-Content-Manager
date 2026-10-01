@@ -213,10 +213,11 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         with PipelineStep(4, 8, "MULTI-AGENT AI DIRECTORS", "Parallel execution of B-Roll, Motion Graphics, and Character Planners"):
             set_job_status_ai_directing(job_uuid)
             ai_model_pref = job_settings.get("ai_model", "Claude Sonnet 5")
+            style_pref = job_settings.get("video_style", "viral")
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                future_broll = executor.submit(generate_broll_plan, unified_json_str, ai_model_pref)
-                future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, ai_model_pref)
-                future_char = executor.submit(generate_character_plan, unified_json_str, ai_model_pref)
+                future_broll = executor.submit(generate_broll_plan, unified_json_str, ai_model_pref, style_pref)
+                future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, ai_model_pref, style_pref)
+                future_char = executor.submit(generate_character_plan, unified_json_str, ai_model_pref, style_pref)
 
                 broll_plan = future_broll.result()
                 mg_plan = future_mg.result()
@@ -240,7 +241,8 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             edit_decision_list = generate_sfx_plan(
                 unified_analysis_json=unified_json_str,
                 resolved_visual_blueprint=resolved_visual_blueprint,
-                ai_model_pref=ai_model_pref
+                ai_model_pref=ai_model_pref,
+                style_pref=style_pref
             )
 
         # --- STEP 6: BLUEPRINT VALIDATION ---

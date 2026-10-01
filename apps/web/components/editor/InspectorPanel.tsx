@@ -11,6 +11,8 @@ import {
   Trash2,
   MoveVertical,
   Diamond,
+  BrainCircuit,
+  Check,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -43,6 +45,89 @@ function KeyframeToggle({ clip, trackType, property, currentValue }: { clip: any
     >
       <Diamond className={cn("w-3.5 h-3.5", isActive && "fill-white")} />
     </button>
+  );
+}
+
+function FeedbackUI({ type, original, current }: { type: string, original: any, current: any }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await fetch("http://localhost:8000/api/v1/jobs/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          niche: "educational_explainer", // Hardcoded for demo
+          original: original,
+          correction: current,
+          reason: reason
+        })
+      });
+      setSuccess(true);
+      setTimeout(() => {
+        setIsOpen(false);
+        setSuccess(false);
+        setReason("");
+      }, 2000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="w-full py-2 px-3 mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-center gap-2 text-emerald-400 text-xs font-bold">
+        <Check className="w-4 h-4" /> Feedback Learned!
+      </div>
+    );
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="w-full py-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all mt-4"
+      >
+        <BrainCircuit className="w-3.5 h-3.5" />
+        <span>Train AI (Submit Correction)</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="w-full mt-4 p-3 bg-neutral-900 border border-indigo-500/30 rounded-lg space-y-2 text-xs">
+      <div className="text-indigo-300 font-bold flex items-center gap-1.5 mb-2">
+        <BrainCircuit className="w-3.5 h-3.5" /> 
+        Explain Correction
+      </div>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Why did you change this?"
+        className="w-full bg-black/50 border border-neutral-800 rounded p-2 text-white outline-none focus:border-indigo-500 resize-none h-16"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={() => setIsOpen(false)}
+          className="flex-1 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-white font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={!reason || submitting}
+          className="flex-1 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium disabled:opacity-50"
+        >
+          {submitting ? "Sending..." : "Submit"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -406,6 +491,12 @@ export function InspectorPanel() {
           <TransformControls clip={caption} trackType="caption" updateFn={updateCaption} />
         </div>
 
+        <FeedbackUI 
+          type="caption" 
+          original={{ preset: "unknown", text: "unknown" }} 
+          current={{ preset: caption.stylePreset, text: caption.text }} 
+        />
+
         <button
           onClick={() => deleteClip("caption", caption.id)}
           className="w-full py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all mt-4"
@@ -493,6 +584,12 @@ export function InspectorPanel() {
           
           <TransformControls clip={broll} trackType="broll" updateFn={updateBRollClip} />
         </div>
+        
+        <FeedbackUI 
+          type="broll" 
+          original={{ fitMode: "unknown" }} 
+          current={{ fitMode: broll.fitMode }} 
+        />
 
         <button
           onClick={() => deleteClip("broll", broll.id)}

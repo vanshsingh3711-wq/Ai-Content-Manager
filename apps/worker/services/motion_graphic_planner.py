@@ -1,4 +1,4 @@
-from services.ai_director import EditList, _call_llm, _wait_for_internet_retry
+from services.ai_director import EditList, _call_llm, _wait_for_internet_retry, _load_style_profile
 
 # Single source of truth — must match draw functions in render_canvas.js.
 # Any template not in this set will cause render_canvas.js to exit 1.
@@ -16,10 +16,14 @@ ALLOWED_TEMPLATES = {
     "code_reveal",
 }
 
-def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5") -> EditList:
-    system_prompt = """You are the Motion Graphics Planner for a premium documentary video pipeline.
+def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:
+    style_context = _load_style_profile(style_pref)
+    system_prompt = f"""You are the Motion Graphics Planner for a premium documentary video pipeline.
 You only focus on two actions: 'motion_graphics' (overlaying data/graphics) and 'zoom_in' (camera punch-ins).
 Do NOT output 'cut' or 'b_roll'.
+
+STYLE PROFILE INSTRUCTIONS:
+{style_context}
 
 RULES:
 1. **DENSITY & PACING (CRITICAL)**: This is a high-energy TikTok/Reels style video. Visuals must change every 1.5 to 3.0 seconds. The screen must NEVER be empty.

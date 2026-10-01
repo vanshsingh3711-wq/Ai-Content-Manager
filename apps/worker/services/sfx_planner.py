@@ -1,18 +1,23 @@
 from pydantic import BaseModel
-from services.ai_director import EditList, _call_llm, _wait_for_internet_retry
+from services.ai_director import EditList, _call_llm, _wait_for_internet_retry, _load_style_profile
 
 @_wait_for_internet_retry
-def generate_sfx_plan(unified_analysis_json: str, resolved_visual_blueprint: EditList, ai_model_pref: str = "Claude Opus 5.5") -> EditList:
+def generate_sfx_plan(unified_analysis_json: str, resolved_visual_blueprint: EditList, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:
     """
     Acts as the Foley Artist / SFX Planner. 
     It runs sequentially AFTER the Master Blueprint Resolver.
     It reads the finalized visual blueprint and adds appropriate sound effects.
     """
     
-    system_prompt = """You are the Sound Effects (SFX) Planner for an AI video editing pipeline.
+    style_context = _load_style_profile(style_pref)
+    
+    system_prompt = f"""You are the Sound Effects (SFX) Planner for an AI video editing pipeline.
 You will receive the finalized visual edit plan (B-roll, motion graphics, character animations) and the unified analysis of the video (transcript).
 
 Your job is to add 'sfx' actions that accompany the visual elements.
+
+STYLE PROFILE INSTRUCTIONS (CRITICAL FOR SFX):
+{style_context}
 
 RULES:
 1. ONLY output 'sfx' actions. Do NOT output 'cut', 'b_roll', 'motion_graphics', or 'character'.

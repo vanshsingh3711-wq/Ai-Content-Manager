@@ -1,10 +1,14 @@
-from services.ai_director import EditList, _call_llm, _wait_for_internet_retry
+from services.ai_director import EditList, _call_llm, _wait_for_internet_retry, _load_style_profile
 
 @_wait_for_internet_retry
-def generate_character_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5") -> EditList:
-    system_prompt = """You are the 2D Character Planner for a video editing pipeline.
+def generate_character_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:
+    style_context = _load_style_profile(style_pref)
+    system_prompt = f"""You are the 2D Character Planner for a video editing pipeline.
 You only focus on one action: 'character' (placing a 2D character reaction/animation on screen).
 Do NOT output any other actions.
+
+STYLE PROFILE INSTRUCTIONS:
+{style_context}
 
 RULES:
 1. 'character': Use when the script calls for an emotional reaction (surprised, explaining, pointing). 
