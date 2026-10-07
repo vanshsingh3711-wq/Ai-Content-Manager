@@ -17,21 +17,22 @@ RULES:
 4. **Transitions**: Provide a `transition` (e.g., "fade", "slide", "wipe", "morph") if the character should enter smoothly. Leave null for a clean cut.
 
 OUTPUT SCHEMA (JSON):
-{
+OUTPUT SCHEMA (JSON):
+{{
   "edits": [
-    {
+    {{
       "action": "character",
       "trigger_id": "ID_01 (Required)",
       "character_action": "explaining",
       "transition": "fade",
       "visual_beats": [
-        { "timestamp": 0.0, "text": "Let me explain", "emphasis": "intro", "animation_state": "explaining" },
-        { "timestamp": 2.5, "text": "Wow!", "emphasis": "jump", "animation_state": "surprised" }
+        {{ "timestamp": 0.0, "text": "Let me explain", "emphasis": "intro", "animation_state": "explaining" }},
+        {{ "timestamp": 2.5, "text": "Wow!", "emphasis": "jump", "animation_state": "surprised" }}
       ],
       "reason": "Why this character reaction fits the tone here"
-    }
+    }}
   ]
-}
+}}
 """
     print(f"\n[CHARACTER PLANNER] Asking LLM ({ai_model_pref}) to plan character emotions and gestures...")
     result = _call_llm(system_prompt, f"Context:\n{unified_analysis_json}", ai_model_pref)

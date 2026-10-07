@@ -19,18 +19,18 @@ RULES:
 5. **Transitions**: Provide a `transition` (e.g., "fade", "crossfade", "slide", "push", "zoom", "wipe", "morph") if the incoming B-roll should blend smoothly from the previous visual. Leave null for a clean cut. Transition selection should depend on the relationship between scenes.
 
 OUTPUT SCHEMA (JSON):
-{
+{{
   "edits": [
-    {
+    {{
       "action": "cut | b_roll",
       "trigger_id": "beat_1 (Required for b_roll)",
       "start": 0.0, "end": 3.75,
       "search_query": "B-roll keywords",
       "transition": "fade",
       "reason": "Why this b-roll works here"
-    }
+    }}
   ]
-}
+}}
 """
     import json
     try:

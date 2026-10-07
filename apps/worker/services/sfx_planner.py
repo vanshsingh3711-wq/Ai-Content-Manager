@@ -28,16 +28,16 @@ RULES:
 6. Do NOT overload the video with sounds. Only use sounds on high-impact visual changes.
 
 OUTPUT SCHEMA (JSON):
-{
+{{
   "edits": [
-    {
+    {{
       "action": "sfx",
       "trigger_id": "ID_01 (Required)",
       "sound_effect": "whoosh",
       "reason": "To accompany the B-roll transition"
-    }
+    }}
   ]
-}
+}}
 """
 
     user_prompt = f"""--- UNIFIED ANALYSIS (Transcript & Context) ---

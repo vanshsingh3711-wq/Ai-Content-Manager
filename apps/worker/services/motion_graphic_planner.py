@@ -49,25 +49,25 @@ RULES:
 6. **Transitions**: Provide a `transition` (e.g., "fade", "slide", "wipe", "morph") if the incoming scene should blend smoothly from the previous. Leave null for a clean cut.
 
 OUTPUT SCHEMA (JSON):
-{
+{{
   "edits": [
-    {
+    {{
       "action": "motion_graphics",
       "trigger_id": "beat_1",
       "start": 0.0,
       "end": 3.75,
       "motion_graphics_type": "metric_reveal",
-      "motion_graphics_targets": {
+      "motion_graphics_targets": {{
         "label": "USER GROWTH",
         "metric": "450,000",
         "delta": "+12.4%"
-      },
+      }},
       "motion_graphics_personality": "premium",
       "transition": "slide",
       "reason": "Shows massive growth"
-    }
+    }}
   ]
-}
+}}
 """
     import json
     try:

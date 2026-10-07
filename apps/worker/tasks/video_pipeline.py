@@ -129,7 +129,8 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                     log_info("Generating TTS Audio for Faceless Video...")
                     topic = job_settings.get("topic", job_title)
                     script = job_settings.get("script", f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result.")
-                    os.system(f'edge-tts --text "{script}" --write-media "{extracted_wav_path}"')
+                    import subprocess
+                    subprocess.run(["edge-tts", "--text", script, "--write-media", extracted_wav_path], check=True)
                     ffmpeg_bin = get_ffmpeg_binary_path()
                     total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
                     

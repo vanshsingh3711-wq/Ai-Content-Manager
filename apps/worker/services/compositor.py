@@ -33,11 +33,16 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     result = subprocess.run(final_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         stderr_text = result.stderr or ""
-        # The actual error is usually at the end of the FFmpeg output
-        stderr_preview = stderr_text[-2000:] if len(stderr_text) > 2000 else stderr_text
-        _log("STDERR", f"({label}) {stderr_preview}")
+        # Write full cmd and stderr to a temp file for debugging
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".log", mode="w") as f:
+            f.write("CMD:\n" + " ".join(final_cmd) + "\n\nSTDERR:\n" + stderr_text)
+            log_path = f.name
+        
+        stderr_preview = stderr_text[-3000:]
+        _log("STDERR", f"({label}) Failed! Debug log saved to {log_path}\n{stderr_preview}")
         raise RuntimeError(
-            f"FFmpeg failed for '{label}' (exit code {result.returncode}):\n{stderr_preview}"
+            f"FFmpeg failed for '{label}' (exit code {result.returncode}). Log: {log_path}\n{stderr_preview}"
         )
     return result
 
@@ -634,12 +639,16 @@ def render_video_pipeline(
                     if tid and tid in broll_map:
                         broll_path_a = broll_map[tid]
                         if os.path.exists(broll_path_a) and os.path.getsize(broll_path_a) > 1024:
-                            cmd.extend(["-an", "-i", broll_path_a])
+                            cmd.extend(["-an", "-t", str(rel_end - rel_start), "-i", broll_path_a])
                             bv = f"[broll_{broll_count}_v]"
-                            broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setpts=PTS-STARTPTS+{rel_start}/TB{bv};"
+                            broll_transition = a.get("transition")
+                            
+                            broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                            if broll_transition in ["fade", "crossfade", "morph"]:
+                                broll_filter += f",fade=t=in:st=0:d=0.5"
+                            broll_filter += f",setpts=PTS-STARTPTS+{rel_start}/TB{bv};"
                             filter_str.append(broll_filter)
                             
-                            broll_transition = a.get("transition")
                             overlay_x, overlay_y = "0", "0"
                             if broll_transition == "slide" or broll_transition == "push":
                                 overlay_x = f"'if(lte(t,{rel_start}+0.5), -w+(w/0.5)*(t-{rel_start}), 0)'"

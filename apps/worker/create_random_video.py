@@ -60,8 +60,8 @@ async def main():
         },
         {
             "trigger_id": "chunk2",
-            "action": "character",
-            "character_action": "explaining",
+            "action": "motion_graphics",
+            "motion_graphics_text": "Ocean Facts",
             "transition": "slide",
             "visual_beats": [
                 {"timestamp": 0.0, "text": "Ocean", "emphasis": "intro", "animation_state": "explaining"},
@@ -80,8 +80,8 @@ async def main():
         },
         {
             "trigger_id": "chunk4",
-            "action": "character",
-            "character_action": "surprised",
+            "action": "motion_graphics",
+            "motion_graphics_text": "Venus Facts",
             "transition": "fade",
             "visual_beats": [
                 {"timestamp": 0.0, "text": "Venus Day > Year", "emphasis": "jump", "animation_state": "surprised"},
