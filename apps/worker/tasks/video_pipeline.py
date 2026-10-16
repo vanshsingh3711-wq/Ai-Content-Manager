@@ -1,4 +1,6 @@
 import os
+import sys
+import shutil
 import traceback
 import uuid
 import json
@@ -51,13 +53,23 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
     pipeline_start = time.time()
     log_header("AUTOMATED VIDEO EDITING PIPELINE", job_id=job_id)
     
-    session = get_worker_db()
     job_uuid = uuid.UUID(job_id) if isinstance(job_id, str) else job_id
     temp_job_dir = os.path.join(settings.TEMP_DIR, str(job_uuid))
 
     try:
-        # 1. Fetch Job from PostgreSQL
-        job = session.get(VideoJob, job_uuid)
+        # 1. Fetch Job from PostgreSQL (with retry if DB is waking up)
+        job = None
+        for attempt in range(3):
+            session = get_worker_db()
+            try:
+                job = session.get(VideoJob, job_uuid)
+                break
+            except Exception as conn_err:
+                session.close()
+                if attempt == 2:
+                    raise
+                time.sleep(1.5 * (attempt + 1))
+
         if not job:
             error_msg = f"Job {job_id} not found in database"
             log_error(error_msg)
@@ -80,7 +92,11 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 
         session.close() # Close DB before heavy work
 
-        log_info(f"Target Video Job: '{job_title}' | Type: {job_video_type} | Ratio: {job_settings.get('aspect_ratio', '9:16')} | Style: {job_settings.get('video_style', 'viral')}")
+        ai_model_pref = job_settings.get("ai_model", "DeepSeek-Hybrid")
+        style_pref = job_settings.get("video_style", "viral")
+        aspect_ratio = job_settings.get("aspect_ratio", "9:16")
+
+        log_info(f"Target Video Job: '{job_title}' | Type: {job_video_type} | Ratio: {aspect_ratio} | Style: {style_pref} | Model: {ai_model_pref}")
 
 
         # Prepare workspace paths
@@ -133,7 +149,10 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                     topic = job_settings.get("topic", job_title)
                     script = job_settings.get("script", f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result.")
                     import subprocess
-                    subprocess.run(["edge-tts", "--text", script, "--write-media", extracted_wav_path], check=True)
+                    edge_tts_bin = os.path.join(os.path.dirname(sys.executable), "edge-tts")
+                    if not os.path.exists(edge_tts_bin):
+                        edge_tts_bin = shutil.which("edge-tts") or "edge-tts"
+                    subprocess.run([edge_tts_bin, "--text", script, "--write-media", extracted_wav_path], check=True)
                     ffmpeg_bin = get_ffmpeg_binary_path()
                     total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
                     
@@ -183,7 +202,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             # - "DeepSeek-Hybrid" (default): R1 for Beat Sheet & Motion Graphics, V3 for B-roll and Character
             # - "DeepSeek-Reasoner" or "DeepSeek R1": R1 for all
             # - "DeepSeek-Chat" or "DeepSeek V3": V3 for all
-            ai_model_setting = str(job_settings.get("ai_model", "DeepSeek-Hybrid")).lower()
+            ai_model_setting = str(ai_model_pref).lower()
             if "reasoner" in ai_model_setting or "r1" in ai_model_setting or "pro" in ai_model_setting:
                 beat_model = "deepseek-reasoner"
                 mg_model = "deepseek-reasoner"
