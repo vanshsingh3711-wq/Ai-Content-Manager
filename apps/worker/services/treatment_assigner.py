@@ -162,4 +162,6 @@ def assign_visual_treatments(
             "concreteness": beat.get("concreteness")
         })
 
+    beat_sheet["is_faceless"] = is_faceless
+
     return beat_sheet, log_table

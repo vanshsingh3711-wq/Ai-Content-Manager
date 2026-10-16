@@ -38,3 +38,35 @@ def test_hook_cta_never_demoted():
     treatments = [b["treatment"] for b in updated["beats"]]
     
     assert "none" not in treatments, "Hook or CTA was demoted!"
+
+
+def test_talking_head_enforces_untreated_speaker_ratio():
+    # In a talking head video (is_faceless=False), at least 35% must remain untreated ('none')
+    beats = [
+        {"id": 1, "role": "claim", "importance": 4, "concreteness": "concrete", "start": 0.0, "end": 3.0},
+        {"id": 2, "role": "claim", "importance": 4, "concreteness": "concrete", "start": 3.0, "end": 6.0},
+        {"id": 3, "role": "claim", "importance": 4, "concreteness": "concrete", "start": 6.0, "end": 9.0},
+        {"id": 4, "role": "claim", "importance": 4, "concreteness": "concrete", "start": 9.0, "end": 12.0},
+    ]
+    beat_sheet = {"beats": beats}
+    settings = {"is_faceless": False, "MAX_OVERLAYS_PER_MIN": 20}
+    updated, _ = assign_visual_treatments(beat_sheet, 12.0, settings)
+    
+    treatments = [b["treatment"] for b in updated["beats"]]
+    assert "none" in treatments, "Talking head should demote treated beats to preserve speaker visibility!"
+    assert updated.get("is_faceless") is False
+
+
+def test_faceless_preserves_broll_without_untreated_cap():
+    # In a faceless video (is_faceless=True), low importance beats fallback to b_roll
+    beats = [
+        {"id": 1, "role": "claim", "importance": 1, "concreteness": "abstract", "start": 0.0, "end": 3.0},
+        {"id": 2, "role": "claim", "importance": 1, "concreteness": "abstract", "start": 3.0, "end": 6.0},
+    ]
+    beat_sheet = {"beats": beats}
+    settings = {"is_faceless": True}
+    updated, _ = assign_visual_treatments(beat_sheet, 6.0, settings)
+    
+    treatments = [b["treatment"] for b in updated["beats"]]
+    assert treatments == ["b_roll", "b_roll"], f"Expected all b_roll fallback, got {treatments}"
+    assert updated.get("is_faceless") is True
