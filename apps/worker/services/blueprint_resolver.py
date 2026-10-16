@@ -1,66 +1,83 @@
-import json
-from pydantic import BaseModel, Field
-from typing import List
-from services.ai_director import EditList, _call_llm, _wait_for_internet_retry
+from typing import List, Dict, Any
+from services.ai_director import EditList, EditDecision
 
-@_wait_for_internet_retry
 def resolve_master_blueprint(
     unified_analysis_json: str,
     broll_plan: EditList,
     mg_plan: EditList,
     char_plan: EditList,
-    ai_model_pref: str = "Claude Opus 5.5"
+    ai_model_pref: str = "Claude Opus 5.5"  # Kept for API compatibility
 ) -> EditList:
     """
-    Acts as the Master Director. Takes the independent plans from the visual sub-agents
-    and intelligently resolves any conflicts, alters timestamps, and applies creative direction.
+    Deterministic conflict resolver — replaces the 4th LLM call.
+
+    Strategy:
+    1. Collect all edits from all three specialized plans (MG, B-roll, Character).
+    2. Cuts, characters, zoom-ins, and SFX always pass through without conflict.
+    3. If B-roll and Motion Graphics compete for the exact same trigger_id:
+       Motion Graphics wins (more specific on-screen graphic).
+    4. Sort all decisions cleanly by start timestamp.
+    5. Preserves all carefully validated timestamps and targets with 0 hallucination.
     """
-    
-    system_prompt = """You are the Master Blueprint Resolver for an AI video editing pipeline.
-You will receive a unified analysis of a video (transcript and timing) AND three separate visual plans from specialized AI sub-agents:
-1. B-Roll Plan
-2. Motion Graphics Plan
-3. 2D Character Plan
+    all_edits: List[EditDecision] = []
+    seen_triggers: Dict[str, EditDecision] = {}
 
-Your job is to merge these into a single, cohesive Edit Decision List.
+    PRIORITY = {
+        "motion_graphics": 3,
+        "b_roll": 2,
+        "character": 1,
+        "zoom_in": 0,
+        "sfx": 0,
+        "cut": 0,
+    }
 
-CONFLICT RESOLUTION RULES:
-- You have FULL creative control to adjust timestamps, modify transitions, or rewrite text to ensure the video flows perfectly.
-- A scene/chunk (`trigger_id`) CAN contain multiple visual beats (e.g., a character reacting, followed by a motion graphic).
-- However, if multiple distinct visual assets (e.g., B-roll and Motion Graphics) are scheduled to appear at the EXACT SAME timestamp, you MUST resolve the conflict intelligently.
-- Look at the transcript script for that chunk. If the script is highly visual and describes a real-world concept better suited for footage, keep the 'b_roll'.
-- If the script highlights a specific statistic, quote, or textual point, keep the 'motion_graphics'.
-- Ensure visual continuity. Do not arbitrarily cut if the visual still supports the dialogue.
-- Allow complex visual beats within scenes. A 7-second scene could contain several coordinated animation events or text changes if the dialogue contains distinct ideas.
+    # Order of plan inspection: Motion Graphics first, then B-roll, then Character
+    for plan in [mg_plan, broll_plan, char_plan]:
+        if not plan or not getattr(plan, "edits", None):
+            continue
 
-OUTPUT FORMAT:
-Output ONLY a valid JSON object containing the finalized, merged "edits" array. Ensure the JSON is properly closed and formatted.
-"""
+        for edit in plan.edits:
+            # Ensure edit is an EditDecision object
+            if isinstance(edit, dict):
+                clean_dict = {k: v for k, v in edit.items() if not k.startswith("_")}
+                edit_obj = EditDecision(**clean_dict)
+            else:
+                edit_obj = edit
 
-    user_prompt = f"""--- UNIFIED ANALYSIS (Transcript & Context) ---
-{unified_analysis_json}
+            action = getattr(edit_obj, "action", "")
+            tid = getattr(edit_obj, "trigger_id", "") or ""
 
---- B-ROLL PLAN ---
-{broll_plan.model_dump_json(indent=2)}
+            # Passthrough actions that never conflict as background visuals
+            if action in ("character", "sfx", "zoom_in", "cut") or not tid:
+                all_edits.append(edit_obj)
+                continue
 
---- MOTION GRAPHICS PLAN ---
-{mg_plan.model_dump_json(indent=2)}
+            # Visual overlay conflict resolution on identical trigger_id
+            if tid in seen_triggers:
+                existing_edit = seen_triggers[tid]
+                existing_priority = PRIORITY.get(getattr(existing_edit, "action", ""), 0)
+                new_priority = PRIORITY.get(action, 0)
 
---- 2D CHARACTER PLAN ---
-{char_plan.model_dump_json(indent=2)}
+                if new_priority > existing_priority:
+                    # Replace existing with higher-priority edit
+                    all_edits = [e for e in all_edits if e is not existing_edit]
+                    seen_triggers[tid] = edit_obj
+                    all_edits.append(edit_obj)
+                # else: keep existing higher-priority edit, skip this one
+            else:
+                seen_triggers[tid] = edit_obj
+                all_edits.append(edit_obj)
 
-Please merge these plans, resolving conflicts based on the script, and output the final JSON EditList.
-"""
+    # Sort all edits chronologically by start time (treat None as 0.0)
+    all_edits.sort(key=lambda e: (e.start if e.start is not None else 0.0))
 
-    print(f"\n[RESOLVER: STARTING CONFLICT RESOLUTION]")
-    print(f" -> Received B-Roll Plan: {len(broll_plan.edits)} events")
-    print(f" -> Received Motion Graphics Plan: {len(mg_plan.edits)} events")
-    print(f" -> Received Character Plan: {len(char_plan.edits)} events")
-    print(f" -> Master LLM ({ai_model_pref}) is now analyzing the script to merge, resolve overlapping timestamps, and optimize quality...")
+    broll_count = sum(1 for e in all_edits if e.action == "b_roll")
+    mg_count = sum(1 for e in all_edits if e.action == "motion_graphics")
+    char_count = sum(1 for e in all_edits if e.action == "character")
+    cut_count = sum(1 for e in all_edits if e.action == "cut")
+    zoom_count = sum(1 for e in all_edits if e.action == "zoom_in")
 
-    final_plan = _call_llm(system_prompt, user_prompt, ai_model_pref)
-    
-    print(f"\n[RESOLVER: FINALIZED MASTER BLUEPRINT]")
-    print(f" -> Final merged events: {len(final_plan.edits)}")
-    print(f" -> The conflict resolver successfully prioritized actions based on transcript context.")
-    return final_plan
+    print(f"\n[RESOLVER: DETERMINISTIC] Merged {len(all_edits)} edits without LLM:")
+    print(f" -> B-Roll: {broll_count} | MG: {mg_count} | Char: {char_count} | Zoom: {zoom_count} | Cut: {cut_count}")
+
+    return EditList(edits=all_edits)

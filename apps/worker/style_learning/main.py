@@ -84,60 +84,69 @@ def process_video(video_url, max_seconds, yes_flag):
     os.makedirs(output_dir, exist_ok=True)
     
     start_time = time.time()
+    print(f"[*] Analyzing YouTube video: {video_url}")
+    video_path, audio_path, video_title = download_video(video_url, output_dir)
+    print(f"[*] Title: '{video_title}'")
     
-    trap = io.StringIO()
-    with redirect_stdout(trap):
-        video_path, audio_path, video_title = download_video(video_url, output_dir)
-        timing = extract_timing(video_path)
-        duration = timing["duration"]
-        if max_seconds and duration > max_seconds: duration = max_seconds
-        
-        from services.transcriber import get_whisper_model
-        model = get_whisper_model(model_size="small")
-        segments, _ = model.transcribe(audio_path, word_timestamps=True)
-        
-        words_for_beat = []
-        for segment in segments:
-            for w in segment.words:
-                if max_seconds and w.end > max_seconds: continue
-                words_for_beat.append({"word": w.word, "start": w.start, "end": w.end})
-        transcript = " ".join([w["word"] for w in words_for_beat])
-        
-        beat_sheet = {}
-        if words_for_beat:
-            try:
-                beat_sheet_obj = analyze_script(words_for_beat, transcript)
-                beat_sheet = beat_sheet_obj.model_dump()
-            except Exception as e:
-                pass
-                
-        color = extract_color(video_path)
-        
-        cut_times = [c for c in timing["cut_times"] if c <= duration]
-        interval_times = [float(i) for i in range(0, int(duration), 2)]
-        sample_times = sorted(list(set([round(c, 1) for c in cut_times] + interval_times)))
-        
-        cap = cv2.VideoCapture(video_path)
-        frames_dir = os.path.join(output_dir, "frames")
-        os.makedirs(frames_dir, exist_ok=True)
-        
-        raw_sampled_files = []
-        for t in sample_times:
-            cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
-            ret, frame = cap.read()
-            if ret:
-                frame_path = os.path.join(frames_dir, f"frame_{t:.1f}.jpg")
-                cv2.imwrite(frame_path, frame)
-                raw_sampled_files.append((t, frame_path))
-        cap.release()
-        
-        sampled_files = drop_duplicates(raw_sampled_files)
-        
-        if len(sampled_files) > MAX_FRAMES:
-            sampled_files = sampled_files[:MAX_FRAMES]
+    print(f"[*] Step 1/6: Timing & Scene detection (up to {max_seconds or 'all'}s)...")
+    timing = extract_timing(video_path, max_seconds=max_seconds)
+    duration = timing["duration"]
+    if max_seconds and duration > max_seconds: duration = max_seconds
+    
+    print(f"[*] Step 2/6: Audio transcription with Faster-Whisper...")
+    from services.transcriber import get_whisper_model
+    model = get_whisper_model(model_size="small")
+    segments, _ = model.transcribe(audio_path, word_timestamps=True)
+    
+    words_for_beat = []
+    for segment in segments:
+        if max_seconds and segment.start > max_seconds:
+            break
+        for w in segment.words:
+            if max_seconds and w.end > max_seconds:
+                break
+            words_for_beat.append({"word": w.word, "start": w.start, "end": w.end})
+    transcript = " ".join([w["word"] for w in words_for_beat])
+    print(f"[*] Transcribed {len(words_for_beat)} words.")
+    
+    print(f"[*] Step 3/6: Script beat sheet analysis...")
+    beat_sheet = {}
+    if words_for_beat:
+        try:
+            beat_sheet_obj = analyze_script(words_for_beat, transcript)
+            beat_sheet = beat_sheet_obj.model_dump()
+        except Exception as e:
+            print(f"[!] Beat analysis note: {e}")
             
-        total_tokens_in, total_tokens_out, est_cost = estimate_cost(len(sampled_files))
+    print(f"[*] Step 4/6: Color palette and theme extraction...")
+    color = extract_color(video_path, max_seconds=max_seconds)
+    
+    print(f"[*] Step 5/6: Frame sampling and deduplication...")
+    cut_times = [c for c in timing["cut_times"] if c <= duration]
+    interval_times = [float(i) for i in range(0, int(duration), 2)]
+    sample_times = sorted(list(set([round(c, 1) for c in cut_times] + interval_times)))
+    
+    cap = cv2.VideoCapture(video_path)
+    frames_dir = os.path.join(output_dir, "frames")
+    os.makedirs(frames_dir, exist_ok=True)
+    
+    raw_sampled_files = []
+    for t in sample_times:
+        cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
+        ret, frame = cap.read()
+        if ret:
+            frame_path = os.path.join(frames_dir, f"frame_{t:.1f}.jpg")
+            cv2.imwrite(frame_path, frame)
+            raw_sampled_files.append((t, frame_path))
+    cap.release()
+    
+    sampled_files = drop_duplicates(raw_sampled_files)
+    if len(sampled_files) > MAX_FRAMES:
+        sampled_files = sampled_files[:MAX_FRAMES]
         
+    print(f"[*] Extracted {len(sampled_files)} unique visual frames.")
+    total_tokens_in, total_tokens_out, est_cost = estimate_cost(len(sampled_files))
+    
     # Ask for confirmation if --yes not provided
     if not yes_flag:
         print(f"Video Title: {video_title}")
@@ -146,62 +155,63 @@ def process_video(video_url, max_seconds, yes_flag):
         print("\n[!] Please run with --yes to proceed with vision API calls.")
         sys.exit(0)
 
-    # Proceed with vision inside trap to hide prints unless there's an error
+    print(f"[*] Step 6/6: Vision analysis on {len(sampled_files)} frames...")
     vision_start_time = time.time()
     visual_events = []
     failures = 0
     repairs = 0
     cache_file = os.path.join(output_dir, "vision_cache.json")
     
-    with redirect_stdout(trap):
-        for t, frame_path in sampled_files:
-            context_words = [w["word"] for w in words_for_beat if abs((w["start"]+w["end"])/2 - t) < 5.0]
-            text_context = " ".join(context_words)
-            
-            event = call_vision(frame_path, text_context, cache_file)
-            if event:
-                event["timestamp"] = t
-                event["_text_context"] = text_context
-                visual_events.append(event)
-                if event.get("status") == "failed":
-                    failures += 1
-                if event.get("_repaired"):
-                    repairs += 1
-                    
-        vision_end_time = time.time()
+    for idx, (t, frame_path) in enumerate(sampled_files):
+        context_words = [w["word"] for w in words_for_beat if abs((w["start"]+w["end"])/2 - t) < 5.0]
+        text_context = " ".join(context_words)
         
-        sound = extract_sound(audio_path, cut_times)
-        
-        # Summary block
-        summary = {
+        event = call_vision(frame_path, text_context, cache_file)
+        if event:
+            event["timestamp"] = t
+            event["_text_context"] = text_context
+            visual_events.append(event)
+            ev_type = event.get("what", {}).get("type", "unknown")
+            print(f"    [{idx+1}/{len(sampled_files)}] Frame @ {t:.1f}s -> {ev_type}")
+            if event.get("status") == "failed":
+                failures += 1
+            if event.get("_repaired"):
+                repairs += 1
+                
+    vision_end_time = time.time()
+    print(f"[*] Extracting sound and SFX...")
+    sound = extract_sound(audio_path, cut_times, max_seconds=max_seconds)
+    
+    # Summary block
+    summary = {
+        "title": video_title,
+        "duration": duration,
+        "sfx_per_minute": sound["sfx_per_minute"],
+        "cuts_per_minute": timing["cuts_per_minute"],
+        "theme": color["brightness_summary"],
+        "top_templates": []
+    }
+    
+    analysis = {
+        "metadata": {
             "title": video_title,
             "duration": duration,
-            "sfx_per_minute": sound["sfx_per_minute"],
-            "cuts_per_minute": timing["cuts_per_minute"],
-            "theme": color["brightness_summary"],
-            "top_templates": [] # Could aggregate here
-        }
+            "url": video_url
+        },
+        "timing": timing,
+        "beat_sheet": beat_sheet,
+        "color": color,
+        "sound": sound,
+        "visual_events": visual_events,
+        "summary": summary
+    }
+    
+    out_path = os.path.join(output_dir, "analysis.json")
+    with open(out_path, "w") as f:
+        json.dump(analysis, f, indent=2)
         
-        analysis = {
-            "metadata": {
-                "title": video_title,
-                "duration": duration,
-                "url": video_url
-            },
-            "timing": timing,
-            "beat_sheet": beat_sheet,
-            "color": color,
-            "sound": sound,
-            "visual_events": visual_events,
-            "summary": summary
-        }
-        
-        out_path = os.path.join(output_dir, "analysis.json")
-        with open(out_path, "w") as f:
-            json.dump(analysis, f, indent=2)
-            
-        generate_contact_sheet(sampled_files, os.path.join(output_dir, "contact_sheet.png"))
-        generate_review_html(visual_events, os.path.join(output_dir, "review.html"))
+    generate_contact_sheet(sampled_files, os.path.join(output_dir, "contact_sheet.png"))
+    generate_review_html(visual_events, os.path.join(output_dir, "review.html"))
         
     end_time = time.time()
     
@@ -228,6 +238,16 @@ def process_video(video_url, max_seconds, yes_flag):
     print(f"Total Cost: ${est_cost:.4f}")
     print(f"\n--- Summary Block ---")
     print(json.dumps(summary, indent=2))
+
+    try:
+        from style_learning.aggregate import main as aggregate_main
+        print(f"\n[*] Generating editorial_logic.json via aggregate.py...")
+        aggregate_main(video_id)
+        from style_learning.generate_profile import main as profile_main
+        print(f"\n[*] Generating Master Markdown Style Profile...")
+        profile_main("warikoo_finance", [video_id])
+    except Exception as agg_err:
+        print(f"[!] Aggregation note: {agg_err}")
 
 if __name__ == "__main__":
     env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"))

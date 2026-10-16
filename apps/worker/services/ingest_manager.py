@@ -27,6 +27,24 @@ def stage_raw_video(job_source_url: str, raw_video_path: str, temp_dir: str):
             staged = True
             log_success(f"Staged uploaded video from local storage: {local_raw} ({os.path.getsize(local_raw)} bytes)")
 
+    # 2.5 Check if it's a Cloudflare R2 / AWS S3 cloud URL
+    if not staged and ("amazonaws.com" in job_source_url or "cloudflarestorage.com" in job_source_url):
+        try:
+            from services.publisher import get_s3_client
+            from config import get_worker_settings
+            settings = get_worker_settings()
+            s3 = get_s3_client()
+            if s3 and settings.R2_BUCKET_NAME:
+                bucket = settings.R2_BUCKET_NAME
+                key = job_source_url.split(f"{bucket}/")[-1]
+                log_info(f"Downloading video from S3 bucket '{bucket}', key '{key}'...")
+                s3.download_file(bucket, key, raw_video_path)
+                if os.path.exists(raw_video_path) and os.path.getsize(raw_video_path) > 1024:
+                    staged = True
+                    log_success(f"Downloaded video from S3 directly: {os.path.getsize(raw_video_path)} bytes")
+        except Exception as s3_err:
+            log_warning(f"Direct S3 client download failed, falling back to HTTP: {s3_err}")
+
     # 3. HTTP Streaming Download
     if not staged and (job_source_url.startswith("http://") or job_source_url.startswith("https://")):
         log_info(f"Streaming video bytes from HTTP endpoint...")

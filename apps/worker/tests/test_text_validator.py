@@ -58,7 +58,8 @@ def test_text_validator(monkeypatch):
     monkeypatch.setattr("services.motion_graphic_planner._call_llm", mock_llm_bad)
     
     import json
-    res = plan_motion_graphics(json.dumps({"beat_sheet": beat_sheet}), "mock_model")
+    with pytest.raises(RuntimeError):
+        plan_motion_graphics(json.dumps({"beat_sheet": beat_sheet}), "mock_model")
     # Should fail and retry max_retries (3) times
     assert len(calls) == 3
 
@@ -84,7 +85,8 @@ def test_number_validator(monkeypatch):
     
     monkeypatch.setattr("services.motion_graphic_planner._call_llm", mock_llm_bad)
     import json
-    plan_motion_graphics(json.dumps({"beat_sheet": beat_sheet}), "mock_model")
+    with pytest.raises(RuntimeError):
+        plan_motion_graphics(json.dumps({"beat_sheet": beat_sheet}), "mock_model")
     assert len(calls) == 3
     
     # Good case: beat 2 with chart_reveal and matching digits

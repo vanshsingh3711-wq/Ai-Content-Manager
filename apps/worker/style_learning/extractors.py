@@ -6,7 +6,7 @@ import json
 from scenedetect import detect, ContentDetector
 from sklearn.cluster import MiniBatchKMeans
 
-def extract_timing(video_path):
+def extract_timing(video_path, max_seconds=None):
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -15,7 +15,9 @@ def extract_timing(video_path):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     cap.release()
 
-    scene_list = detect(video_path, ContentDetector())
+    effective_duration = min(duration, max_seconds) if max_seconds else duration
+    end_time = effective_duration if max_seconds and max_seconds < duration else None
+    scene_list = detect(video_path, ContentDetector(), end_time=end_time)
     
     # scene_list is a list of tuples (start_time, end_time)
     cut_times = [scene[0].get_seconds() for scene in scene_list]
@@ -42,16 +44,19 @@ def extract_timing(video_path):
         "first_visual_change_time": cut_times[1] if len(cut_times) > 1 else duration
     }
 
-def extract_color(video_path):
+def extract_color(video_path, max_seconds=None):
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps <= 0: fps = 30
     
+    max_frames = int(fps * max_seconds) if max_seconds else None
     pixels = []
     frame_idx = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
+            break
+        if max_frames and frame_idx > max_frames:
             break
         if frame_idx % int(fps * 2) == 0:
             frame = cv2.resize(frame, (64, 64))
@@ -88,8 +93,8 @@ def extract_color(video_path):
         "brightness_summary": theme
     }
 
-def extract_sound(audio_path, cut_times):
-    y, sr = librosa.load(audio_path, sr=16000)
+def extract_sound(audio_path, cut_times, max_seconds=None):
+    y, sr = librosa.load(audio_path, sr=16000, duration=max_seconds)
     
     # 1. SFX Classification (Phase 2A)
     onset_frames = librosa.onset.onset_detect(y=y, sr=sr)

@@ -129,8 +129,9 @@ class TestBrollValidation:
         assert len(validated) == 0
         assert report.rejected_count == 1
 
-    def test_excessive_broll_count_rejected(self):
+    def test_excessive_broll_count_rejected(self, monkeypatch):
         """Only MAX_BROLL_COUNT B-rolls should be accepted."""
+        monkeypatch.setattr(EditingConfig, "MAX_BROLL_COUNT", 3)
         edits = [
             make_edit("ID_01", "b_roll", search_query="a", reason="reason a"),
             make_edit("ID_03", "b_roll", search_query="b", reason="reason b"),

@@ -1,7 +1,6 @@
 from services.ai_director import EditList, _call_llm, _wait_for_internet_retry, _load_style_profile
 
-# Single source of truth — must match draw functions in render_canvas.js.
-# Any template not in this set will cause render_canvas.js to exit 1.
+# Single source of truth — must match Remotion compositions
 ALLOWED_TEMPLATES = {
     "hero_reveal",
     "step_sequence",
@@ -9,11 +8,20 @@ ALLOWED_TEMPLATES = {
     "before_after",
     "metric_reveal",
     "chart_reveal",
-    "keyword_emphasis",
-    "cta_reveal",
     "icon_reveal",
-    "media_reveal",
     "code_reveal",
+    "browser_walkthrough",
+    "vscode_code_typing",
+    "stat_card_highlight",
+    "kinetic_text",
+}
+
+# These are Remotion compositions
+REMOTION_ONLY_TEMPLATES = {
+    "browser_walkthrough",
+    "vscode_code_typing",
+    "stat_card_highlight",
+    "kinetic_text",
 }
 
 def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:
@@ -31,17 +39,22 @@ RULES:
 3. For beat_6 specifically, you MUST use the "quote_reveal" template (as a key-phrase card). Do NOT use "before_after" for beat_6.
 4. 'motion_graphics': Use for important statistics, trends, quotes, or steps. Provide 'trigger_id', 'motion_graphics_type', 'motion_graphics_targets', 'motion_graphics_personality', and 'reason'.
 3. For 'motion_graphics_type', pick ONLY from this exact list (no other values are accepted):
-   - "hero_reveal"      (targets: 'label', 'headline', 'supporting')
-   - "step_sequence"    (targets: 'title', 'step1', 'step2', 'step3')
-   - "quote_reveal"     (targets: 'quote', 'author')
-   - "before_after"     (targets: 'beforeLabel', 'before', 'afterLabel', 'after')
-   - "metric_reveal"    (targets: 'label', 'metric', 'delta')
-   - "chart_reveal"     (targets: 'title', 'dataPoint1', 'dataPoint2')
-   - "keyword_emphasis" (targets: 'text', 'highlight')
-   - "cta_reveal"       (targets: 'callToAction', 'website')
-   - "icon_reveal"      (targets: 'concept', 'label')
-   - "media_reveal"     (targets: 'caption')
-   - "code_reveal"      (targets: 'language', 'code')
+   - "hero_reveal"          (targets: 'label', 'headline', 'supporting')
+   - "step_sequence"        (targets: 'title', 'step1', 'step2', 'step3')
+   - "quote_reveal"         (targets: 'quote', 'author')
+   - "before_after"         (targets: 'beforeLabel', 'before', 'afterLabel', 'after')
+   - "metric_reveal"        (targets: 'label', 'metric', 'delta')
+   - "chart_reveal"         (targets: 'title', 'dataPoint1', 'dataPoint2')
+   - "icon_reveal"          (targets: 'concept', 'label')
+   - "code_reveal"          (targets: 'language', 'code')
+   - "browser_walkthrough"  (targets: 'url', 'tabTitle', 'highlightText')
+   - "vscode_code_typing"   (targets: 'title', 'activeFile', 'code', 'language')
+   - "stat_card_highlight"  (targets: 'label', 'stat', 'delta')
+   - "kinetic_text"         (targets: 'text')
+     * Use "kinetic_text" for punchy single-line statements, hooks, or quick emphasis.
+     * Use "browser_walkthrough" when discussing websites, SaaS products, pricing, or web documentation.
+     * Use "vscode_code_typing" when explaining terminal commands, code snippets, config files, or scripts.
+     * Use "stat_card_highlight" or "metric_reveal" for financial, growth, or key performance figures.
      * ONLY use before_after when the beat explicitly contrasts two named things (e.g. 'X vs Y', 'A but B').
      * Do NOT use it for generic explanations; prefer hero_reveal or quote_reveal instead.
 4. For 'motion_graphics_personality', pick one of: ["premium", "energetic", "technical"].
@@ -53,7 +66,7 @@ OUTPUT SCHEMA (JSON):
   "edits": [
     {{
       "action": "motion_graphics",
-      "trigger_id": "beat_1",
+      "trigger_id": "ID_01 (Required: Use the exact chunk ID from the transcript)",
       "start": 0.0,
       "end": 3.75,
       "motion_graphics_type": "metric_reveal",
@@ -79,7 +92,7 @@ OUTPUT SCHEMA (JSON):
 You have been provided with a pre-computed Beat Sheet in the Context. This is your absolute SOURCE OF TRUTH.
 1. TIMING: You must ONLY generate 'motion_graphics' edits that perfectly align with the exact start and end times of the provided beats. Do not invent your own pacing.
 2. TREATMENT ASSIGNMENT: You must ONLY generate 'motion_graphics' edits for beats that have `"treatment": "motion_graphic"` OR `"treatment": "kinetic_text"`. 
-   - If treatment is "kinetic_text", you MUST map it to the simplest text template available (e.g., "quote_reveal") with no complex media.
+   - If treatment is "kinetic_text", you MUST use the "kinetic_text" template with targets: 'text'.
    - DO NOT generate motion graphics for beats with any other treatment (like b_roll) or 'none'.
 3. ROLE MAPPING: Use the beat's 'role' to guide the type of motion graphic.
    - 'list' or 'process' roles MUST map to 'step_sequence' and include all items.
@@ -87,7 +100,8 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
    - 'statistic' roles MUST map to 'metric_reveal'.
 4. NUMBERS: You MUST NOT use 'chart_reveal', 'metric_reveal', or 'animated_counter' unless the beat text actually contains real numbers.
 5. EMPHASIS & CONTENT: You MUST populate the targets (like 'headline', 'quote', 'label') with the exact 'focus_phrase' or 'text' from the beat. Do NOT use placeholder text or invent your own words.
-6. You MUST NOT generate motion graphics that violate these rules. The beat sheet is the master timeline.
+6. TRIGGER ID: You must use the beat's ID formatted as 'beat_1', 'beat_2', etc. as the trigger_id instead of the transcript chunk IDs.
+7. You MUST NOT generate motion graphics that violate these rules. The beat sheet is the master timeline.
 """
     except Exception:
         pass
@@ -178,7 +192,9 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
             print(f"[MOTION GRAPHICS PLANNER] Validation errors on attempt {attempt+1}:\n" + "\n".join(errors))
             if attempt < max_retries - 1:
                 system_prompt += "\n\nERROR ON PREVIOUS ATTEMPT:\n" + "\n".join(errors) + "\nYou MUST fix this. Use ONLY exact words from the beat text."
-            continue
+                continue
+            else:
+                raise RuntimeError(f"Motion graphics validation failed:\n" + "\n".join(errors))
         break
 
     try:

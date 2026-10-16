@@ -53,6 +53,7 @@ media_temp/
 *.mkv
 *.mp3
 *.ass
+!apps/web/public/assets/audio/*
 
 # Editor & OS
 .DS_Store

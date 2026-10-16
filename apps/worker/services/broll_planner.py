@@ -23,7 +23,7 @@ OUTPUT SCHEMA (JSON):
   "edits": [
     {{
       "action": "cut | b_roll",
-      "trigger_id": "beat_1 (Required for b_roll)",
+      "trigger_id": "ID_01 (Required: Use the exact chunk ID from the transcript)",
       "start": 0.0, "end": 3.75,
       "search_query": "B-roll keywords",
       "transition": "fade",
@@ -44,7 +44,8 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
 2. TREATMENT ASSIGNMENT: You must ONLY generate 'b_roll' edits for beats that have `"treatment": "b_roll"`. DO NOT generate b-roll for beats with any other treatment (like motion_graphic or kinetic_text), or 'none'.
 3. ROLE: Use the beat's 'role' (e.g. hook, transition, example) to guide the mood of the B-roll.
 4. EMPHASIS: Use the 'emphasis_words' from the beat to drive on-screen highlights if needed.
-5. You MUST NOT generate B-roll that violates these rules. The beat sheet is the master timeline.
+5. TRIGGER ID: You must use the beat's ID formatted as 'beat_1', 'beat_2', etc. as the trigger_id instead of the transcript chunk IDs.
+6. You MUST NOT generate B-roll that violates these rules. The beat sheet is the master timeline.
 """
     except Exception:
         pass

@@ -14,20 +14,21 @@ class EditingConfig:
 
     # ── B-roll Guardrails ──────────────────────────────────────────────
     # Maximum number of B-roll events allowed in a single video
-    MAX_BROLL_COUNT: int = 3
+    MAX_BROLL_COUNT: int = 10           # Default for talking head
+    MAX_BROLL_COUNT_FACELESS: int = 20  # Faceless videos need B-roll as primary visual
 
     # Maximum total B-roll duration as a fraction of final video duration
-    # 0.40 = B-roll can occupy at most 40% of the final video
-    MAX_BROLL_DURATION_RATIO: float = 0.40
+    # 0.50 = B-roll can occupy at most 50% of the final video
+    MAX_BROLL_DURATION_RATIO: float = 0.50
 
     # Minimum duration for a single B-roll clip (seconds)
-    MIN_BROLL_DURATION_SEC: float = 2.5
+    MIN_BROLL_DURATION_SEC: float = 2.0
 
     # Maximum duration for a single B-roll clip (seconds)
-    MAX_BROLL_DURATION_SEC: float = 6.0
+    MAX_BROLL_DURATION_SEC: float = 8.0
 
     # Minimum spacing between consecutive B-roll events (seconds)
-    MIN_BROLL_SPACING_SEC: float = 5.0
+    MIN_BROLL_SPACING_SEC: float = 2.5
 
     # Whether every B-roll decision must include a reason/justification
     BROLL_REASON_REQUIRED: bool = True

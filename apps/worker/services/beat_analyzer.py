@@ -174,7 +174,7 @@ def auto_repair_llm_beat_sheet(llm_beat_sheet: LLMBeatSheet, words: List[Dict[st
 
     return llm_beat_sheet
 
-def analyze_script(transcript_words: List[Dict[str, Any]], script_text: str, max_retries: int = 2) -> BeatSheet:
+def analyze_script(transcript_words: List[Dict[str, Any]], script_text: str, max_retries: int = 2, ai_model_pref: str = "deepseek-reasoner") -> BeatSheet:
     system_prompt = """You are a master video editor breaking down a script into a 'Beat Sheet'.
 A beat is a distinct idea or logical segment, typically covering 3-10 seconds of speech. Merge very short sentences; split only if a sentence carries two distinct ideas.
 
@@ -269,7 +269,7 @@ FEW-SHOT EXAMPLES:
                 logger.warning(f"[BeatAnalyzer Schema Retry {attempt}/{max_retries}] Fixing errors:\n{error_feedback}")
                 current_user_prompt += f"\n\nYOUR PREVIOUS OUTPUT HAD THESE ERRORS. FIX THEM:\n{error_feedback}"
                 
-            response_str = _call_llm(system_prompt, current_user_prompt, raw_output=True)
+            response_str = _call_llm(system_prompt, current_user_prompt, ai_model_pref=ai_model_pref, raw_output=True)
             data = json.loads(response_str)
             llm_beat_sheet = LLMBeatSheet.model_validate(data)
             
@@ -449,15 +449,41 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
         chosen = candidates[0]
         
         from services.ai_director import EditDecision
-        # Use simplest option: hero_reveal
-        print(f"[{planner_name}] GAP PROMOTION: Promoting beat {chosen['id']} inside gap ({gap_start:.1f}-{gap_end:.1f}) using simplest option 'hero_reveal'")
+
+        # Choose template and build correct targets based on the beat's role
+        role = chosen.get("role", "").lower()
+        focus = chosen.get("focus_phrase") or chosen["text"]
+
+        if role in ("hook", "reveal", "punchline", "emotional"):
+            mg_type = "kinetic_text"
+            mg_targets = {"text": focus[:80]}
+        elif role in ("statistic", "data", "metric", "kpi"):
+            mg_type = "metric_reveal"
+            mg_targets = {
+                "label":  chosen.get("focus_phrase", "KEY STAT")[:30].upper(),
+                "metric": focus[:25],
+                "delta":  "",
+            }
+        else:
+            # Default: hero_reveal with correct required keys
+            mg_type = "hero_reveal"
+            mg_targets = {
+                "label":      role.upper() if role else "INSIGHT",
+                "headline":   focus[:55],
+                "supporting": chosen["text"][:90],
+            }
+
+        print(f"[{planner_name}] GAP PROMOTION: beat {chosen['id']} ({gap_start:.1f}–{gap_end:.1f}) → {mg_type!r}")
+        is_mg = (planner_name == "MOTION GRAPHICS PLANNER")
         new_edit = EditDecision(
-            action="motion_graphics" if planner_name == "MOTION GRAPHICS PLANNER" else "broll",
+            action="motion_graphics" if is_mg else "b_roll",
             trigger_id=f"beat_{chosen['id']}",
             start=chosen["start"],
             end=chosen["end"],
-            motion_graphics_type="hero_reveal",
-            motion_graphics_targets={"text": chosen["text"][:30]}
+            motion_graphics_type=mg_type if is_mg else None,
+            motion_graphics_targets=mg_targets if is_mg else None,
+            search_query=None if is_mg else (chosen.get("focus_phrase") or chosen.get("text", "cinematic footage")[:40]),
+            reason=f"Gap promotion for beat {chosen['id']}",
         )
         
         _apply_window_logic(new_edit, chosen, getattr(new_edit, "action"))
@@ -505,4 +531,5 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
         print(f" - {ge - gs:.2f}s ({gs:.2f} to {ge:.2f})")
     
     print(f"[{planner_name} STATS] Pre-enforcement returned: {total_proposed} overlays. Dropped: {dropped}. Snapped: {snapped_count}. Post-enforcement: {len(overlays)}.")
+    valid_edits.sort(key=lambda e: e.start)
     return valid_edits

@@ -10,8 +10,9 @@
   "scripts": {
     "dev": "npm run dev --workspace=@ai-content-manager/web",
     "dev:web": "npm run dev --workspace=@ai-content-manager/web",
-    "dev:api": "cd apps/api && python -m uvicorn main:app --reload --port 8000",
-    "dev:worker": "cd apps/worker && nice -n 10 python -m celery -A celery_app.celery_app worker --loglevel=info --concurrency=1 -E",
+    "dev:api": "cd apps/api && (../../.venv/bin/python -m uvicorn main:app --reload --port 8000 || python3 -m uvicorn main:app --reload --port 8000 || python -m uvicorn main:app --reload --port 8000)",
+    "dev:worker": "cd apps/worker && (nice -n 10 ../../.venv/bin/python -m celery -A celery_app.celery_app worker --loglevel=info --concurrency=1 -E || nice -n 10 python3 -m celery -A celery_app.celery_app worker --loglevel=info --concurrency=1 -E || nice -n 10 python -m celery -A celery_app.celery_app worker --loglevel=info --concurrency=1 -E)",
+    "remotion:studio": "npm run studio --workspace=@ai-content-manager/motion-components",
     "build": "npm run build --workspace=@ai-content-manager/web",
     "lint": "npm run lint --workspace=@ai-content-manager/web"
   },

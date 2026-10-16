@@ -37,6 +37,7 @@ def validate_blueprint(
     timestamp_map: Dict[str, Any],
     video_duration: float,
     config: Optional[Any] = None,
+    is_faceless: bool = False,
 ) -> Tuple[List[Dict[str, Any]], ValidationReport]:
     """
     Validates and filters AI-generated editing decisions.
@@ -46,12 +47,14 @@ def validate_blueprint(
         timestamp_map: Mapping of chunk IDs to {start, end, text, words}.
         video_duration: Total duration of the original video in seconds.
         config: Optional EditingConfig override (uses EDITING_CONFIG singleton by default).
+        is_faceless: True if the video is faceless (allows higher B-roll budgets).
 
     Returns:
         Tuple of (validated_edits, validation_report).
         validated_edits contains only the edits that passed validation.
     """
     cfg = config or EDITING_CONFIG
+    max_broll_count = getattr(cfg, "MAX_BROLL_COUNT_FACELESS", 20) if is_faceless else cfg.MAX_BROLL_COUNT
     report = ValidationReport(original_count=len(edits))
 
     # Calculate B-roll budget
@@ -192,11 +195,11 @@ def validate_blueprint(
 
             # 2. Count limit
             broll_count_so_far = len([e for e in validated if e.get("action") == "b_roll"])
-            if broll_count_so_far >= cfg.MAX_BROLL_COUNT:
+            if broll_count_so_far >= max_broll_count:
                 report.issues.append(ValidationIssue(
                     trigger_id=trigger_id,
                     action=action,
-                    issue=f"B-roll count limit reached ({cfg.MAX_BROLL_COUNT})",
+                    issue=f"B-roll count limit reached ({max_broll_count})",
                 ))
                 report.rejected_count += 1
                 continue
@@ -278,8 +281,77 @@ def validate_blueprint(
             report.accepted_count += 1
             continue
 
-        # ── zoom_in / sfx / character / motion_graphics — lightweight validation ────────────────────
-        if action in ("zoom_in", "sfx", "character", "motion_graphics"):
+        # ── zoom_in / sfx / character — lightweight validation ────────────────────
+        if action in ("zoom_in", "sfx", "character"):
+            validated.append(edit)
+            report.accepted_count += 1
+            continue
+
+        # ── motion_graphics — validate template + required keys ───────
+        if action == "motion_graphics":
+            from services.motion_graphic_planner import ALLOWED_TEMPLATES
+
+            TEMPLATE_REQUIRED_KEYS = {
+                "hero_reveal":         {"label", "headline", "supporting"},
+                "metric_reveal":       {"label", "metric"},
+                "quote_reveal":        {"quote"},
+                "step_sequence":       {"title", "step1", "step2"},
+                "before_after":        {"beforeLabel", "before", "afterLabel", "after"},
+                "chart_reveal":        {"title", "dataPoint1"},
+                "icon_reveal":         {"concept", "label"},
+                "code_reveal":         {"code"},
+                "stat_card_highlight": {"label", "stat"},
+                "browser_walkthrough": {"url", "tabTitle"},
+                "vscode_code_typing":  {"title", "activeFile", "code"},
+                "kinetic_text":        {"text"},
+            }
+
+            KEY_DEFAULTS = {
+                "beforeLabel": "BEFORE",
+                "afterLabel": "AFTER",
+                "delta": "",
+                "author": "",
+                "language": "python",
+                "url": "https://example.com",
+                "tabTitle": "Overview",
+                "title": "KEY TAKEAWAY",
+                "label": "KEY INSIGHT",
+                "concept": "💡",
+                "activeFile": "main.py",
+            }
+
+            mg_type = edit.get("motion_graphics_type", "")
+            if mg_type not in ALLOWED_TEMPLATES:
+                # Auto-correct to hero_reveal rather than reject
+                edit["motion_graphics_type"] = "hero_reveal"
+                report.issues.append(ValidationIssue(
+                    trigger_id=trigger_id,
+                    action=action,
+                    issue=f"Unknown template '{mg_type}' → corrected to hero_reveal",
+                    severity="modified",
+                ))
+                report.modified_count += 1
+
+            targets = edit.get("motion_graphics_targets") or {}
+            required = TEMPLATE_REQUIRED_KEYS.get(edit.get("motion_graphics_type", ""), set())
+            missing = required - set(targets.keys())
+            if missing:
+                # Fill in missing keys with sensible defaults from motion_graphics_text, reason, or semantic defaults
+                fallback_text = edit.get("motion_graphics_text") or edit.get("reason", "")
+                for key in missing:
+                    if key in KEY_DEFAULTS:
+                        targets[key] = KEY_DEFAULTS[key]
+                    else:
+                        targets[key] = fallback_text[:60] if fallback_text else "..."
+                edit["motion_graphics_targets"] = targets
+                report.issues.append(ValidationIssue(
+                    trigger_id=trigger_id,
+                    action=action,
+                    issue=f"Missing keys {missing} for {edit.get('motion_graphics_type')} filled with fallbacks",
+                    severity="modified",
+                ))
+                report.modified_count += 1
+
             validated.append(edit)
             report.accepted_count += 1
             continue

@@ -5,16 +5,20 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "start": "remotion studio src/index.ts",
-    "build": "remotion render src/index.ts",
+    "start": "remotion studio src/remotion/index.ts",
+    "studio": "remotion studio src/remotion/index.ts",
+    "build": "remotion render src/remotion/index.ts",
     "test": "vitest run"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",
+    "@remotion/cli": "^4.0.535",
+    "@remotion/renderer": "^4.0.535",
     "@rive-app/react-canvas": "^4.34.3",
     "framer-motion": "^13.4.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "remotion": "^4.0.535"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",

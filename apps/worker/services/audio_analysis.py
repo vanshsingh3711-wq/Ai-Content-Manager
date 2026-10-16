@@ -65,3 +65,35 @@ def classify_audio_regions(
         r["end"] = round(r["end"], 3)
         
     return regions
+
+
+def denoise_audio_rnnoise(
+    input_audio_path: str,
+    output_audio_path: str,
+    model_name: str = "cb.rnnn"
+) -> str:
+    """
+    Offline neural audio noise suppression using the pre-trained RNNoise recurrent neural network.
+    Eliminates mic hum, background air conditioning, and room noise in seconds with 0 API cost.
+    """
+    import os
+    import subprocess
+    
+    models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bin", "models", "rnnoise"))
+    model_path = os.path.join(models_dir, model_name)
+    
+    if not os.path.exists(model_path):
+        # Fallback to copy if model not found
+        return input_audio_path
+        
+    cmd = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", input_audio_path,
+        "-af", f"arnndn=m={model_path}",
+        output_audio_path
+    ]
+    
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode == 0 and os.path.exists(output_audio_path):
+        return output_audio_path
+    return input_audio_path

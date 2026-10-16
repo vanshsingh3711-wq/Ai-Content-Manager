@@ -29,12 +29,21 @@ def analyze_visual_context(video_path: str, video_id: str, video_duration: float
     log_info(f"VisualAnalysis: Extracted {len(extracted_frames)} frames")
     # 2. Scene Detection (Optional)
     log_info("VisualAnalysis: Running Scene Detection")
-    scenes = detect_scenes(extracted_frames)
+    scenes = []
+    try:
+        scenes = detect_scenes(extracted_frames)
+    except Exception as e:
+        log_warning(f"VisualAnalysis: Scene detection failed: {e}")
     timeline.scenes = scenes
     log_info(f"VisualAnalysis: Detected {len(scenes)} scenes")
+
     # 3. Subject Detection (Optional)
     log_info("VisualAnalysis: Running Subject Detection")
-    subjects = detect_subjects(extracted_frames)
+    subjects = []
+    try:
+        subjects = detect_subjects(extracted_frames)
+    except Exception as e:
+        log_warning(f"VisualAnalysis: Subject detection failed: {e}")
     timeline.subjects = subjects
     log_info(f"VisualAnalysis: Detected {len(subjects)} subject events")
     # 4. Composition Analysis (Depends on subjects)

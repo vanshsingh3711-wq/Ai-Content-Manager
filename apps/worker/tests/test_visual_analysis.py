@@ -4,6 +4,9 @@ from unittest.mock import patch, MagicMock
 
 sys.modules["cv2"] = MagicMock()
 sys.modules["mediapipe"] = MagicMock()
+sys.modules["mediapipe.tasks"] = MagicMock()
+sys.modules["mediapipe.tasks.python"] = MagicMock()
+sys.modules["mediapipe.tasks.python.vision"] = MagicMock()
 
 from services.visual_analysis.schemas import UnifiedVisualTimeline, SubjectEvent, BoundingBox
 from services.visual_analysis.composition_analyzer import analyze_composition

@@ -3,8 +3,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
-from storage import generate_presigned_upload_url
+from config import get_settings
+from storage import generate_presigned_upload_url, get_s3_client
 
+settings = get_settings()
 router = APIRouter(prefix="/api/v1/storage", tags=["Storage"])
 
 ALLOWED_CONTENT_TYPES = {
@@ -75,6 +77,48 @@ async def dev_upload_endpoint(request: Request, key: str = Query(..., descriptio
         "status": "success",
         "message": "Dev upload stored successfully",
         "file_key": key,
+    }
+
+
+@router.put("/proxy-upload")
+async def proxy_upload_endpoint(request: Request, key: str = Query(..., description="File storage key")):
+    """
+    Fallback upload endpoint when direct browser-to-S3 CORS fails.
+    Streams file bytes from client and uploads to S3 directly from backend, or saves locally.
+    """
+    body = await request.body()
+    s3_client = get_s3_client()
+    bucket_name = settings.R2_BUCKET_NAME
+
+    if s3_client and bucket_name:
+        try:
+            content_type = request.headers.get("content-type", "video/mp4")
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=key,
+                Body=body,
+                ContentType=content_type,
+            )
+            return {
+                "status": "success",
+                "mode": "s3_proxy",
+                "file_key": key,
+                "message": "Uploaded to S3 via backend proxy",
+            }
+        except Exception as e:
+            pass
+
+    # Local fallback in media_temp
+    local_file_path = os.path.join(MEDIA_TEMP_DIR, key.replace("/", os.sep))
+    os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+    with open(local_file_path, "wb") as f:
+        f.write(body)
+
+    return {
+        "status": "success",
+        "mode": "dev_local",
+        "file_key": key,
+        "message": "Stored in local media_temp",
     }
 
 

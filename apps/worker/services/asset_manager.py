@@ -30,14 +30,37 @@ def fetch_broll_assets(
     edits: List[Dict[str, Any]],
     assets_dir: str = "",
     output_dir: Optional[str] = None,
+    job_settings: Optional[Dict[str, Any]] = None,
+    aspect_ratio: Optional[str] = None,
 ) -> Dict[str, str]:
     """
-    Downloads portrait B-roll video clips from Pexels Video API for all 'b_roll' actions.
+    Downloads aspect-ratio-aware B-roll video clips from Pexels Video API for all 'b_roll' actions.
+    Supports query fallbacks and optimal resolution matching.
     """
     target_dir = output_dir or assets_dir or os.path.abspath("./media_temp/assets")
     os.makedirs(target_dir, exist_ok=True)
     broll_map: Dict[str, str] = {}
     api_key = settings.PEXELS_API_KEY or os.getenv("PEXELS_API_KEY")
+
+    # Determine target aspect ratio and orientation
+    target_ar = aspect_ratio or (job_settings.get("aspect_ratio", "9:16") if job_settings else "9:16")
+    orientation_map = {
+        "9:16": "portrait",
+        "16:9": "landscape",
+        "1:1": "square",
+        "4:5": "portrait",
+    }
+    orientation = orientation_map.get(target_ar, "portrait")
+
+    # Target resolution for distance scoring
+    if orientation == "portrait":
+        target_w, target_h = 1080, 1920
+    elif orientation == "landscape":
+        target_w, target_h = 1920, 1080
+    elif orientation == "square":
+        target_w, target_h = 1080, 1080
+    else:
+        target_w, target_h = 1080, 1920
 
     for edit in edits:
         if edit.get("action") != "b_roll":
@@ -52,50 +75,86 @@ def fetch_broll_assets(
             broll_map[trigger_id] = dest_path
             continue
 
-        download_success = False
+        if not api_key:
+            print("[!] Warning: PEXELS_API_KEY is not set. Cannot fetch B-roll.")
+            continue
 
-        if api_key:
-            print(f"[*] Querying Pexels for B-roll: '{search_query}' (Trigger: {trigger_id})...")
-            url = "https://api.pexels.com/videos/search"
-            headers = {"Authorization": api_key}
-            params = {
-                "query": search_query,
-                "orientation": "portrait",
-                "per_page": 3,
-                "size": "medium",
-            }
+        print(f"[*] Querying Pexels ({orientation}) for B-roll: '{search_query}' (Trigger: {trigger_id})...")
+        url = "https://api.pexels.com/videos/search"
+        headers = {"Authorization": api_key}
+        params = {
+            "query": search_query,
+            "orientation": orientation,
+            "per_page": 5,
+            "size": "medium",
+        }
+
+        videos = []
+        try:
             res = requests.get(url, headers=headers, params=params, timeout=15)
-            res.raise_for_status()
-            
-            data = res.json()
-            videos = data.get("videos", [])
-            if not videos:
-                raise RuntimeError(f"No videos found on Pexels for query: {search_query}")
-                
-            video_files = videos[0].get("video_files", [])
-            # Select best portrait MP4 file
-            best_file = None
-            for vf in video_files:
-                if vf.get("file_type") == "video/mp4":
-                    if not best_file or (vf.get("width", 0) > best_file.get("width", 0)):
-                        best_file = vf
+            if res.status_code == 200:
+                videos = res.json().get("videos", [])
+        except Exception as e:
+            print(f"[!] Pexels search query failed: {e}")
 
-            download_url = best_file.get("link") if best_file else None
-            if not download_url:
-                raise RuntimeError(f"No valid MP4 file found in Pexels result for query: {search_query}")
-                
-            print(f"[*] Downloading Pexels B-roll from: {download_url[:60]}...")
+        # Fallback retry if no videos found
+        if not videos:
+            words = [w for w in search_query.split() if len(w) > 2]
+            fallbacks = []
+            if len(words) > 1:
+                fallbacks.append(" ".join(words[:2]))
+            if words:
+                fallbacks.append(words[0])
+            fallbacks.extend(["abstract background", "technology background"])
+
+            for fb_query in fallbacks:
+                print(f"[*] Retrying Pexels query with fallback: '{fb_query}'...")
+                params["query"] = fb_query
+                try:
+                    fb_res = requests.get(url, headers=headers, params=params, timeout=15)
+                    if fb_res.status_code == 200:
+                        fb_videos = fb_res.json().get("videos", [])
+                        if fb_videos:
+                            videos = fb_videos
+                            print(f"[OK] Found {len(videos)} videos with fallback '{fb_query}'.")
+                            break
+                except Exception as ex:
+                    print(f"[!] Fallback query '{fb_query}' error: {ex}")
+
+        if not videos:
+            print(f"[!] Warning: No Pexels videos found for '{search_query}' or fallbacks. Skipping trigger {trigger_id}.")
+            continue
+
+        # Select best MP4 file closest to target aspect ratio / resolution
+        video_files = videos[0].get("video_files", [])
+        best_file = None
+        best_score = float("inf")
+        for vf in video_files:
+            if vf.get("file_type") == "video/mp4":
+                w = vf.get("width", 0)
+                h = vf.get("height", 0)
+                score = abs(w - target_w) + abs(h - target_h)
+                if score < best_score:
+                    best_score = score
+                    best_file = vf
+
+        download_url = best_file.get("link") if best_file else None
+        if not download_url:
+            print(f"[!] Warning: No valid MP4 link found in Pexels result for '{search_query}'. Skipping trigger {trigger_id}.")
+            continue
+
+        try:
+            print(f"[*] Downloading Pexels B-roll ({best_file.get('width')}x{best_file.get('height')}) from: {download_url[:60]}...")
             vid_res = requests.get(download_url, stream=True, timeout=30)
             vid_res.raise_for_status()
-            
+
             with open(dest_path, "wb") as f:
                 for chunk in vid_res.iter_content(chunk_size=16384):
                     f.write(chunk)
             print(f"[OK] Downloaded B-roll asset to: {dest_path}")
-        else:
-            raise ValueError("PEXELS_API_KEY is not set.")
-
-        broll_map[trigger_id] = dest_path
+            broll_map[trigger_id] = dest_path
+        except Exception as e:
+            print(f"[!] Failed to download B-roll file from {download_url[:60]}: {e}")
 
     return broll_map
 

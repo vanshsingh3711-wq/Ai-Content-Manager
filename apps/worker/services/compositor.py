@@ -47,19 +47,37 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     return result
 
 def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, fps: float, width: int, height: int, temp_dir: str, prefix: str) -> Optional[str]:
-    """Spawns Python Playwright HTML renderer to generate a transparent WebM/MOV overlay."""
+    """Renders motion graphic overlay using Remotion (with HTML Playwright fallback)."""
     out_path = os.path.join(temp_dir, f"{prefix}.mov")
+
+    # 1. Try Remotion (high quality React animations)
+    try:
+        from services.remotion_renderer import render_remotion_canvas
+        remotion_out = render_remotion_canvas(
+            comp_id=comp_id,
+            props=props,
+            duration_sec=duration_sec,
+            fps=fps,
+            width=width,
+            height=height,
+            out_path=out_path
+        )
+        if remotion_out and os.path.exists(remotion_out) and os.path.getsize(remotion_out) > 0:
+            _log("REMOTION", f"Successfully rendered Remotion '{comp_id}' -> {remotion_out}")
+            return remotion_out
+    except Exception as e:
+        _log("REMOTION_WARN", f"Remotion failed: {e}. Falling back to HTML renderer...")
+
+    # 2. Fallback to HTML Playwright renderer
     frames = int(duration_sec * fps)
-    
-    # Format for HTML render
     html_props = {
         "type": comp_id,
         "targets": {k: v for k, v in props.items() if k != "componentId"}
     }
     props_json = json.dumps(html_props)
-    
+
     script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "motion_html/render_html_motion.py"))
-    
+
     cmd = [
         sys.executable, script_path,
         out_path,
@@ -69,7 +87,7 @@ def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, f
         str(height),
         props_json
     ]
-    
+
     _log("CANVAS", f"Rendering HTML {comp_id} to {out_path} ({frames} frames @ {fps}fps)")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -605,8 +623,12 @@ def render_video_pipeline(
 
         base_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
         if "zoom_in" in action_types:
-            zoom_w, zoom_h = int(target_w * 1.15), int(target_h * 1.15)
-            base_scale = f"scale={zoom_w}:{zoom_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+            zoom_frames = max(1, int(duration * source_fps))
+            fps_val = int(round(source_fps)) if source_fps else 30
+            base_scale = (
+                f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},"
+                f"zoompan=z='min(1.0+0.15*(in/{zoom_frames}),1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={target_w}x{target_h}:fps={fps_val}"
+            )
             
         filter_str.append(f"[base_v]{base_scale}[norm_v];")
         current_v = "[norm_v]"
@@ -747,8 +769,12 @@ def render_video_pipeline(
             
             char_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
             if "zoom_in" in action_types:
-                zoom_w, zoom_h = int(target_w * 1.15), int(target_h * 1.15)
-                char_scale = f"scale={zoom_w}:{zoom_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                zoom_frames = max(1, int(duration * source_fps))
+                fps_val = int(round(source_fps)) if source_fps else 30
+                char_scale = (
+                    f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},"
+                    f"zoompan=z='min(1.0+0.15*(in/{zoom_frames}),1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={target_w}x{target_h}:fps={fps_val}"
+                )
                 
             filter_str.append(f"[char_v_trim]{char_scale}[char_v_scaled];")
             filter_str.append(f"{current_v}[char_v_scaled]overlay=x=0:y=0:eof_action=pass[with_char];")
@@ -759,7 +785,7 @@ def render_video_pipeline(
             sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
             sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
             if not sfx_fetched:
-                sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../apps/web/public/assets/audio/pop.wav"))
+                sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", "pop.wav"))
             if os.path.exists(sfx_path):
                 cmd.extend(["-i", sfx_path])
                 filter_str.append(f"[{input_idx}:a]adelay=0|0[sfx_a];")

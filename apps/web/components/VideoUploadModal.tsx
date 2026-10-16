@@ -167,18 +167,35 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
       setProgress(40);
       console.log(`[FRONTEND: STEP 2/3] 📤 Uploading binary (${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB) to: ${upload_url}`);
 
-      const uploadRes = await fetch(upload_url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": selectedFile.type || "video/mp4",
-        },
-        body: selectedFile,
-      });
+      let uploadRes: Response | null = null;
+      try {
+        uploadRes = await fetch(upload_url, {
+          method: "PUT",
+          headers: {
+            "Content-Type": selectedFile.type || "video/mp4",
+          },
+          body: selectedFile,
+        });
+      } catch (directUploadErr) {
+        console.warn(`[FRONTEND: STEP 2/3] ⚠️ Direct upload failed (e.g. S3 CORS). Retrying via API proxy...`, directUploadErr);
+      }
+
+      // If direct S3 upload failed or preflight was blocked by CORS, fallback to API proxy
+      if (!uploadRes || !uploadRes.ok) {
+        console.log(`[FRONTEND: STEP 2/3] 🔄 Uploading via backend proxy: ${apiUrl}/api/v1/storage/proxy-upload`);
+        uploadRes = await fetch(`${apiUrl}/api/v1/storage/proxy-upload?key=${encodeURIComponent(file_key)}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": selectedFile.type || "video/mp4",
+          },
+          body: selectedFile,
+        });
+      }
 
       if (!uploadRes.ok) {
         const errText = await uploadRes.text();
-        console.error(`[FRONTEND: STEP 2/3] ❌ Direct upload failed:`, errText);
-        throw new Error(`Direct storage upload failed (${uploadRes.status}): ${errText}`);
+        console.error(`[FRONTEND: STEP 2/3] ❌ Storage upload failed:`, errText);
+        throw new Error(`Storage upload failed (${uploadRes.status}): ${errText}`);
       }
       console.log(`[FRONTEND: STEP 2/3] ✅ Binary upload complete.`);
 

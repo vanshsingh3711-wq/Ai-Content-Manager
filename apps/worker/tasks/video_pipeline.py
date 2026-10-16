@@ -75,10 +75,13 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         job_id_str = str(job.id)
 
         job_settings = job.settings or {}
+        if "USE_GRANULAR_OVERLAYS" not in job_settings:
+            job_settings["USE_GRANULAR_OVERLAYS"] = True
                 
         session.close() # Close DB before heavy work
 
         log_info(f"Target Video Job: '{job_title}' | Type: {job_video_type} | Ratio: {job_settings.get('aspect_ratio', '9:16')} | Style: {job_settings.get('video_style', 'viral')}")
+
 
         # Prepare workspace paths
         os.makedirs(temp_job_dir, exist_ok=True)
@@ -175,10 +178,33 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 )
             else:
                 visual_timeline = {"video_id": job_id_str, "scenes": [], "subjects": [], "safe_regions": []}
-            use_beat_sheet = os.getenv("USE_BEAT_SHEET", "false").lower() == "true"
+
+            # DeepSeek Model Routing:
+            # - "DeepSeek-Hybrid" (default): R1 for Beat Sheet & Motion Graphics, V3 for B-roll and Character
+            # - "DeepSeek-Reasoner" or "DeepSeek R1": R1 for all
+            # - "DeepSeek-Chat" or "DeepSeek V3": V3 for all
+            ai_model_setting = str(job_settings.get("ai_model", "DeepSeek-Hybrid")).lower()
+            if "reasoner" in ai_model_setting or "r1" in ai_model_setting or "pro" in ai_model_setting:
+                beat_model = "deepseek-reasoner"
+                mg_model = "deepseek-reasoner"
+                broll_model = "deepseek-reasoner"
+                char_model = "deepseek-reasoner"
+            elif "chat" in ai_model_setting or ("v3" in ai_model_setting and "hybrid" not in ai_model_setting):
+                beat_model = "deepseek-chat"
+                mg_model = "deepseek-chat"
+                broll_model = "deepseek-chat"
+                char_model = "deepseek-chat"
+            else:
+                # Default: Auto-Hybrid mode (R1 for Director intelligence, V3 for footage search)
+                beat_model = "deepseek-reasoner"
+                mg_model = "deepseek-reasoner"
+                broll_model = "deepseek-chat"
+                char_model = "deepseek-chat"
+
+            use_beat_sheet = os.getenv("USE_BEAT_SHEET", "true").lower() == "true"  # Beat sheet ON by default
             beat_sheet_dict = {}
             if use_beat_sheet:
-                log_info("USE_BEAT_SHEET is true. Generating Beat Sheet...")
+                log_info(f"USE_BEAT_SHEET is true. Generating Beat Sheet with {beat_model}...")
                 try:
                     words_for_beat = []
                     sorted_chunks = sorted(timestamp_map.values(), key=lambda x: x.get("start", 0))
@@ -186,7 +212,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                         for w in chunk.get("words", []):
                             words_for_beat.append({"word": w["word"], "start": w["start"], "end": w["end"]})
                     if words_for_beat:
-                        beat_sheet_obj = analyze_script(words_for_beat, bracketed_transcript)
+                        beat_sheet_obj = analyze_script(words_for_beat, bracketed_transcript, ai_model_pref=beat_model)
                         beat_sheet_dict = beat_sheet_obj.model_dump()
                         
                         # Assign treatments
@@ -213,12 +239,13 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         # --- STEP 4: MULTI-AGENT AI DIRECTORS ---
         with PipelineStep(4, 8, "MULTI-AGENT AI DIRECTORS", "Parallel execution of B-Roll, Motion Graphics, and Character Planners"):
             set_job_status_ai_directing(job_uuid)
-            ai_model_pref = job_settings.get("ai_model", "Claude Sonnet 5")
             style_pref = job_settings.get("video_style", "viral")
+            log_info(f"AI Directing Models -> Story & Motion Graphics: {mg_model} | B-Roll & Visuals: {broll_model}")
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                future_broll = executor.submit(generate_broll_plan, unified_json_str, ai_model_pref, style_pref)
-                future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, ai_model_pref, style_pref)
-                future_char = executor.submit(generate_character_plan, unified_json_str, ai_model_pref, style_pref)
+                future_broll = executor.submit(generate_broll_plan, unified_json_str, broll_model, style_pref)
+                future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, mg_model, style_pref)
+                future_char = executor.submit(generate_character_plan, unified_json_str, char_model, style_pref)
 
                 broll_plan = future_broll.result()
                 mg_plan = future_mg.result()
@@ -248,11 +275,24 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 6: BLUEPRINT VALIDATION ---
         with PipelineStep(6, 8, "BLUEPRINT VALIDATION", "Enforcing B-roll budgets, timestamp validity, and safety guardrails"):
+            
+            # --- FIX: Inject beat_sheet into timestamp_map so the validator doesn't reject beat triggers ---
+            if beat_sheet_dict and "beats" in beat_sheet_dict:
+                for b in beat_sheet_dict["beats"]:
+                    b_id = f"beat_{b['id']}"
+                    timestamp_map[b_id] = {
+                        "start": b["start"],
+                        "end": b["end"],
+                        "text": b["text"]
+                    }
+                    
+            is_faceless = (str(job_video_type).lower() == "faceless")
             edits_dicts = [e.model_dump() for e in edit_decision_list.edits]
             validated_edits, validation_report = validate_blueprint(
                 edits=edits_dicts,
                 timestamp_map=timestamp_map,
                 video_duration=total_duration,
+                is_faceless=is_faceless,
             )
             log_info(f"Validation Report:\n{format_validation_report(validation_report)}")
             if validation_report.rejected_count > 0:
@@ -270,7 +310,11 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 7: ASSET SOURCING & SUBTITLES ---
         with PipelineStep(7, 8, "ASSET SOURCING & DYNAMIC SUBTITLES", "Pexels Video API & ASS Karaoke formatting"):
-            broll_map = fetch_broll_assets(validated_edits, output_dir=assets_dir)
+            broll_map = fetch_broll_assets(
+                validated_edits,
+                output_dir=assets_dir,
+                job_settings=job_settings,
+            )
             
             caption_preset = job_settings.get("caption_preset", "tiktok_yellow")
             highlight_color = "&H0000FFFF"
@@ -293,17 +337,21 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 7.5: 3D AVATAR RENDERING ---
         with PipelineStep(7.5, 8, "3D AVATAR RENDERING", "Rendering headless WebGL character"):
-            import asyncio
-            from services.engine_3d.renderer import render_3d_character
-            character_webm_path = os.path.join(temp_job_dir, "character.mov")
-            
-            log_info(f"Rendering 3D character to {character_webm_path}...")
-            # We pass the validated_edits dictionary directly, and the total_duration
-            asyncio.run(render_3d_character(
-                ai_plan={"edits": validated_edits}, 
-                output_video_path=character_webm_path,
-                duration=total_duration
-            ))
+            if job_settings.get("use_3d_avatar", False):
+                import asyncio
+                from services.engine_3d.renderer import render_3d_character
+                character_webm_path = os.path.join(temp_job_dir, "character.mov")
+                
+                log_info(f"Rendering 3D character to {character_webm_path}...")
+                # We pass the validated_edits dictionary directly, and the total_duration
+                asyncio.run(render_3d_character(
+                    ai_plan={"edits": validated_edits}, 
+                    output_video_path=character_webm_path,
+                    duration=total_duration
+                ))
+            else:
+                log_info("Skipping 3D avatar rendering (use_3d_avatar is disabled)")
+                character_webm_path = None
 
         # --- STEP 8: FFMPEG COMPOSITOR & PUBLISHING ---
         with PipelineStep(8, 8, "FFMPEG RENDERING & PUBLISHING", "Assembly of final MP4 and social export"):
