@@ -77,8 +77,10 @@ def render_motion_graphic(
         return None
 
     # Write props to a temp JSON file (avoids shell escaping issues)
+    render_props = dict(props)
+    render_props["durationInFrames"] = int(duration_frames)
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump(props, f)
+        json.dump(render_props, f)
         props_file = f.name
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -96,6 +98,7 @@ def render_motion_graphic(
             f"--height={height}",
             "--codec=prores",
             "--prores-profile=4444",
+            "--pixel-format=yuva444p10le",
             "--log=verbose",
             "--overwrite",
             "--concurrency=2",               # Limit CPU usage

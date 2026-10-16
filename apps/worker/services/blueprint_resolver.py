@@ -52,20 +52,24 @@ def resolve_master_blueprint(
                 all_edits.append(edit_obj)
                 continue
 
-            # Visual overlay conflict resolution on identical trigger_id
-            if tid in seen_triggers:
-                existing_edit = seen_triggers[tid]
+            # Visual overlay conflict resolution per layer type:
+            # - B-roll is the background video footage layer
+            # - Motion Graphics is the transparent foreground card layer
+            # They do not conflict with each other; both can be active on the same beat trigger.
+            # Multiple edits of the SAME action type on the same trigger resolve by priority.
+            layer_key = (action, tid)
+            if layer_key in seen_triggers:
+                existing_edit = seen_triggers[layer_key]
                 existing_priority = PRIORITY.get(getattr(existing_edit, "action", ""), 0)
                 new_priority = PRIORITY.get(action, 0)
 
                 if new_priority > existing_priority:
-                    # Replace existing with higher-priority edit
+                    # Replace existing with higher-priority edit of same type
                     all_edits = [e for e in all_edits if e is not existing_edit]
-                    seen_triggers[tid] = edit_obj
+                    seen_triggers[layer_key] = edit_obj
                     all_edits.append(edit_obj)
-                # else: keep existing higher-priority edit, skip this one
             else:
-                seen_triggers[tid] = edit_obj
+                seen_triggers[layer_key] = edit_obj
                 all_edits.append(edit_obj)
 
     # Sort all edits chronologically by start time (treat None as 0.0)

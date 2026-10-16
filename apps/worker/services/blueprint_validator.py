@@ -58,7 +58,8 @@ def validate_blueprint(
     report = ValidationReport(original_count=len(edits))
 
     # Calculate B-roll budget
-    max_broll_duration = video_duration * cfg.MAX_BROLL_DURATION_RATIO
+    broll_ratio = getattr(cfg, "MAX_BROLL_DURATION_RATIO_FACELESS", 1.0) if is_faceless else cfg.MAX_BROLL_DURATION_RATIO
+    max_broll_duration = video_duration * broll_ratio
     report.broll_budget_max = round(max_broll_duration, 2)
 
     validated: List[Dict[str, Any]] = []
@@ -252,13 +253,14 @@ def validate_blueprint(
 
             # 6. Minimum spacing from previous B-roll
             if broll_events:
+                min_broll_spacing = getattr(cfg, "MIN_BROLL_SPACING_SEC_FACELESS", 0.0) if is_faceless else cfg.MIN_BROLL_SPACING_SEC
                 last_broll_end = broll_events[-1]["end"]
                 spacing = chunk_start - last_broll_end
-                if spacing < cfg.MIN_BROLL_SPACING_SEC:
+                if spacing < min_broll_spacing:
                     report.issues.append(ValidationIssue(
                         trigger_id=trigger_id,
                         action=action,
-                        issue=f"B-roll spacing {spacing:.2f}s below minimum {cfg.MIN_BROLL_SPACING_SEC}s",
+                        issue=f"B-roll spacing {spacing:.2f}s below minimum {min_broll_spacing}s",
                     ))
                     report.rejected_count += 1
                     continue

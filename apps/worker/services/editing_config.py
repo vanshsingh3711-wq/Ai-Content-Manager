@@ -18,8 +18,9 @@ class EditingConfig:
     MAX_BROLL_COUNT_FACELESS: int = 20  # Faceless videos need B-roll as primary visual
 
     # Maximum total B-roll duration as a fraction of final video duration
-    # 0.50 = B-roll can occupy at most 50% of the final video
+    # 0.50 = B-roll can occupy at most 50% of the final video for talking head
     MAX_BROLL_DURATION_RATIO: float = 0.50
+    MAX_BROLL_DURATION_RATIO_FACELESS: float = 1.0  # Faceless videos can be 100% b-roll
 
     # Minimum duration for a single B-roll clip (seconds)
     MIN_BROLL_DURATION_SEC: float = 2.0
@@ -29,6 +30,7 @@ class EditingConfig:
 
     # Minimum spacing between consecutive B-roll events (seconds)
     MIN_BROLL_SPACING_SEC: float = 2.5
+    MIN_BROLL_SPACING_SEC_FACELESS: float = 0.0  # Faceless videos allow continuous back-to-back b-roll
 
     # Whether every B-roll decision must include a reason/justification
     BROLL_REASON_REQUIRED: bool = True

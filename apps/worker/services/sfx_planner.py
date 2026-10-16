@@ -2,12 +2,13 @@ import random
 from typing import List
 from services.ai_director import EditList, EditDecision
 
-# Deterministic SFX mapping based on visual action types
+# Deterministic SFX mapping based on visual action types (studio-quality curated sounds)
 SFX_ACTION_MAP = {
-    "motion_graphics": ["whoosh", "ding", "pop"],
-    "b_roll":          ["swoosh", "whoosh"],
-    "zoom_in":         ["whoosh", "riser"],
-    "character":       ["pop", "boing"],
+    "motion_graphics": ["pop", "whoosh", "chime"],
+    "kinetic_text":    ["pop", "whoosh"],
+    "b_roll":          ["whoosh", "transition"],
+    "zoom_in":         ["riser", "whoosh"],
+    "character":       ["pop", "chime"],
 }
 
 def generate_sfx_plan(

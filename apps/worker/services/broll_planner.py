@@ -40,12 +40,12 @@ OUTPUT SCHEMA (JSON):
             system_prompt += """
 \nBEAT SHEET INTEGRATION (STRICT):
 You have been provided with a pre-computed Beat Sheet in the Context. This is your absolute SOURCE OF TRUTH.
-1. TIMING: You must ONLY generate 'b_roll' edits that perfectly align with the exact start and end times of the provided beats. Do not invent your own pacing.
-2. TREATMENT ASSIGNMENT: You must ONLY generate 'b_roll' edits for beats that have `"treatment": "b_roll"`. DO NOT generate b-roll for beats with any other treatment (like motion_graphic or kinetic_text), or 'none'.
+1. TIMING: Align your 'b_roll' edits with the exact start and end times of the provided beats.
+2. TREATMENT ASSIGNMENT: Prioritize beats with "treatment": "b_roll", but you MUST ALSO generate b-roll for beats that need visual background footage (including beats with motion_graphic, kinetic_text, or untreated gaps) so the video maintains continuous, high-retention visual stock footage without black screens.
 3. ROLE: Use the beat's 'role' (e.g. hook, transition, example) to guide the mood of the B-roll.
-4. EMPHASIS: Use the 'emphasis_words' from the beat to drive on-screen highlights if needed.
+4. EMPHASIS: Use the 'emphasis_words' from the beat to create concrete, punchy search queries for stock footage (e.g. "artificial intelligence neural network", "robotic arm assembly", "modern data center servers").
 5. TRIGGER ID: You must use the beat's ID formatted as 'beat_1', 'beat_2', etc. as the trigger_id instead of the transcript chunk IDs.
-6. You MUST NOT generate B-roll that violates these rules. The beat sheet is the master timeline.
+6. The beat sheet is the master timeline.
 """
     except Exception:
         pass

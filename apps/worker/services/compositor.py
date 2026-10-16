@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import json
 import sys
+import math
 from typing import Any, Dict, List, Optional, Tuple
 from services.media_extractor import get_ffmpeg_binary_path
 from services.editing_config import EDITING_CONFIG
@@ -330,16 +331,42 @@ def _build_segment_timeline(
     if current_time < total_duration:
         kept_intervals.append((current_time, total_duration))
 
-    # 2. Build base chronological timeline of gaps and chunks
-    chunks = []
-    for chunk_id, chunk_data in timestamp_map.items():
-        chunks.append({
+    # 2. Build base chronological timeline of non-overlapping chunks
+    # Filter out secondary/injected triggers (like beat_*) if transcript chunks (chunk_* or ID_*) exist
+    has_transcript_chunks = any(not str(k).startswith("beat_") for k in timestamp_map.keys())
+    candidate_items = [
+        (cid, cdata) for cid, cdata in timestamp_map.items()
+        if not (has_transcript_chunks and str(cid).startswith("beat_"))
+    ]
+    if not candidate_items:
+        candidate_items = list(timestamp_map.items())
+
+    raw_chunks = []
+    for chunk_id, chunk_data in candidate_items:
+        raw_chunks.append({
             "id": chunk_id,
-            "start": chunk_data.get("start", 0.0),
-            "end": chunk_data.get("end", 0.0),
+            "start": float(chunk_data.get("start", 0.0)),
+            "end": float(chunk_data.get("end", 0.0)),
             "text": chunk_data.get("text", ""),
         })
-    chunks.sort(key=lambda c: c["start"])
+    raw_chunks.sort(key=lambda c: c["start"])
+
+    # Ensure strictly non-overlapping, strictly increasing chunks
+    chunks = []
+    current_end = 0.0
+    for c in raw_chunks:
+        c_start = max(0.0, c["start"])
+        c_end = min(total_duration, c["end"])
+        if c_end <= c_start:
+            continue
+        if c_start < current_end:
+            if c_end <= current_end:
+                continue
+            c_start = current_end
+        c["start"] = c_start
+        c["end"] = c_end
+        chunks.append(c)
+        current_end = c_end
 
     base_timeline = []
     
@@ -473,7 +500,7 @@ def _build_segment_timeline(
                     overlap_end = min(seg_end, e_end)
                     frag_dur = overlap_end - overlap_start
                     
-                    min_frag_dur = settings.get("MIN_FRAGMENT_DURATION", 1.0) if settings else 1.0
+                    min_frag_dur = settings.get("MIN_FRAGMENT_DURATION", 0.1) if settings else 0.1
                     if frag_dur < min_frag_dur and dur >= min_frag_dur:
                         continue
                         
@@ -511,6 +538,10 @@ def render_video_pipeline(
     edits = edits or []
     timestamp_map = timestamp_map or {}
     settings = settings or {}
+
+    for idx, e in enumerate(edits):
+        if isinstance(e, dict) and "_edit_id" not in e:
+            e["_edit_id"] = f"edit_{idx}"
 
     target_aspect = settings.get("aspect_ratio", "9:16")
     if target_aspect == "16:9": target_w, target_h = 1920, 1080
@@ -588,11 +619,13 @@ def render_video_pipeline(
             for a in seg.get("actions", []):
                 if a.get("_pre_mg_path"):
                     continue  # already set (shouldn't happen, but be safe)
+                a_eid = a.get("_edit_id")
                 tid = a.get("trigger_id")
                 for edit in edits:
-                    if edit.get("trigger_id") == tid and edit.get("_pre_mg_path"):
-                        a["_pre_mg_path"] = edit["_pre_mg_path"]
-                        break
+                    if (a_eid and edit.get("_edit_id") == a_eid) or (tid and edit.get("trigger_id") == tid):
+                        if edit.get("_pre_mg_path"):
+                            a["_pre_mg_path"] = edit["_pre_mg_path"]
+                            break
 
     _log("RENDER", f"Chunked rendering of {len(kept_segments)} segments to prevent OOM...")
     segment_files = []
@@ -636,7 +669,19 @@ def render_video_pipeline(
         if use_granular:
             mg_count = 0
             broll_count = 0
-            actions_sorted = sorted(seg["actions"], key=lambda x: x.get("seg_overlap_start", seg["start"]))
+            # Strict layer order: B-roll first (background footage), then characters, then motion graphics (foreground cards)
+            LAYER_ORDER = {
+                "b_roll": 0,
+                "character": 1,
+                "motion_graphics": 2,
+            }
+            actions_sorted = sorted(
+                seg["actions"],
+                key=lambda x: (
+                    LAYER_ORDER.get(x.get("action"), 2),
+                    x.get("seg_overlap_start", seg["start"])
+                )
+            )
             
             for a in actions_sorted:
                 action_type = a.get("action")
@@ -661,7 +706,8 @@ def render_video_pipeline(
                     if tid and tid in broll_map:
                         broll_path_a = broll_map[tid]
                         if os.path.exists(broll_path_a) and os.path.getsize(broll_path_a) > 1024:
-                            cmd.extend(["-an", "-t", str(rel_end - rel_start), "-i", broll_path_a])
+                            offset = a.get("seg_overlap_start", seg["start"]) - a.get("original_start", seg["start"])
+                            cmd.extend(["-ss", str(max(0, offset)), "-an", "-t", str(rel_end - rel_start), "-i", broll_path_a])
                             bv = f"[broll_{broll_count}_v]"
                             broll_transition = a.get("transition")
                             
@@ -955,3 +1001,74 @@ def _validate_rendered_output(ffmpeg_bin: str, output_path: str, source_has_audi
 
     _log("DONE", f"Final video: {final_size:,} bytes ({final_size / 1024 / 1024:.2f} MB) | "
          f"Duration: {final_duration:.2f}s | Audio: {'OK' if output_streams['has_audio'] else 'NONE'}")
+
+
+def build_faceless_background_video(
+    clips: List[str],
+    total_duration: float,
+    audio_path: str,
+    output_path: str,
+    target_w: int = 1080,
+    target_h: int = 1920,
+    ffmpeg_bin: Optional[str] = None,
+) -> bool:
+    """
+    Builds a continuous, seamless stock footage background video for faceless shorts.
+    Loops / concatenates available stock footage clips so the video is never black,
+    applies subtle contrast and cinematic darkening so foreground text/motion graphics pop,
+    and muxes with the speech audio track.
+    """
+    if not clips or total_duration <= 0:
+        return False
+
+    ffmpeg_bin = ffmpeg_bin or get_ffmpeg_binary_path()
+    valid_clips = [c for c in clips if os.path.exists(c) and os.path.getsize(c) > 1024]
+    if not valid_clips:
+        return False
+
+    # Repeat list of clips if needed to ensure total footage duration >= total_duration
+    expanded_clips = valid_clips * max(1, int(math.ceil(total_duration / max(10.0, len(valid_clips) * 5.0))))
+
+    inputs = []
+    filter_parts = []
+    for i, c in enumerate(expanded_clips):
+        inputs.extend(["-i", c])
+        filter_parts.append(
+            f"[{i}:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+            f"crop={target_w}:{target_h},fps=30,setsar=1[v{i}];"
+        )
+
+    concat_inputs = "".join(f"[v{i}]" for i in range(len(expanded_clips)))
+    filter_parts.append(f"{concat_inputs}concat=n={len(expanded_clips)}:v=1:a=0,eq=brightness=-0.05:contrast=1.05[vout]")
+
+    tmp_out = output_path + ".tmp_base.mp4"
+    cmd = [
+        ffmpeg_bin, "-y",
+        *inputs,
+        "-i", audio_path,
+        "-filter_complex", "".join(filter_parts),
+        "-map", "[vout]",
+        "-map", f"{len(expanded_clips)}:a",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:a", "aac",
+        "-t", str(round(total_duration, 3)),
+        tmp_out
+    ]
+
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if res.returncode == 0 and os.path.exists(tmp_out) and os.path.getsize(tmp_out) > 1024:
+            os.replace(tmp_out, output_path)
+            _log("FACELESS", f"Created continuous stock background ({os.path.getsize(output_path)} bytes, {total_duration:.2f}s)")
+            return True
+        else:
+            _log("WARN", f"build_faceless_background_video failed (rc={res.returncode}): {res.stderr[-300:]}")
+            if os.path.exists(tmp_out):
+                os.remove(tmp_out)
+            return False
+    except Exception as e:
+        _log("WARN", f"build_faceless_background_video exception: {e}")
+        if os.path.exists(tmp_out):
+            os.remove(tmp_out)
+        return False
+

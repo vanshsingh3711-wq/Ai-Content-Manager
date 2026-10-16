@@ -238,7 +238,8 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                         treatment_settings = {
                             "MAX_OVERLAYS_PER_MIN": 8,
                             "MIN_OVERLAY_DURATION": 2.0,
-                            "MAX_OVERLAY_DURATION": 6.0
+                            "MAX_OVERLAY_DURATION": 6.0,
+                            "is_faceless": (job_video_type == VideoType.FACELESS_SHORT)
                         }
                         updated_sheet, log_table = assign_visual_treatments(beat_sheet_dict, total_duration, treatment_settings)
                         beat_sheet_dict = updated_sheet
@@ -305,7 +306,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                         "text": b["text"]
                     }
                     
-            is_faceless = (str(job_video_type).lower() == "faceless")
+            is_faceless = (job_video_type == VideoType.FACELESS_SHORT or "faceless" in str(job_video_type).lower())
             edits_dicts = [e.model_dump() for e in edit_decision_list.edits]
             validated_edits, validation_report = validate_blueprint(
                 edits=edits_dicts,
@@ -334,6 +335,36 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 output_dir=assets_dir,
                 job_settings=job_settings,
             )
+
+            # Continuous stock footage background for faceless videos (eliminates black screens completely)
+            if is_faceless and broll_map:
+                valid_broll_clips = [
+                    p for p in broll_map.values()
+                    if os.path.exists(p) and os.path.getsize(p) > 1024
+                ]
+                if valid_broll_clips:
+                    log_info(f"Synthesizing continuous faceless background from {len(valid_broll_clips)} stock footage clips...")
+                    try:
+                        from services.compositor import build_faceless_background_video
+                        target_aspect = job_settings.get("aspect_ratio", "9:16")
+                        if target_aspect == "16:9": bg_w, bg_h = 1920, 1080
+                        elif target_aspect == "1:1": bg_w, bg_h = 1080, 1080
+                        elif target_aspect == "4:5": bg_w, bg_h = 1080, 1350
+                        else: bg_w, bg_h = 1080, 1920
+
+                        built_ok = build_faceless_background_video(
+                            clips=valid_broll_clips,
+                            total_duration=total_duration,
+                            audio_path=extracted_wav_path,
+                            output_path=raw_video_path,
+                            target_w=bg_w,
+                            target_h=bg_h,
+                            ffmpeg_bin=get_ffmpeg_binary_path()
+                        )
+                        if built_ok:
+                            log_info(f"Replaced blank canvas with continuous stock footage background: {raw_video_path}")
+                    except Exception as e:
+                        log_warning(f"Could not build continuous stock background: {e}")
             
             caption_preset = job_settings.get("caption_preset", "tiktok_yellow")
             highlight_color = "&H0000FFFF"

@@ -400,11 +400,12 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
                 continue
             target_beat = min(beats, key=lambda b: abs(b["start"] - edit_start))
             
-        if target_beat.get("importance", 5) <= 2:
+        action = getattr(edit, "action", "")
+        is_faceless = beat_sheet_dict.get("is_faceless", False) or target_beat.get("is_faceless", False) or (planner_name == "B-ROLL PLANNER")
+        if action != "b_roll" and not is_faceless and target_beat.get("importance", 5) <= 2:
             dropped += 1
             continue
-            
-        action = getattr(edit, "action", "")
+
         old_start = edit.start
         old_end = edit.end
         

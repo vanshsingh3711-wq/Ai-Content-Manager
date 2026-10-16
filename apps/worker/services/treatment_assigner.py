@@ -51,9 +51,10 @@ def assign_visual_treatments(
         beat["emphasis_start"] = start
         beat["emphasis_end"] = end
 
+        is_faceless = settings.get("is_faceless", False)
         if importance <= 2:
-            beat["treatment"] = "none"
-            beat["treatment_reason"] = "Importance <= 2"
+            beat["treatment"] = "b_roll" if is_faceless else "none"
+            beat["treatment_reason"] = "Importance <= 2 (Faceless b-roll fallback)" if is_faceless else "Importance <= 2"
         elif role in ["statistic", "comparison", "list"]:
             beat["treatment"] = "motion_graphic"
             beat["treatment_reason"] = f"Role: {role}"
@@ -72,12 +73,14 @@ def assign_visual_treatments(
                 beat["treatment_reason"] = "Concreteness: abstract -> motion_graphic"
 
     # Pass 2: Enforce max consecutive treated beats (demote lowest importance in the run)
+    is_faceless = settings.get("is_faceless", False)
     while True:
-        # Find the first run > 2 of treated beats
+        # Find the first run > 2 of treated beats (for faceless, only limit consecutive motion_graphics)
         run_start = -1
         max_run = []
         for i in range(len(beats)):
-            if beats[i]["treatment"] != "none":
+            treated = (beats[i]["treatment"] in ["motion_graphic", "kinetic_text"]) if is_faceless else (beats[i]["treatment"] != "none")
+            if treated:
                 if run_start == -1:
                     run_start = i
             else:
@@ -102,26 +105,27 @@ def assign_visual_treatments(
         demotable.sort(key=lambda x: x.get("importance", 1))
         lowest_beat = demotable[0]
         
-        lowest_beat["treatment"] = "none"
+        lowest_beat["treatment"] = "b_roll" if is_faceless else "none"
         lowest_beat["treatment_reason"] = "Demoted: Lowest importance in consecutive treated run > 2"
 
-    # Pass 3: Enforce minimum untreated share (by duration)
-    total_treated_duration = sum(b["emphasis_end"] - b["emphasis_start"] for b in beats if b["treatment"] != "none")
-    target_untreated_duration = total_duration_sec * 0.35
-    max_treated_duration = total_duration_sec - target_untreated_duration
-    
-    if total_treated_duration > max_treated_duration:
-        # Sort treated beats by importance ascending
-        treated_beats = [b for b in beats if b["treatment"] != "none" and b.get("role") not in ["hook", "cta"]]
-        treated_beats.sort(key=lambda x: x.get("importance", 1))
+    # Pass 3: Enforce minimum untreated share (by duration) - Only for talking-head videos with speaker
+    if not is_faceless:
+        total_treated_duration = sum(b["emphasis_end"] - b["emphasis_start"] for b in beats if b["treatment"] != "none")
+        target_untreated_duration = total_duration_sec * 0.35
+        max_treated_duration = total_duration_sec - target_untreated_duration
         
-        for b in treated_beats:
-            if total_treated_duration <= max_treated_duration:
-                break
-            dur = b["emphasis_end"] - b["emphasis_start"]
-            b["treatment"] = "none"
-            b["treatment_reason"] = "Demoted: Untreated share constraint (35%)"
-            total_treated_duration -= dur
+        if total_treated_duration > max_treated_duration:
+            # Sort treated beats by importance ascending
+            treated_beats = [b for b in beats if b["treatment"] != "none" and b.get("role") not in ["hook", "cta"]]
+            treated_beats.sort(key=lambda x: x.get("importance", 1))
+            
+            for b in treated_beats:
+                if total_treated_duration <= max_treated_duration:
+                    break
+                dur = b["emphasis_end"] - b["emphasis_start"]
+                b["treatment"] = "none"
+                b["treatment_reason"] = "Demoted: Untreated share constraint (35%)"
+                total_treated_duration -= dur
 
     # Pass 4: Enforce max untreated gap rule
     max_gap_sec = settings.get("MAX_UNTREATED_GAP_SEC", 9.0)
