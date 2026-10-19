@@ -10,13 +10,16 @@ import {
   Film,
   Music,
   Zap,
+  Sparkles,
+  UserCheck,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
+import { MediaDrawerTab } from "./MediaDrawer";
 
 interface TimelineToolbarProps {
-  onOpenDrawer?: (tab: "media" | "captions" | "broll" | "audio") => void;
+  onOpenDrawer?: (tab: MediaDrawerTab) => void;
 }
 
 export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
@@ -30,6 +33,8 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
     addBRollClip,
     addAudioClip,
     playheadTime,
+    subjectOverlayVisible,
+    toggleSubjectOverlay,
   } = useTimelineStore(useShallow((state) => ({
     selectedItem: state.selectedItem,
     zoomLevel: state.zoomLevel,
@@ -40,6 +45,8 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
     addBRollClip: state.addBRollClip,
     addAudioClip: state.addAudioClip,
     playheadTime: state.playheadTime,
+    subjectOverlayVisible: state.subjectOverlayVisible,
+    toggleSubjectOverlay: state.toggleSubjectOverlay,
   })));
 
   const handleSplit = () => {
@@ -146,6 +153,13 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
             <span className="hidden sm:inline">Add B-Roll</span>
           </button>
           <button
+            onClick={() => onOpenDrawer?.("graphics")}
+            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+            <span className="hidden sm:inline">Add Card</span>
+          </button>
+          <button
             onClick={handleAddAudio}
             className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
           >
@@ -162,8 +176,24 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
         </div>
       </div>
 
-      {/* Right Zoom Slider */}
+      {/* Right Controls: Safe Zones & Zoom Slider */}
       <div className="flex items-center gap-2">
+        <button
+          onClick={toggleSubjectOverlay}
+          title={subjectOverlayVisible ? "Hide Presenter Safe Zones" : "Show Presenter Safe Zones"}
+          className={cn(
+            "flex items-center gap-1 px-2 py-1 text-xs font-mono rounded transition-colors",
+            subjectOverlayVisible
+              ? "text-emerald-400 bg-emerald-950/60 border border-emerald-500/40"
+              : "text-neutral-500 hover:text-white hover:bg-neutral-900"
+          )}
+        >
+          <UserCheck className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Safe Zones</span>
+        </button>
+
+        <div className="h-3.5 w-[1px] bg-neutral-800 mx-0.5" />
+
         <button
           onClick={() => setZoomLevel(zoomLevel - 10)}
           className="p-1 text-neutral-500 hover:text-white rounded hover:bg-neutral-900 transition-colors"

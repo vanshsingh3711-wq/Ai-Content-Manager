@@ -6,11 +6,18 @@ import {
   Film,
   Video,
   Music,
+  Sparkles,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { ClipFilmstrip } from "./ClipFilmstrip";
+import {
+  EDITOR_DRAG_MIME,
+  deserializeDragPayload,
+  projectPointerToTimelineTimestamp,
+  createAddElementOperationFromDrop,
+} from "@/lib/editor/drag-drop-types";
 
 const KeyframeDiamond = ({
   time,
@@ -131,6 +138,7 @@ export function TimelineContainer() {
     setPlayheadTime,
     setSelectedItem,
     trimVideoClip,
+    dispatchOperation,
   } = useTimelineStore(useShallow((state) => ({
     project: state.project,
     playheadTime: state.playheadTime,
@@ -139,16 +147,63 @@ export function TimelineContainer() {
     setPlayheadTime: state.setPlayheadTime,
     setSelectedItem: state.setSelectedItem,
     trimVideoClip: state.trimVideoClip,
+    dispatchOperation: state.dispatchOperation,
   })));
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Drag-and-drop target track state
+  const [dropTargetTrack, setDropTargetTrack] = useState<"caption" | "graphic" | "broll" | "video" | "audio" | null>(null);
+
+  const handleTrackDrop = (
+    e: React.DragEvent,
+    targetTrackHint?: "caption" | "graphic" | "broll" | "video" | "audio"
+  ) => {
+    e.preventDefault();
+    setDropTargetTrack(null);
+
+    const rawData =
+      e.dataTransfer.getData(EDITOR_DRAG_MIME) ||
+      e.dataTransfer.getData("text/plain");
+    if (!rawData) return;
+
+    const payload = deserializeDragPayload(rawData);
+    if (!payload) return;
+
+    const trackRect = scrollRef.current?.getBoundingClientRect();
+    if (!trackRect) return;
+
+    const scrollLeft = scrollRef.current.scrollLeft;
+    const dropTimestamp = projectPointerToTimelineTimestamp(
+      e.clientX,
+      trackRect,
+      project.duration,
+      zoomLevel,
+      scrollLeft
+    );
+
+    const operation = createAddElementOperationFromDrop(payload, {
+      timestamp: dropTimestamp,
+      durationLimit: project.duration,
+    });
+
+    dispatchOperation(operation);
+    setPlayheadTime(dropTimestamp);
+
+    if ((operation as any).element?.id) {
+      setSelectedItem({
+        type: payload.type as any,
+        id: (operation as any).element.id,
+      });
+    }
+  };
+
   // Dragging states
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [trimmingClip, setTrimmingClip] = useState<{
     clipId: string;
-    type: "video" | "broll" | "caption" | "audio";
+    type: "video" | "broll" | "caption" | "audio" | "graphic";
     handle: "start" | "end";
     initialStart: number;
     initialEnd: number;
@@ -158,7 +213,7 @@ export function TimelineContainer() {
 
   const [movingClip, setMovingClip] = useState<{
     id: string;
-    type: "broll" | "caption" | "audio";
+    type: "broll" | "caption" | "audio" | "graphic";
     initialStart: number;
     initialEnd: number;
     initialX: number;
@@ -251,6 +306,7 @@ export function TimelineContainer() {
             if (trimmingClip.type === "caption") store.updateCaption(trimmingClip.clipId, { end: newEnd });
             if (trimmingClip.type === "broll") store.updateBRollClip(trimmingClip.clipId, { end: newEnd });
             if (trimmingClip.type === "audio") store.updateAudioClip(trimmingClip.clipId, { end: newEnd });
+            if (trimmingClip.type === "graphic") store.updateGraphicElement(trimmingClip.clipId, { end: newEnd });
           }
         }
       }
@@ -272,6 +328,8 @@ export function TimelineContainer() {
           store.updateBRollClip(movingClip.id, { start: newStart, end: newEnd });
         } else if (movingClip.type === "audio") {
           store.updateAudioClip(movingClip.id, { start: newStart, end: newEnd });
+        } else if (movingClip.type === "graphic") {
+          store.updateGraphicElement(movingClip.id, { start: newStart, end: newEnd });
         }
       }
       setMovingClip(null);
@@ -377,7 +435,21 @@ export function TimelineContainer() {
           </div>
 
           {/* TRACK 1: Text & Captions */}
-          <div className="mt-2 mb-2 relative h-9 border-y border-neutral-900 bg-neutral-950/40 flex items-center">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTargetTrack("caption");
+            }}
+            onDragLeave={() => setDropTargetTrack(null)}
+            onDrop={(e) => handleTrackDrop(e, "caption")}
+            className={cn(
+              "mt-2 mb-2 relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
+              dropTargetTrack === "caption"
+                ? "border-yellow-400 bg-yellow-500/10 ring-1 ring-yellow-400/50"
+                : "border-neutral-900"
+            )}
+          >
             <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-yellow-400 font-semibold shadow">
               <Type className="w-3 h-3" />
               <span>Captions</span>
@@ -465,8 +537,88 @@ export function TimelineContainer() {
             })}
           </div>
 
+          {/* TRACK 1.5: Motion Graphics */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTargetTrack("graphic");
+            }}
+            onDragLeave={() => setDropTargetTrack(null)}
+            onDrop={(e) => handleTrackDrop(e, "graphic")}
+            className={cn(
+              "mb-2 relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
+              dropTargetTrack === "graphic"
+                ? "border-purple-400 bg-purple-500/10 ring-1 ring-purple-400/50"
+                : "border-neutral-900"
+            )}
+          >
+            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-purple-400 font-semibold shadow">
+              <Sparkles className="w-3 h-3" />
+              <span>Graphics</span>
+            </div>
+
+            {(project.tracks.graphicsTrack || []).length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-[10px] text-neutral-600 pointer-events-none italic">
+                Drag motion cards here
+              </div>
+            )}
+
+            {(project.tracks.graphicsTrack || []).map((graphic) => {
+                const { tempStart, tempEnd } = getRenderTimes(graphic.id, graphic.start, graphic.end);
+                const isMoving = movingClip?.id === graphic.id;
+                const deltaX = isMoving ? movingClip.currentX - movingClip.initialX : 0;
+                const left = timeToPixels(tempStart) + deltaX;
+                const width = Math.max(20, timeToPixels(tempEnd - tempStart));
+                const isSelected = selectedItem?.id === graphic.id;
+
+                return (
+                  <div
+                    key={graphic.id}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setSelectedItem({ type: "graphic", id: graphic.id });
+                      setMovingClip({
+                        id: graphic.id,
+                        type: "graphic",
+                        initialStart: graphic.start,
+                        initialEnd: graphic.end,
+                        initialX: e.clientX,
+                        currentX: e.clientX,
+                      });
+                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    className={cn(
+                      "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
+                      isSelected
+                        ? "bg-purple-600/40 border-purple-400 text-purple-200 ring-2 ring-purple-400/40 z-10"
+                        : "bg-purple-900/30 border-purple-500/30 text-purple-300 hover:bg-purple-800/30",
+                      isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
+                    )}
+                    style={{ left: `${left}px`, width: `${width}px` }}
+                  >
+                    <span className="truncate flex-1 text-center px-3 pointer-events-none">{graphic.name || graphic.compositionId}</span>
+                  </div>
+                );
+              })}
+            </div>
+
           {/* TRACK 2: B-Roll & Overlays */}
-          <div className="mb-2 relative h-10 border-y border-neutral-900 bg-neutral-950/40 flex items-center">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTargetTrack("broll");
+            }}
+            onDragLeave={() => setDropTargetTrack(null)}
+            onDrop={(e) => handleTrackDrop(e, "broll")}
+            className={cn(
+              "mb-2 relative h-10 border-y bg-neutral-950/40 flex items-center transition-colors",
+              dropTargetTrack === "broll"
+                ? "border-purple-400 bg-purple-500/10 ring-1 ring-purple-400/50"
+                : "border-neutral-900"
+            )}
+          >
             <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
               <Film className="w-3 h-3 text-neutral-400" />
               <span>B-Roll</span>
@@ -649,11 +801,31 @@ export function TimelineContainer() {
           </div>
 
           {/* TRACK 4: Background Music & Audio */}
-          <div className="relative h-9 border-y border-neutral-900 bg-neutral-950/40 flex items-center">
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
-              <Music className="w-3 h-3 text-neutral-400" />
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTargetTrack("audio");
+            }}
+            onDragLeave={() => setDropTargetTrack(null)}
+            onDrop={(e) => handleTrackDrop(e, "audio")}
+            className={cn(
+              "relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
+              dropTargetTrack === "audio"
+                ? "border-emerald-400 bg-emerald-500/10 ring-1 ring-emerald-400/50"
+                : "border-neutral-900"
+            )}
+          >
+            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-emerald-400 font-semibold shadow">
+              <Music className="w-3 h-3" />
               <span>Audio</span>
             </div>
+
+            {(project.tracks.audioTrack || []).length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-[10px] text-neutral-600 pointer-events-none italic">
+                Drag audio tracks here
+              </div>
+            )}
 
             {project.tracks.audioTrack.map((audio) => {
               const { tempStart, tempEnd } = getRenderTimes(audio.id, audio.start, audio.end);

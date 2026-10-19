@@ -63,10 +63,17 @@ def fetch_sfx(keyword: str, output_path: str) -> bool:
         except Exception as e:
             print(f"  [SFX_MANAGER] Local copy failed: {e}")
 
-    # 2. Fallback to Freesound API if key is set
-    if not FREESOUND_API_KEY:
-        print(f"  [SFX_MANAGER] No local SFX match and FREESOUND_API_KEY not set for '{keyword}'.")
-        return False
+    # 2. Procedural synthesis fallback (100% reliable, zero external dependencies)
+    try:
+        from services.audio_sfx_synthesizer import synthesize_cue
+        synthesize_cue(kw_clean, output_path)
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            print(f"  [SFX_MANAGER] Synthesized procedural SFX for '{keyword}' -> {output_path}")
+            return True
+    except Exception as e:
+        print(f"  [SFX_MANAGER] Procedural SFX synthesis failed: {e}")
+
+    # 3. Fallback to Freesound API if key is set
 
     search_url = "https://freesound.org/apiv2/search/text/"
     params = {

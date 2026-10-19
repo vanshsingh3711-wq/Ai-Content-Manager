@@ -78,3 +78,16 @@ def test_unified_analysis_optional_beat_sheet():
     json_str = '{"transcript": "hello", "visual_analysis": {"video_id": "1"}}'
     ua = UnifiedAnalysis.model_validate_json(json_str)
     assert ua.beat_sheet == {} or ua.beat_sheet is None
+
+@patch("services.motion_graphic_planner._call_llm")
+def test_mg_planner_layer_instructions(mock_call_llm):
+    from services.ai_director import EditList
+    mock_call_llm.return_value = EditList(edits=[])
+    ua_no_beats = get_base_unified_analysis(with_beat_sheet=False).model_dump_json()
+    generate_motion_graphics_plan(ua_no_beats)
+    call_args = mock_call_llm.call_args[0]
+    prompt = call_args[0]
+    assert "LAYER PLACEMENT ('layer')" in prompt
+    assert '"front" (DEFAULT)' in prompt
+    assert '"behind"' in prompt
+

@@ -573,6 +573,17 @@ def render_video_pipeline(
     import tempfile
     temp_dir = tempfile.mkdtemp(prefix="ai_compositor_")
 
+    # Pre-synthesize procedural SFX kit calibrated to dialog volume
+    speech_db = -21.0
+    sfx_kit_dir = os.path.join(temp_dir, ".sfx")
+    try:
+        from services.audio_sfx_synthesizer import measure_speech_db, synthesize_project_sfx_library
+        speech_db = measure_speech_db(raw_video_path)
+        synthesize_project_sfx_library(sfx_kit_dir, speech_db)
+        _log("SFX", f"Pre-synthesized procedural SFX kit calibrated to speech ({speech_db:.1f} dBFS)")
+    except Exception as e:
+        _log("SFX_WARN", f"Procedural SFX kit pre-synthesis skipped: {e}")
+
     if not kept_segments:
         kept_segments = [{"start": 0.0, "end": total_duration, "chunk_id": "FULL", "actions": [], "is_cut": False}]
 
@@ -612,20 +623,72 @@ def render_video_pipeline(
                 )
                 edit["_pre_mg_path"] = mg_path
 
-        # Propagate _pre_mg_path from original edits into the shallow-copied
-        # action clones inside each segment (build_segment_timeline clones before
-        # pre-render runs, so the clones miss _pre_mg_path without this step).
-        for seg in kept_segments:
-            for a in seg.get("actions", []):
-                if a.get("_pre_mg_path"):
-                    continue  # already set (shouldn't happen, but be safe)
-                a_eid = a.get("_edit_id")
-                tid = a.get("trigger_id")
+    # Studio Depth Matting: pre-render speaker cutouts for any behind cards
+    try:
+        from services.depth_matting import (
+            extract_behind_ranges,
+            cut_range_to_prores,
+            is_depth_matting_available
+        )
+        behind_ranges = extract_behind_ranges(edits, timestamp_map, total_duration, fps=source_fps)
+        if behind_ranges and is_depth_matting_available():
+            _log("DEPTH_MATTE", f"Found {len(behind_ranges)} behind range(s). Pre-rendering studio depth cutouts...")
+            for r_idx, rng in enumerate(behind_ranges):
+                cutout_path = os.path.join(temp_dir, f"cutout_{r_idx:02d}.mov")
+                try:
+                    cut_range_to_prores(
+                        video_path=raw_video_path,
+                        start_s=rng["start"],
+                        end_s=rng["end"],
+                        output_mov_path=cutout_path,
+                        fps=source_fps,
+                        width=target_w,
+                        height=target_h
+                    )
+                    for edit in edits:
+                        eid = str(edit.get("_edit_id") or edit.get("trigger_id") or "")
+                        if eid in rng["edit_ids"] or (
+                            (str(edit.get("layer", "")).lower() == "behind" or str(edit.get("depth", "")).lower() == "behind")
+                            and edit.get("start", 0.0) >= rng["start"] - 0.1
+                            and edit.get("end", total_duration) <= rng["end"] + 0.1
+                        ):
+                            edit["_pre_cutout_path"] = cutout_path
+                            edit["_cutout_start"] = rng["start"]
+                            edit["_cutout_end"] = rng["end"]
+                except Exception as ex:
+                    _log("DEPTH_MATTE_WARN", f"Failed to render cutout for range {rng['start']:.2f}-{rng['end']:.2f}: {ex}")
+    except Exception as e:
+        _log("DEPTH_MATTE_WARN", f"Depth matting initialization skipped: {e}")
+
+    # Propagate _pre_mg_path and _pre_cutout_path from original edits into the shallow-copied
+    # action clones inside each segment (build_segment_timeline clones before
+    # pre-render runs, so the clones miss pre-renders without this step).
+    for seg in kept_segments:
+        for a in seg.get("actions", []):
+            a_eid = a.get("_edit_id")
+            tid = a.get("trigger_id")
+            a_act = a.get("action")
+            matched_edit = None
+            if a_eid:
                 for edit in edits:
-                    if (a_eid and edit.get("_edit_id") == a_eid) or (tid and edit.get("trigger_id") == tid):
-                        if edit.get("_pre_mg_path"):
-                            a["_pre_mg_path"] = edit["_pre_mg_path"]
-                            break
+                    if edit.get("_edit_id") == a_eid:
+                        matched_edit = edit
+                        break
+            if not matched_edit and tid:
+                for edit in edits:
+                    if edit.get("trigger_id") == tid and (
+                        edit.get("action") == a_act or
+                        (a_act in ["motion_graphics", "kinetic_text"] and edit.get("action") in ["motion_graphics", "kinetic_text"])
+                    ):
+                        matched_edit = edit
+                        break
+            if matched_edit:
+                if not a.get("_pre_mg_path") and matched_edit.get("_pre_mg_path"):
+                    a["_pre_mg_path"] = matched_edit["_pre_mg_path"]
+                if not a.get("_pre_cutout_path") and matched_edit.get("_pre_cutout_path"):
+                    a["_pre_cutout_path"] = matched_edit["_pre_cutout_path"]
+                    a["_cutout_start"] = matched_edit.get("_cutout_start")
+                    a["_cutout_end"] = matched_edit.get("_cutout_end")
 
     _log("RENDER", f"Chunked rendering of {len(kept_segments)} segments to prevent OOM...")
     segment_files = []
@@ -669,16 +732,31 @@ def render_video_pipeline(
         if use_granular:
             mg_count = 0
             broll_count = 0
-            # Strict layer order: B-roll first (background footage), then characters, then motion graphics (foreground cards)
-            LAYER_ORDER = {
-                "b_roll": 0,
-                "character": 1,
-                "motion_graphics": 2,
-            }
+            # Multi-layer sandwich order:
+            # 0: Fullscreen B-roll background
+            # 1: Behind B-roll (background with cutout overlay)
+            # 2: Behind motion graphics (card sits behind speaker, cutout placed on top)
+            # 3: Character / avatar overlay
+            # 4: Front motion graphics (card sits IN FRONT of speaker, never covered by cutout)
+            def _action_layer_order(act_dict: dict) -> int:
+                act = act_dict.get("action", "")
+                is_behind = (
+                    str(act_dict.get("layer", "")).lower() == "behind"
+                    or str(act_dict.get("depth", "")).lower() == "behind"
+                    or bool(act_dict.get("_pre_cutout_path"))
+                )
+                if act == "b_roll":
+                    return 1 if is_behind else 0
+                if act == "motion_graphics" or act_dict.get("motion_graphics_text"):
+                    return 2 if is_behind else 4
+                if act == "character":
+                    return 3
+                return 4
+
             actions_sorted = sorted(
                 seg["actions"],
                 key=lambda x: (
-                    LAYER_ORDER.get(x.get("action"), 2),
+                    _action_layer_order(x),
                     x.get("seg_overlap_start", seg["start"])
                 )
             )
@@ -699,6 +777,19 @@ def render_video_pipeline(
                         filter_str.append(f"{current_v}{mg_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_mg_{mg_count}];")
                         current_v = f"[with_mg_{mg_count}]"
                         input_idx += 1
+
+                        # Studio Depth Matting: layer-2 cutout overlay
+                        cutout_path = a.get("_pre_cutout_path")
+                        if cutout_path and os.path.exists(cutout_path):
+                            cutout_start = a.get("_cutout_start", seg["start"])
+                            cutout_offset = a.get("seg_overlap_start", seg["start"]) - cutout_start
+                            cmd.extend(["-ss", str(max(0, cutout_offset)), "-t", str(rel_end - rel_start), "-i", cutout_path])
+                            cutout_v = f"[cutout_mg_{mg_count}_v]"
+                            filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{cutout_v};")
+                            filter_str.append(f"{current_v}{cutout_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_cutout_mg_{mg_count}];")
+                            current_v = f"[with_cutout_mg_{mg_count}]"
+                            input_idx += 1
+                        
                         mg_count += 1
                         
                 elif action_type == "b_roll":
@@ -724,6 +815,19 @@ def render_video_pipeline(
                             filter_str.append(f"{current_v}{bv}overlay=x={overlay_x}:y={overlay_y}:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_broll_{broll_count}];")
                             current_v = f"[with_broll_{broll_count}]"
                             input_idx += 1
+
+                            # Studio Depth Matting for behind B-roll
+                            cutout_path = a.get("_pre_cutout_path")
+                            if cutout_path and os.path.exists(cutout_path):
+                                cutout_start = a.get("_cutout_start", seg["start"])
+                                cutout_offset = a.get("seg_overlap_start", seg["start"]) - cutout_start
+                                cmd.extend(["-ss", str(max(0, cutout_offset)), "-t", str(rel_end - rel_start), "-i", cutout_path])
+                                cutout_v = f"[cutout_br_{broll_count}_v]"
+                                filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{cutout_v};")
+                                filter_str.append(f"{current_v}{cutout_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_cutout_br_{broll_count}];")
+                                current_v = f"[with_cutout_br_{broll_count}]"
+                                input_idx += 1
+
                             broll_count += 1
                             
             # To ensure the legacy block doesn't trigger when using granular overlays:
@@ -765,6 +869,7 @@ def render_video_pipeline(
         character_action = None
         has_sfx = False
         sfx_keyword = "pop"
+        sfx_delay_ms = 0
 
         for a in seg["actions"]:
             if a.get("action") == "character" or a.get("character_action"):
@@ -776,6 +881,24 @@ def render_video_pipeline(
             if a.get("action") == "sfx" or a.get("sound_effect"):
                 has_sfx = True
                 sfx_keyword = a.get("sound_effect", "pop")
+                rel_s = max(0.0, a.get("seg_overlap_start", seg["start"]) - seg["start"])
+                sfx_delay_ms = int(round(rel_s * 1000))
+
+        # Procedural SFX: automatically pair sound cues with motion graphics and zoom_in
+        if not has_sfx:
+            if mg_path or (use_granular and mg_count > 0):
+                from services.audio_sfx_synthesizer import recommend_sfx_for_action
+                for a in seg.get("actions", []):
+                    if a.get("action") == "motion_graphics" or a.get("motion_graphics_text"):
+                        sfx_keyword = recommend_sfx_for_action(a)
+                        has_sfx = True
+                        rel_s = max(0.0, a.get("seg_overlap_start", seg["start"]) - seg["start"])
+                        sfx_delay_ms = int(round(rel_s * 1000))
+                        break
+            elif "zoom_in" in action_types:
+                sfx_keyword = "zoom"
+                has_sfx = True
+                sfx_delay_ms = 0
 
         broll_transition = None
         for a in seg["actions"]:
@@ -806,6 +929,14 @@ def render_video_pipeline(
             filter_str.append(f"{current_v}[mg_v]overlay=x=0:y=0:eof_action=pass[with_mg];")
             current_v = "[with_mg]"
             input_idx += 1
+
+            cutout_path = mg_action.get("_pre_cutout_path") if mg_action else None
+            if cutout_path and os.path.exists(cutout_path):
+                cmd.extend(["-i", cutout_path])
+                filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[cutout_v];")
+                filter_str.append(f"{current_v}[cutout_v]overlay=x=0:y=0:eof_action=pass[with_cutout];")
+                current_v = "[with_cutout]"
+                input_idx += 1
             
         if character_video_path and os.path.exists(character_video_path):
             cmd.extend(["-i", character_video_path])
@@ -828,13 +959,19 @@ def render_video_pipeline(
             input_idx += 1
             
         if has_sfx:
-            sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
-            sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
-            if not sfx_fetched:
-                sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", "pop.wav"))
+            from services.audio_sfx_synthesizer import resolve_cue_name
+            cue_resolved = resolve_cue_name(sfx_keyword)
+            cached_sfx = os.path.join(sfx_kit_dir, f"{cue_resolved}.wav")
+            if os.path.exists(cached_sfx):
+                sfx_path = cached_sfx
+            else:
+                sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
+                sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
+                if not sfx_fetched:
+                    sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", "pop.wav"))
             if os.path.exists(sfx_path):
                 cmd.extend(["-i", sfx_path])
-                filter_str.append(f"[{input_idx}:a]adelay=0|0[sfx_a];")
+                filter_str.append(f"[{input_idx}:a]adelay={sfx_delay_ms}|{sfx_delay_ms}[sfx_a];")
                 filter_str.append(f"{current_a}[sfx_a]amix=inputs=2:duration=first:dropout_transition=2[a_out_sfx];")
                 current_a = "[a_out_sfx]"
                 input_idx += 1

@@ -107,6 +107,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         extracted_wav_path = os.path.join(temp_job_dir, "extracted_audio.wav")
         subtitle_ass_path = os.path.join(temp_job_dir, "subtitles.ass")
         rendered_mp4_path = os.path.join(temp_job_dir, "final_rendered.mp4")
+        deterministic_cuts = []
 
         # --- STEP 1: DOWNLOADING & STAGING ---
         with PipelineStep(1, 8, "DOWNLOADING & RAW MEDIA INGEST", f"Source: {job_source_url}"):
@@ -148,11 +149,25 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                     log_info("Generating TTS Audio for Faceless Video...")
                     topic = job_settings.get("topic", job_title)
                     script = job_settings.get("script", f"Here is a brand new faceless video about {topic}. We are currently generating this completely with AI. Stay tuned for the final result.")
-                    import subprocess
-                    edge_tts_bin = os.path.join(os.path.dirname(sys.executable), "edge-tts")
-                    if not os.path.exists(edge_tts_bin):
-                        edge_tts_bin = shutil.which("edge-tts") or "edge-tts"
-                    subprocess.run([edge_tts_bin, "--text", script, "--write-media", extracted_wav_path], check=True)
+                    
+                    import asyncio
+                    import edge_tts
+                    voice = job_settings.get("tts_voice", "en-US-ChristopherNeural")
+                    
+                    async def _generate_tts():
+                        comm = edge_tts.Communicate(script, voice)
+                        await comm.save(extracted_wav_path)
+
+                    try:
+                        asyncio.run(_generate_tts())
+                    except Exception as tts_err:
+                        log_warning(f"Async edge_tts failed: {tts_err}. Falling back to CLI...")
+                        import subprocess
+                        edge_tts_bin = os.path.join(os.path.dirname(sys.executable), "edge-tts")
+                        if not os.path.exists(edge_tts_bin):
+                            edge_tts_bin = shutil.which("edge-tts") or "edge-tts"
+                        subprocess.run([edge_tts_bin, "--text", script, "--write-media", extracted_wav_path], timeout=30, check=True)
+
                     ffmpeg_bin = get_ffmpeg_binary_path()
                     total_duration = _probe_duration(ffmpeg_bin, extracted_wav_path)
                     
@@ -185,6 +200,24 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             
             unified_audio_regions = classify_audio_regions(total_duration, speech_intervals, silence_intervals)
             log_info(f"Unified Audio Regions preview: {unified_audio_regions[:5]}")
+
+            from services.speech_pruner import generate_deterministic_silence_cuts, invert_cuts_to_kept_ranges
+            if job_video_type != VideoType.FACELESS_SHORT:
+                deterministic_cuts = generate_deterministic_silence_cuts(
+                    total_duration=total_duration,
+                    speech_intervals=speech_intervals,
+                    silence_intervals=silence_intervals,
+                    head_margin_s=0.15,
+                    tail_margin_s=0.25,
+                    min_gap_duration=0.60,
+                    breath_cushion_s=0.10,
+                )
+                kept_preview = invert_cuts_to_kept_ranges(deterministic_cuts, total_duration)
+                kept_sec = sum(ke - ks for ks, ke in kept_preview)
+                log_info(
+                    f"[SPEECH_SPINE] Generated {len(deterministic_cuts)} deterministic silence cuts | "
+                    f"Trimming {total_duration - kept_sec:.1f}s dead air -> {kept_sec:.1f}s active speech"
+                )
 
         # --- STEP 3: VISUAL ANALYSIS ---
         with PipelineStep(3, 8, "VISUAL INTELLIGENCE LAYER", "Extracting scenes, subjects, and safe regions"):
@@ -230,10 +263,35 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                     for chunk in sorted_chunks:
                         for w in chunk.get("words", []):
                             words_for_beat.append({"word": w["word"], "start": w["start"], "end": w["end"]})
-                    if words_for_beat:
-                        beat_sheet_obj = analyze_script(words_for_beat, bracketed_transcript, ai_model_pref=beat_model)
+
+                    # Exclude words that fall completely inside a deterministic silence cut
+                    def _word_in_cut(ws: float, we: float) -> bool:
+                        for cut in deterministic_cuts:
+                            cs = cut.get("start", 0.0)
+                            ce = cut.get("end", 0.0)
+                            if ws >= cs - 0.05 and we <= ce + 0.05:
+                                return True
+                        return False
+
+                    kept_words_for_beat = [
+                        w for w in words_for_beat
+                        if not _word_in_cut(w["start"], w["end"])
+                    ]
+                    if not kept_words_for_beat:
+                        kept_words_for_beat = words_for_beat
+
+                    if kept_words_for_beat:
+                        beat_sheet_obj = analyze_script(kept_words_for_beat, bracketed_transcript, ai_model_pref=beat_model)
                         beat_sheet_dict = beat_sheet_obj.model_dump()
                         
+                        # Active speech duration for pacing calculation
+                        active_speech_dur = total_duration
+                        if deterministic_cuts:
+                            from services.speech_pruner import invert_cuts_to_kept_ranges
+                            kept_spans = invert_cuts_to_kept_ranges(deterministic_cuts, total_duration)
+                            if kept_spans:
+                                active_speech_dur = sum(ke - ks for ks, ke in kept_spans)
+
                         # Assign treatments
                         treatment_settings = {
                             "MAX_OVERLAYS_PER_MIN": 8,
@@ -241,10 +299,10 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                             "MAX_OVERLAY_DURATION": 6.0,
                             "is_faceless": (job_video_type == VideoType.FACELESS_SHORT)
                         }
-                        updated_sheet, log_table = assign_visual_treatments(beat_sheet_dict, total_duration, treatment_settings)
+                        updated_sheet, log_table = assign_visual_treatments(beat_sheet_dict, active_speech_dur, treatment_settings)
                         beat_sheet_dict = updated_sheet
                         
-                        log_info(f"Generated {len(beat_sheet_dict.get('beats', []))} beats with treatments assigned.")
+                        log_info(f"Generated {len(beat_sheet_dict.get('beats', []))} beats on active speech ({active_speech_dur:.1f}s) with treatments assigned.")
                 except Exception as e:
                     log_warning(f"Beat analyzer failed: {e}")
 
@@ -284,7 +342,8 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 broll_plan=broll_plan,
                 mg_plan=mg_plan,
                 char_plan=char_plan,
-                ai_model_pref=ai_model_pref
+                ai_model_pref=ai_model_pref,
+                deterministic_cuts=deterministic_cuts,
             )
             edit_decision_list = generate_sfx_plan(
                 unified_analysis_json=unified_json_str,
@@ -432,6 +491,23 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 access_token=None,
             )
 
+            # --- NLE TIMELINE MULTI-TRACK EXPORT (PHASE 2) ---
+            try:
+                from services.nle_exporter import export_nle_project
+                nle_export_dir = os.path.join(temp_job_dir, "nle_export")
+                nle_res = export_nle_project(
+                    output_dir=nle_export_dir,
+                    project_name=job_title,
+                    raw_video_path=raw_video_path,
+                    edits=validated_edits,
+                    timestamp_map=timestamp_map,
+                    settings=job_settings,
+                    create_zip=True,
+                )
+                log_info(f"Generated NLE multi-track timelines (.fcpxml, .xml, .edl, .srt): {nle_res.get('zip_path')}")
+            except Exception as nle_err:
+                log_warning(f"NLE Timeline export generation skipped: {nle_err}")
+
             set_job_status_completed(job_uuid, final_video_url, edits_json_str)
 
         total_duration = time.time() - pipeline_start
@@ -456,3 +532,48 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         log_error(f"Pipeline failure for Job {job_id}:\n{err_stack}")
         set_job_status_failed(job_uuid, err_stack)
         raise self.retry(exc=exc, countdown=10)
+
+
+@celery_app.task(bind=True, name="tasks.render_timeline_pipeline")
+def render_timeline_pipeline(self: Task, job_id: str, project_data: dict) -> dict:
+    """
+    Renders user-customized timeline project edits into production MP4 and NLE files.
+    """
+    job_uuid = uuid.UUID(job_id) if isinstance(job_id, str) else job_id
+    temp_job_dir = os.path.join(settings.TEMP_DIR, str(job_uuid))
+    os.makedirs(temp_job_dir, exist_ok=True)
+
+    session = get_worker_db()
+    job = session.get(VideoJob, job_uuid)
+    if not job:
+        session.close()
+        return {"status": "error", "message": f"Job {job_id} not found"}
+
+    title = job.title or "Studio Video"
+    raw_video_path = job.source_url or ""
+    session.close()
+
+    # Pre-generate NLE exports
+    try:
+        from services.nle_exporter import export_nle_project
+        edits = project_data.get("edits", [])
+        timestamp_map = project_data.get("timestamp_map", {})
+        job_settings = project_data.get("settings", {})
+        nle_export_dir = os.path.join(temp_job_dir, "nle_export")
+        export_nle_project(
+            output_dir=nle_export_dir,
+            project_name=title,
+            raw_video_path=raw_video_path,
+            edits=edits,
+            timestamp_map=timestamp_map,
+            settings=job_settings,
+            create_zip=True,
+        )
+    except Exception as e:
+        print(f"[Worker: RenderTimeline] NLE export warning: {e}")
+
+    return {
+        "status": "success",
+        "job_id": str(job_uuid),
+        "message": "Render completed successfully",
+    }

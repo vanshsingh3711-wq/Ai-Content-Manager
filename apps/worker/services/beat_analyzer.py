@@ -129,13 +129,16 @@ def auto_repair_llm_beat_sheet(llm_beat_sheet: LLMBeatSheet, words: List[Dict[st
         beat_text_lower = beat.text.lower()
         beat.emphasis_words = [w for w in beat.emphasis_words if w.lower() in beat_text_lower][:3]
         
-        if beat.role not in ["list", "comparison", "statistic", "process"]:
-            if beat.focus_end_word_index - beat.focus_start_word_index >= 4:
-                old_end = beat.focus_end_word_index
-                beat.focus_end_word_index = beat.focus_start_word_index + 3
-                logger.info(f"BeatAnalyzer: Repairing focus_end_word_index from {old_end} to {beat.focus_end_word_index} (max length) for beat {beat.id}")
-                repair_count += 1
-                
+        # Deterministic role downgrades (must run FIRST before length clamping)
+        if beat.role == "statistic" and not has_number(beat.text):
+            logger.info(f"BeatAnalyzer: Repairing role from statistic to claim for beat {beat.id} (no numbers detected)")
+            beat.role = "claim"
+            repair_count += 1
+        elif beat.role == "list" and list_item_count(beat.text) < 3:
+            logger.info(f"BeatAnalyzer: Repairing role from list to claim for beat {beat.id} (list_item_count < 3)")
+            beat.role = "claim"
+            repair_count += 1
+
         if words:
             # Fix function words at the start
             function_words = {"of", "the", "a", "an", "to", "in", "on", "at", "by", "for", "with", "about", "as", "into", "like", "through", "after", "over", "between", "out", "against", "during", "without", "before", "under", "around", "among", "and", "but", "or", "nor", "for", "yet", "so"}
@@ -158,16 +161,14 @@ def auto_repair_llm_beat_sheet(llm_beat_sheet: LLMBeatSheet, words: List[Dict[st
                     logger.info(f"BeatAnalyzer: Repairing focus_end_word_index from {old_end} to {beat.focus_end_word_index} (punctuation) for beat {beat.id}")
                     repair_count += 1
                     break
-        
-        # Deterministic role downgrades
-        if beat.role == "statistic" and not has_number(beat.text):
-            logger.info(f"BeatAnalyzer: Repairing role from statistic to claim for beat {beat.id} (no numbers detected)")
-            beat.role = "claim"
-            repair_count += 1
-        elif beat.role == "list" and list_item_count(beat.text) < 3:
-            logger.info(f"BeatAnalyzer: Repairing role from list to claim for beat {beat.id} (list_item_count < 3)")
-            beat.role = "claim"
-            repair_count += 1
+
+        # Length clamping for non-list/comparison/statistic/process roles
+        if beat.role not in ["list", "comparison", "statistic", "process"]:
+            if beat.focus_end_word_index - beat.focus_start_word_index >= 4:
+                old_end = beat.focus_end_word_index
+                beat.focus_end_word_index = beat.focus_start_word_index + 3
+                logger.info(f"BeatAnalyzer: Repairing focus_end_word_index from {old_end} to {beat.focus_end_word_index} (max length) for beat {beat.id}")
+                repair_count += 1
 
     if repair_count > 0:
         logger.warning(f"BeatAnalyzer: Performed {repair_count} auto-repairs on this run.")

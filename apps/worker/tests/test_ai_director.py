@@ -1,6 +1,9 @@
+import os
 from unittest.mock import patch
 from services.ai_director import _call_llm, EditList
 
+
+@patch.dict(os.environ, {"DEEPSEEK_API_KEY": "mock_deepseek_key"})
 @patch("services.ai_director.OpenAI")
 def test_call_llm_default_behavior(mock_openai):
     # Setup mock to return a valid EditList JSON
@@ -15,6 +18,8 @@ def test_call_llm_default_behavior(mock_openai):
     assert isinstance(result, EditList)
     assert len(result.edits) == 0
 
+
+@patch.dict(os.environ, {"DEEPSEEK_API_KEY": "mock_deepseek_key"})
 @patch("services.ai_director.OpenAI")
 def test_call_llm_raw_output_behavior(mock_openai):
     # Setup mock to return any JSON

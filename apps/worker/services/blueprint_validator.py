@@ -306,6 +306,14 @@ def validate_blueprint(
                 "browser_walkthrough": {"url", "tabTitle"},
                 "vscode_code_typing":  {"title", "activeFile", "code"},
                 "kinetic_text":        {"text"},
+                "cooked_likes":        {"label"},
+                "cooked_terminal":     {"command"},
+                "cooked_social_post":  {"text"},
+                "cooked_chat":         {"messages"},
+                "cooked_notes":        {"items"},
+                "cooked_progress":     {"progress"},
+                "cooked_toasts":       {"title"},
+                "cooked_flow":         {"nodes"},
             }
 
             KEY_DEFAULTS = {
@@ -320,6 +328,16 @@ def validate_blueprint(
                 "label": "KEY INSIGHT",
                 "concept": "💡",
                 "activeFile": "main.py",
+                "command": "npm run dev",
+                "output": "Ready on http://localhost:3000",
+                "name": "Creator",
+                "handle": "@creator",
+                "highlight": "game changer",
+                "likes": "42.8K",
+                "messages": [{"from": "them", "text": "How did you build this?"}, {"from": "me", "text": "Automated workflow pipelines."}],
+                "items": ["Record take", "Run AI editing pipeline", "Publish high retention video"],
+                "progress": 85,
+                "nodes": [{"label": "Input Data"}, {"label": "AI Transform"}, {"label": "Final Output"}],
             }
 
             mg_type = edit.get("motion_graphics_type", "")
@@ -354,6 +372,29 @@ def validate_blueprint(
                 ))
                 report.modified_count += 1
 
+            # ── Studio Depth Matting: normalize layer / depth ─────────────
+            raw_layer = edit.get("layer") or edit.get("depth")
+            norm_layer = "front"
+            if raw_layer and str(raw_layer).lower() in ("behind", "back", "background"):
+                # User constraint: readable / text-dense graphics MUST stay in front
+                UNSUITABLE_FOR_BEHIND = {
+                    "cooked_terminal", "cooked_chat", "cooked_notes",
+                    "code_reveal", "vscode_code_typing", "quote_reveal",
+                    "step_sequence", "kinetic_text", "browser_walkthrough"
+                }
+                if edit.get("motion_graphics_type") in UNSUITABLE_FOR_BEHIND:
+                    norm_layer = "front"
+                    report.issues.append(ValidationIssue(
+                        trigger_id=trigger_id,
+                        action=action,
+                        issue=f"Template '{edit.get('motion_graphics_type')}' has readable text; forced layer from 'behind' to 'front' to prevent obscuring speaker",
+                        severity="modified",
+                    ))
+                    report.modified_count += 1
+                else:
+                    norm_layer = "behind"
+            edit["layer"] = norm_layer
+
             validated.append(edit)
             report.accepted_count += 1
             continue
@@ -365,6 +406,30 @@ def validate_blueprint(
             issue=f"Unknown action type: '{action}'",
         ))
         report.rejected_count += 1
+
+    # ── Phase 3: Anti-AI Quality Guardian & Pacing Linter ──────────────
+    try:
+        from services.ai_tells_linter import lint_and_guard_blueprint
+        linted, linter_summary = lint_and_guard_blueprint(
+            edits=validated,
+            timestamp_map=timestamp_map,
+            video_duration=video_duration,
+        )
+        for l_issue in linter_summary.get("issues", []):
+            report.issues.append(ValidationIssue(
+                trigger_id=l_issue["trigger_id"],
+                action=l_issue["action"],
+                issue=f"[{l_issue['rule']}] {l_issue['details']}",
+                severity=l_issue["severity"],
+            ))
+            if l_issue["severity"] == "rejected":
+                report.rejected_count += 1
+                report.accepted_count = max(0, report.accepted_count - 1)
+            elif l_issue["severity"] == "modified":
+                report.modified_count += 1
+        validated = linted
+    except Exception as e:
+        print(f"[Blueprint Validator] Linter pass skipped: {e}")
 
     report.broll_budget_used = round(total_broll_duration, 2)
     return validated, report

@@ -39,15 +39,17 @@ def create_and_run_test_video():
         session.refresh(user)
 
     test_script = (
-        "Artificial intelligence is transforming how videos are created. "
-        "Instead of spending hours manually editing clips and trimming pauses, "
-        "smart models understand narrative pacing and select the perfect footage. "
-        "Dynamic motion graphic cards explain complex ideas with bold visual clarity. "
-        "This is the future of automated video creation."
+        "The secret to viral videos isn't luck. It's aggressive visual pacing. "
+        "Over seventy-three percent of viewers swipe away within the first three seconds if nothing changes on screen. "
+        "To keep retention above eighty percent, creators use three essential rules: "
+        "First, cut dead silence and eliminate awkward pauses. "
+        "Second, introduce dynamic motion graphic cards every few seconds. "
+        "And third, layer micro-sound design behind every visual cut. "
+        "Automated video editing is no longer a luxury. It is the new creative standard."
     )
 
     settings = {
-        "topic": "The Future of AI Video Creation",
+        "topic": "The Science of High Retention Videos",
         "script": test_script,
         "character": "sarah",
         "niche": "Technology",
@@ -55,7 +57,7 @@ def create_and_run_test_video():
         "aspect_ratio": "9:16",
         "mood": "Energetic",
         "video_style": "viral",
-        "ai_model": "DeepSeek-Hybrid",
+        "ai_model": "DeepSeek-Chat",
         "use_3d_avatar": False,
         "caption_preset": "tiktok_yellow",
         "USE_GRANULAR_OVERLAYS": True,
@@ -65,7 +67,7 @@ def create_and_run_test_video():
     job = VideoJob(
         id=job_id,
         user_id=user.id,
-        title="The Future of AI Video Creation",
+        title="The Science of High Retention Videos",
         source_url="",
         video_type=VideoType.FACELESS_SHORT,
         status=VideoJobStatus.QUEUED,
@@ -92,6 +94,16 @@ def create_and_run_test_video():
     if final_job:
         print(f"[*] Final Status: {final_job.status}")
         print(f"[*] Rendered URL: {final_job.rendered_url}")
+        
+        # Copy to sample_video/faceless_test_video.mp4 for easy user access
+        sample_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sample_video"))
+        target_local_mp4 = os.path.join(sample_dir, "faceless_test_video.mp4")
+        if output and isinstance(output, dict) and output.get("output_path"):
+            prod_path = output["output_path"]
+            if os.path.exists(prod_path):
+                import shutil
+                shutil.copyfile(prod_path, target_local_mp4)
+                print(f"[*] Copied final video to: {target_local_mp4}")
     s.close()
 
 

@@ -12,6 +12,7 @@ import { StatCardHighlight } from './compositions/StatCardHighlight';
 import { BrowserWalkthrough } from './compositions/BrowserWalkthrough';
 import { VSCodeTyping } from './compositions/VSCodeTyping';
 import { KineticText } from './compositions/KineticText';
+import { CookedMotionCard } from './compositions/CookedMotionCard';
 
 // Remotion Root — all compositions registered here
 // Python calls: npx remotion render src/remotion/Root.tsx <ID> --props='{}' out.mov
@@ -65,5 +66,23 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="kinetic-text" component={KineticText} durationInFrames={150} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}
       defaultProps={{ text: 'THIS IS THE HOOK', personality: 'energetic' }} />
+
+    {/* Cooked Motion Templates */}
+    <Composition id="cooked-card" component={CookedMotionCard} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        type: 'likes',
+        props: { label: 'Subscribers', from: 0, to: 100000 },
+        box: [8, 15, 84, 45],
+        motion: 'snappy'
+      }} />
+    <Composition id="cooked-likes" component={(props: any) => <CookedMotionCard type="likes" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ label: 'Metric', from: 0, to: 100000 }} />
+    <Composition id="cooked-terminal" component={(props: any) => <CookedMotionCard type="terminal" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ command: 'npm start', output: 'Server running on port 3000' }} />
+    <Composition id="cooked-social-post" component={(props: any) => <CookedMotionCard type="social_post" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ name: 'Creator', handle: '@creator', text: 'This changed everything.', highlight: 'everything' }} />
+    <Composition id="cooked-chat" component={(props: any) => <CookedMotionCard type="chat" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ messages: [{ from: 'them', text: 'Hey, how did you edit this?' }, { from: 'me', text: 'With AI Content Manager!' }] }} />
+    <Composition id="cooked-notes" component={(props: any) => <CookedMotionCard type="notes" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ title: 'Key Takeaways', items: ['Step 1: Record take', 'Step 2: AI edits', 'Step 3: Publish'] }} />
+    <Composition id="cooked-progress" component={(props: any) => <CookedMotionCard type="progress" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ label: 'Render Progress', progress: 85 }} />
+    <Composition id="cooked-toasts" component={(props: any) => <CookedMotionCard type="toasts" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ title: 'New Notification', message: 'Video rendered successfully!' }} />
+    <Composition id="cooked-flow" component={(props: any) => <CookedMotionCard type="flow" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H} calculateMetadata={getMeta} defaultProps={{ nodes: [{ label: 'Input' }, { label: 'AI Process' }, { label: 'Output' }] }} />
   </>
 );

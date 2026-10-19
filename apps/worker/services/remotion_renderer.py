@@ -47,6 +47,16 @@ ALLOWED_COMPOSITIONS = {
     "browser_walkthrough",
     "vscode_code_typing",
     "kinetic_text",
+    # Cooked Motion Templates
+    "cooked_card",
+    "cooked_likes",
+    "cooked_terminal",
+    "cooked_social_post",
+    "cooked_chat",
+    "cooked_notes",
+    "cooked_progress",
+    "cooked_toasts",
+    "cooked_flow",
 }
 
 
@@ -102,6 +112,7 @@ def render_motion_graphic(
             "--log=verbose",
             "--overwrite",
             "--concurrency=2",               # Limit CPU usage
+            f"--timeout={timeout_sec * 1000}", # Prevent 30s puppeteer seek timeout
         ]
 
         print(f"[RemotionRenderer] 🎬 Rendering '{comp_kebab}' ({duration_frames}f @ {fps}fps, {width}x{height})")
@@ -147,6 +158,11 @@ def build_props_from_edit(edit: Dict[str, Any]) -> Dict[str, Any]:
     comp_id = edit.get("motion_graphics_type", "hero_reveal")
     targets = edit.get("motion_graphics_targets", {})
     personality = edit.get("personality", "premium")
+
+    if comp_id.startswith("cooked_") or comp_id.startswith("cooked-"):
+        props = dict(targets) if isinstance(targets, dict) else {}
+        props["personality"] = personality
+        return props
 
     # Template-specific prop mapping
     PROP_MAPS = {

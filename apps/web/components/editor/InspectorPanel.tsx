@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Sliders,
   Volume2,
@@ -13,6 +13,7 @@ import {
   Diamond,
   BrainCircuit,
   Check,
+  Layers,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -131,7 +132,7 @@ function FeedbackUI({ type, original, current }: { type: string, original: any, 
   );
 }
 
-function TransformControls({ clip, trackType, updateFn }: { clip: any, trackType: "video"|"broll"|"caption", updateFn: Function }) {
+function TransformControls({ clip, trackType, updateFn }: { clip: any, trackType: "video"|"broll"|"caption"|"graphic", updateFn: Function }) {
   const { playheadTime } = useTimelineStore();
   const commitHistory = () => {
     useTimelineStore.getState().commitHistory();
@@ -245,6 +246,7 @@ export function InspectorPanel() {
     updateVideoClip,
     updateCaption,
     updateBRollClip,
+    updateGraphicElement,
     deleteClip,
     setSelectedItem,
     playheadTime,
@@ -255,6 +257,7 @@ export function InspectorPanel() {
     updateVideoClip: state.updateVideoClip,
     updateCaption: state.updateCaption,
     updateBRollClip: state.updateBRollClip,
+    updateGraphicElement: state.updateGraphicElement,
     deleteClip: state.deleteClip,
     setSelectedItem: state.setSelectedItem,
     playheadTime: state.playheadTime,
@@ -597,6 +600,58 @@ export function InspectorPanel() {
         >
           <Trash2 className="w-3.5 h-3.5" />
           <span>Delete Overlay</span>
+        </button>
+      </aside>
+    );
+  }
+
+  // Selected: Graphic Element
+  if (selectedItem.type === "graphic") {
+    const graphic = (project.tracks.graphicsTrack || []).find((g) => g.id === selectedItem.id);
+    if (!graphic) return null;
+
+    return (
+      <aside className="w-64 border-l border-neutral-900 bg-neutral-950 p-4 flex flex-col select-none text-slate-300">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-900 mb-4">
+          <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5" />
+            <span>Graphic Element</span>
+          </h3>
+          <button
+            onClick={() => setSelectedItem(null)}
+            className="text-[10px] text-neutral-500 hover:text-white cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="space-y-4 text-xs flex-1 overflow-y-auto">
+          <div>
+            <label className="block text-neutral-500 mb-1">Name</label>
+            <input
+              type="text"
+              value={graphic.name}
+              onChange={(e) => updateGraphicElement(graphic.id, { name: e.target.value })}
+              className="w-full bg-slate-900 border border-neutral-800 rounded-lg p-2 text-xs text-white outline-none focus:border-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-neutral-500 mb-1">Composition</label>
+            <div className="p-2 rounded bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-yellow-400">
+              {graphic.compositionId}
+            </div>
+          </div>
+
+          <TransformControls clip={graphic} trackType="graphic" updateFn={updateGraphicElement} />
+        </div>
+
+        <button
+          onClick={() => deleteClip("graphic", graphic.id)}
+          className="w-full py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all mt-4 cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Delete Graphic</span>
         </button>
       </aside>
     );

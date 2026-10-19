@@ -6,13 +6,22 @@ import {
   BRollClip,
   CaptionBlock,
   AudioClip,
+  GraphicElement,
+  TrackItemType,
   AspectRatio,
   HistoryState,
-  InterpolationType
+  InterpolationType,
+  SemanticConstraint,
+  TranscriptData,
 } from "../timeline-types";
+import { EditOperation } from "../operations/operation-types";
+import { executeOperation } from "../operations/operation-executor";
+import { SnapGuide } from "../editor/snapping";
+import { resolveProjectLayout, LayoutResolutionOptions } from "../layout/layout-resolver";
+import { reflowProjectToAspectRatio } from "../layout/aspect-ratio-reflow";
 
 interface SelectedItem {
-  type: "video" | "broll" | "caption" | "audio";
+  type: TrackItemType;
   id: string;
 }
 
@@ -23,6 +32,8 @@ interface TimelineState {
   zoomLevel: number; // Pixels per second (e.g. 40)
   selectedItem: SelectedItem | null;
   safeZoneVisible: boolean;
+  subjectOverlayVisible: boolean;
+  activeSnapGuides: SnapGuide[];
 
   // History stack for Undo / Redo
   past: HistoryState[];
@@ -37,6 +48,9 @@ interface TimelineState {
   setAspectRatio: (aspectRatio: AspectRatio) => void;
   setSelectedItem: (item: SelectedItem | null) => void;
   setSafeZoneVisible: (visible: boolean) => void;
+  setSubjectOverlayVisible: (visible: boolean) => void;
+  toggleSubjectOverlay: () => void;
+  setActiveSnapGuides: (guides: SnapGuide[]) => void;
 
   // Video track actions
   splitClipAtPlayhead: (targetType?: SelectedItem["type"], targetClipId?: string) => void;
@@ -57,6 +71,10 @@ interface TimelineState {
   addAudioClip: (audio: Omit<AudioClip, "id">) => void;
   updateAudioClip: (id: string, updates: Partial<AudioClip>) => void;
 
+  // Graphics actions
+  addGraphicElement: (element: Omit<GraphicElement, "id">) => void;
+  updateGraphicElement: (id: string, updates: Partial<GraphicElement>, saveHistory?: boolean) => void;
+
   // Undo / Redo
   undo: () => void;
   redo: () => void;
@@ -65,6 +83,18 @@ interface TimelineState {
   // Keyframes
   setKeyframe: (trackType: SelectedItem["type"], clipId: string, property: string, time: number, value: any, saveHistory?: boolean, interpolation?: InterpolationType) => void;
   removeKeyframe: (trackType: SelectedItem["type"], clipId: string, property: string, time: number) => void;
+
+  // Operational Command Bus
+  dispatchOperation: (op: EditOperation) => void;
+  dispatchBatch: (ops: EditOperation[], description?: string) => void;
+
+  // Semantic Constraints & Layout Resolution
+  resolveLayout: (options?: LayoutResolutionOptions) => void;
+  addConstraint: (constraint: SemanticConstraint) => void;
+  removeConstraint: (constraintId: string) => void;
+
+  // Transcript & Story Beats
+  setTranscript: (transcript: TranscriptData) => void;
 }
 
 const DEFAULT_PROJECT: TimelineProject = {
@@ -78,13 +108,19 @@ const DEFAULT_PROJECT: TimelineProject = {
     brollTrack: [],
     textTrack: [],
     audioTrack: [],
+    graphicsTrack: [],
   },
+  constraints: [],
+  safeZones: [],
 };
 
 const createHistorySnapshot = (project: TimelineProject): HistoryState => ({
   tracks: JSON.parse(JSON.stringify(project.tracks)),
   duration: project.duration,
   aspectRatio: project.aspectRatio,
+  constraints: project.constraints ? JSON.parse(JSON.stringify(project.constraints)) : [],
+  safeZones: project.safeZones ? JSON.parse(JSON.stringify(project.safeZones)) : [],
+  transcript: project.transcript ? JSON.parse(JSON.stringify(project.transcript)) : undefined,
 });
 
 export const useTimelineStore = create<TimelineState>()(
@@ -96,6 +132,8 @@ export const useTimelineStore = create<TimelineState>()(
   zoomLevel: 40,
   selectedItem: null,
   safeZoneVisible: false,
+  subjectOverlayVisible: false,
+  activeSnapGuides: [],
   past: [],
   future: [],
 
@@ -105,10 +143,13 @@ export const useTimelineStore = create<TimelineState>()(
       playheadTime: 0,
       isPlaying: false,
       selectedItem: null,
+      activeSnapGuides: [],
       past: [],
       future: [],
     });
   },
+
+  setActiveSnapGuides: (activeSnapGuides) => set({ activeSnapGuides }),
 
   setPlayheadTime: (time) => {
     const { project } = get();
@@ -127,9 +168,13 @@ export const useTimelineStore = create<TimelineState>()(
 
   setAspectRatio: (aspectRatio) => {
     const { project, past } = get();
+    if (project.aspectRatio === aspectRatio) return;
+
     const snapshot = createHistorySnapshot(project);
+    const reflowedProject = reflowProjectToAspectRatio(project, aspectRatio);
+
     set({
-      project: { ...project, aspectRatio },
+      project: reflowedProject,
       past: [...past.slice(-29), snapshot],
       future: [],
     });
@@ -138,6 +183,10 @@ export const useTimelineStore = create<TimelineState>()(
   setSelectedItem: (selectedItem) => set({ selectedItem }),
 
   setSafeZoneVisible: (safeZoneVisible) => set({ safeZoneVisible }),
+
+  setSubjectOverlayVisible: (subjectOverlayVisible) => set({ subjectOverlayVisible }),
+
+  toggleSubjectOverlay: () => set((state) => ({ subjectOverlayVisible: !state.subjectOverlayVisible })),
 
   splitClipAtPlayhead: (targetType = "video", targetClipId) => {
     const { project, playheadTime, past } = get();
@@ -231,6 +280,27 @@ export const useTimelineStore = create<TimelineState>()(
         past: [...past.slice(-29), snapshot],
         future: [],
       });
+    } else if (targetType === "graphic") {
+      const graphicsTrack = [...(tracks.graphicsTrack || [])];
+      const clipIndex = targetClipId
+        ? graphicsTrack.findIndex((c) => c.id === targetClipId)
+        : graphicsTrack.findIndex((c) => playheadTime > c.start + 0.1 && playheadTime < c.end - 0.1);
+
+      if (clipIndex === -1) return;
+      const target = graphicsTrack[clipIndex];
+      if (playheadTime <= target.start + 0.1 || playheadTime >= target.end - 0.1) return;
+
+      const clipA: GraphicElement = { ...target, id: `${target.id}-p1-${Date.now()}`, end: playheadTime };
+      const clipB: GraphicElement = { ...target, id: `${target.id}-p2-${Date.now()}`, start: playheadTime };
+      graphicsTrack.splice(clipIndex, 1, clipA, clipB);
+      tracks.graphicsTrack = graphicsTrack;
+
+      set({
+        project: { ...project, tracks },
+        selectedItem: { type: "graphic", id: clipB.id },
+        past: [...past.slice(-29), snapshot],
+        future: [],
+      });
     }
   },
 
@@ -307,6 +377,8 @@ export const useTimelineStore = create<TimelineState>()(
       tracks.textTrack = tracks.textTrack.filter((t) => t.id !== id);
     } else if (type === "audio") {
       tracks.audioTrack = tracks.audioTrack.filter((a) => a.id !== id);
+    } else if (type === "graphic") {
+      tracks.graphicsTrack = (tracks.graphicsTrack || []).filter((g) => g.id !== id);
     }
 
     const newDuration = Math.max(
@@ -541,6 +613,125 @@ export const useTimelineStore = create<TimelineState>()(
     });
   },
 
+  addGraphicElement: (element) => {
+    const { project, past } = get();
+    const snapshot = createHistorySnapshot(project);
+    const newElement: GraphicElement = {
+      ...element,
+      id: `graphic-${Date.now()}`,
+    };
+    const currentGraphics = project.tracks.graphicsTrack || [];
+    set({
+      project: {
+        ...project,
+        tracks: {
+          ...project.tracks,
+          graphicsTrack: [...currentGraphics, newElement],
+        },
+      },
+      selectedItem: { type: "graphic", id: newElement.id },
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
+  updateGraphicElement: (id, updates, saveHistory = true) => {
+    const { project, past } = get();
+    const currentGraphics = project.tracks.graphicsTrack || [];
+    const graphicsTrack = currentGraphics.map((g) =>
+      g.id === id ? { ...g, ...updates } : g
+    );
+    const newState: any = {
+      project: {
+        ...project,
+        tracks: {
+          ...project.tracks,
+          graphicsTrack,
+        },
+      },
+    };
+    if (saveHistory) {
+      newState.past = [...past.slice(-29), createHistorySnapshot(project)];
+      newState.future = [];
+    }
+    set(newState);
+  },
+
+  dispatchOperation: (rawOp) => {
+    const { project, past } = get();
+    const snapshot = createHistorySnapshot(project);
+    const { nextProject } = executeOperation(project, rawOp);
+    const resolved = resolveProjectLayout(nextProject);
+
+    set({
+      project: resolved.project,
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
+  dispatchBatch: (ops, description) => {
+    const { project, past } = get();
+    const snapshot = createHistorySnapshot(project);
+    const batchOp: EditOperation = {
+      type: "batch",
+      operations: ops as any,
+      description,
+    };
+    const { nextProject } = executeOperation(project, batchOp);
+    const resolved = resolveProjectLayout(nextProject);
+
+    set({
+      project: resolved.project,
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
+  resolveLayout: (options) => {
+    const { project, past } = get();
+    const resolved = resolveProjectLayout(project, options);
+    if (resolved.changedElementIds.length > 0) {
+      set({
+        project: resolved.project,
+        past: [...past.slice(-29), createHistorySnapshot(project)],
+        future: [],
+      });
+    }
+  },
+
+  addConstraint: (constraint) => {
+    const { project, past } = get();
+    const snapshot = createHistorySnapshot(project);
+    const existing = project.constraints || [];
+    const nextProject = {
+      ...project,
+      constraints: [...existing.filter((c) => c.id !== constraint.id), constraint],
+    };
+    const resolved = resolveProjectLayout(nextProject);
+    set({
+      project: resolved.project,
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
+  removeConstraint: (constraintId) => {
+    const { project, past } = get();
+    const snapshot = createHistorySnapshot(project);
+    const existing = project.constraints || [];
+    const nextProject = {
+      ...project,
+      constraints: existing.filter((c) => c.id !== constraintId),
+    };
+    const resolved = resolveProjectLayout(nextProject);
+    set({
+      project: resolved.project,
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
   undo: () => {
     const { past, future, project } = get();
     if (past.length === 0) return;
@@ -555,6 +746,8 @@ export const useTimelineStore = create<TimelineState>()(
         tracks: previous.tracks,
         duration: previous.duration,
         aspectRatio: previous.aspectRatio,
+        constraints: previous.constraints || [],
+        safeZones: previous.safeZones || [],
       },
       past: newPast,
       future: [currentSnapshot, ...future],
@@ -575,6 +768,8 @@ export const useTimelineStore = create<TimelineState>()(
         tracks: next.tracks,
         duration: next.duration,
         aspectRatio: next.aspectRatio,
+        constraints: next.constraints || [],
+        safeZones: next.safeZones || [],
       },
       past: [...past, currentSnapshot],
       future: newFuture,
@@ -583,8 +778,10 @@ export const useTimelineStore = create<TimelineState>()(
   
   commitHistory: () => {
     const { project, past } = get();
+    const resolved = resolveProjectLayout(project);
     set({
-      past: [...past.slice(-29), createHistorySnapshot(project)],
+      project: resolved.project,
+      past: [...past.slice(-29), createHistorySnapshot(resolved.project)],
       future: [],
     });
   },
@@ -619,6 +816,8 @@ export const useTimelineStore = create<TimelineState>()(
       tracks.textTrack = tracks.textTrack.map((c) => c.id === clipId ? updateClipKeyframes(c) : c);
     } else if (trackType === "audio") {
       tracks.audioTrack = tracks.audioTrack.map((c) => c.id === clipId ? updateClipKeyframes(c) : c);
+    } else if (trackType === "graphic") {
+      tracks.graphicsTrack = (tracks.graphicsTrack || []).map((c) => c.id === clipId ? updateClipKeyframes(c) : c);
     }
 
     const newState: any = { project: { ...project, tracks } };
@@ -659,6 +858,8 @@ export const useTimelineStore = create<TimelineState>()(
       tracks.textTrack = tracks.textTrack.map((c) => c.id === clipId ? removeClipKeyframe(c) : c);
     } else if (trackType === "audio") {
       tracks.audioTrack = tracks.audioTrack.map((c) => c.id === clipId ? removeClipKeyframe(c) : c);
+    } else if (trackType === "graphic") {
+      tracks.graphicsTrack = (tracks.graphicsTrack || []).map((c) => c.id === clipId ? removeClipKeyframe(c) : c);
     }
 
     set({
@@ -666,6 +867,15 @@ export const useTimelineStore = create<TimelineState>()(
       past: [...past.slice(-29), snapshot],
       future: [],
     });
+  },
+
+  setTranscript: (transcript: TranscriptData) => {
+    set((state) => ({
+      project: {
+        ...state.project,
+        transcript,
+      },
+    }));
   },
 
     }),

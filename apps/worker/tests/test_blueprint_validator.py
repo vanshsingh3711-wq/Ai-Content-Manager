@@ -213,3 +213,44 @@ class TestMixedEdits:
         validated, report = validate_blueprint(edits, TMAP, VIDEO_DURATION)
         assert len(report.issues) == 1
         assert "reason" in report.issues[0].issue.lower()
+
+
+class TestStudioDepthMattingValidation:
+    def test_layer_behind_normalization(self):
+        """Ensures layer: behind, depth: behind, and case variations normalize to layer='behind'."""
+        edits = [
+            make_edit("ID_01", "motion_graphics", motion_graphics_type="hero_reveal", layer="BEHIND"),
+            make_edit("ID_02", "motion_graphics", motion_graphics_type="hero_reveal", depth="behind"),
+            make_edit("ID_03", "motion_graphics", motion_graphics_type="hero_reveal", layer="front"),
+        ]
+        validated, report = validate_blueprint(edits, TMAP, VIDEO_DURATION)
+        assert len(validated) == 3
+        assert validated[0]["layer"] == "behind"
+        assert validated[1]["layer"] == "behind"
+        assert validated[2]["layer"] == "front"
+
+    def test_layer_defaults_to_front(self):
+        """Motion graphics without layer specification default to layer='front'."""
+        edits = [
+            make_edit("ID_01", "motion_graphics", motion_graphics_type="hero_reveal"),
+        ]
+        validated, report = validate_blueprint(edits, TMAP, VIDEO_DURATION)
+        assert len(validated) == 1
+        assert validated[0]["layer"] == "front"
+
+    def test_readable_templates_forced_to_front(self):
+        """Text-dense readable templates must never be placed behind the speaker."""
+        edits = [
+            make_edit("ID_01", "motion_graphics", motion_graphics_type="cooked_terminal", layer="behind"),
+            make_edit("ID_02", "motion_graphics", motion_graphics_type="quote_reveal", layer="behind"),
+            make_edit("ID_03", "motion_graphics", motion_graphics_type="cooked_notes", layer="behind"),
+            make_edit("ID_04", "motion_graphics", motion_graphics_type="metric_reveal", layer="behind"),  # Allowed behind
+        ]
+        validated, report = validate_blueprint(edits, TMAP, VIDEO_DURATION)
+        assert len(validated) == 4
+        assert validated[0]["layer"] == "front"   # Forced front
+        assert validated[1]["layer"] == "front"   # Forced front
+        assert validated[2]["layer"] == "front"   # Forced front
+        assert validated[3]["layer"] == "behind"  # Allowed behind
+        assert report.modified_count >= 3
+

@@ -14,6 +14,15 @@ ALLOWED_TEMPLATES = {
     "vscode_code_typing",
     "stat_card_highlight",
     "kinetic_text",
+    # Cooked Motion Templates
+    "cooked_likes",
+    "cooked_terminal",
+    "cooked_social_post",
+    "cooked_chat",
+    "cooked_notes",
+    "cooked_progress",
+    "cooked_toasts",
+    "cooked_flow",
 }
 
 # These are Remotion compositions
@@ -22,6 +31,14 @@ REMOTION_ONLY_TEMPLATES = {
     "vscode_code_typing",
     "stat_card_highlight",
     "kinetic_text",
+    "cooked_likes",
+    "cooked_terminal",
+    "cooked_social_post",
+    "cooked_chat",
+    "cooked_notes",
+    "cooked_progress",
+    "cooked_toasts",
+    "cooked_flow",
 }
 
 def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:
@@ -51,15 +68,33 @@ RULES:
    - "vscode_code_typing"   (targets: 'title', 'activeFile', 'code', 'language')
    - "stat_card_highlight"  (targets: 'label', 'stat', 'delta')
    - "kinetic_text"         (targets: 'text')
+   - "cooked_likes"         (targets: 'label', 'from', 'to')
+   - "cooked_terminal"      (targets: 'command', 'output')
+   - "cooked_social_post"   (targets: 'name', 'handle', 'text', 'highlight', 'likes')
+   - "cooked_chat"          (targets: 'messages' list of items with 'from' and 'text')
+   - "cooked_notes"         (targets: 'title', 'items')
+   - "cooked_progress"      (targets: 'label', 'progress')
+   - "cooked_toasts"        (targets: 'title', 'message')
+   - "cooked_flow"          (targets: 'nodes' list of items with 'label')
      * Use "kinetic_text" for punchy single-line statements, hooks, or quick emphasis.
+     * Use "cooked_likes" for follower growth, audience counts, likes, or subscriber milestones.
+     * Use "cooked_terminal" or "vscode_code_typing" when executing CLI commands, npm/pip commands, or scripts.
+     * Use "cooked_social_post" when quoting tweets, online commentary, or creator posts.
+     * Use "cooked_chat" for simulated conversations, DMs, or customer messages.
+     * Use "cooked_notes" for key takeaways, numbered lessons, or action item checklists.
+     * Use "cooked_progress" for percentage completion, download/export status, or benchmark goals.
+     * Use "cooked_toasts" for push notifications, alerts, or app event popups.
+     * Use "cooked_flow" when illustrating multi-step pipelines, agent loops, or architecture diagrams.
      * Use "browser_walkthrough" when discussing websites, SaaS products, pricing, or web documentation.
-     * Use "vscode_code_typing" when explaining terminal commands, code snippets, config files, or scripts.
      * Use "stat_card_highlight" or "metric_reveal" for financial, growth, or key performance figures.
      * ONLY use before_after when the beat explicitly contrasts two named things (e.g. 'X vs Y', 'A but B').
-     * Do NOT use it for generic explanations; prefer hero_reveal or quote_reveal instead.
+     * Do NOT use it for generic explanations; prefer hero_reveal, cooked_notes, or quote_reveal instead.
 4. For 'motion_graphics_personality', pick one of: ["premium", "energetic", "technical"].
 5. 'zoom_in': Use sparingly at punch lines or revelations. Provide 'trigger_id'.
 6. **Transitions**: Provide a `transition` (e.g., "fade", "slide", "wipe", "morph") if the incoming scene should blend smoothly from the previous. Leave null for a clean cut.
+7. **LAYER PLACEMENT ('layer')**:
+   - "front" (DEFAULT): Use for readable text, quotes, code typing, alerts, kinetic text, and instructions that MUST be viewed clearly without obstruction in front of the speaker.
+   - "behind": Use ONLY for ambient accent cards, follower counter badges, lower-third stats, or metrics where having the speaker stand in front creates sleek studio depth. Do NOT place text-dense reading cards behind the speaker!
 
 OUTPUT SCHEMA (JSON):
 {{
@@ -76,6 +111,7 @@ OUTPUT SCHEMA (JSON):
         "delta": "+12.4%"
       }},
       "motion_graphics_personality": "premium",
+      "layer": "front",
       "transition": "slide",
       "reason": "Shows massive growth"
     }}
@@ -169,6 +205,8 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
                             errors.append(f"Edit {edit.trigger_id} uses numeric template '{mg_type}' but beat text contains no numbers: {beat.get('text')}")
                         
                         for k, v in getattr(edit, 'motion_graphics_targets', {}).items():
+                            if k in ("code", "command", "output", "url", "handle", "activeFile", "language", "name", "app", "avatar"):
+                                continue
                             if isinstance(v, str):
                                 # Text validation
                                 words = set(stem(w) for w in re.findall(r'\b[a-zA-Z]+\b', v))

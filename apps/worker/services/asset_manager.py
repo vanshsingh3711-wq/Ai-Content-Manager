@@ -1,10 +1,17 @@
 import os
 import time
+import uuid
 import requests
 from typing import Dict, List, Any, Optional
-from config import get_worker_settings
-
-settings = get_worker_settings()
+try:
+    from config import get_worker_settings
+    settings = get_worker_settings()
+except ImportError:
+    try:
+        from config import get_settings
+        settings = get_settings()
+    except Exception:
+        settings = None
 
 def _wait_for_internet_retry(func):
     def wrapper(*args, **kwargs):
@@ -74,6 +81,30 @@ def fetch_broll_assets(
         if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
             broll_map[trigger_id] = dest_path
             continue
+
+        # Check if B-roll refers to real web evidence (GitHub, Twitter, URLs)
+        web_source = edit.get("web_url") or edit.get("url") or (search_query if ("http://" in search_query or "https://" in search_query or "github.com" in search_query or "x.com" in search_query) else None)
+        if web_source:
+            try:
+                import subprocess
+                from services.web_evidence_capture import capture_web_evidence
+                evidence_img = os.path.join(target_dir, f"evidence_{trigger_id}.png")
+                ev_res = capture_web_evidence(web_source, output_path=evidence_img, width=target_w, height=target_h)
+                if os.path.exists(evidence_img):
+                    dur = max(2.0, float(edit.get("end", 0.0) or 0.0) - float(edit.get("start", 0.0) or 0.0)) if edit.get("start") else 3.0
+                    cmd = [
+                        "ffmpeg", "-y", "-loop", "1", "-i", evidence_img,
+                        "-t", f"{dur:.2f}",
+                        "-vf", f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", dest_path
+                    ]
+                    sub_res = subprocess.run(cmd, capture_output=True, text=True)
+                    if sub_res.returncode == 0 and os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+                        print(f"  [ASSET_MANAGER] Converted real web evidence ({ev_res['type']}) to B-roll -> {dest_path}")
+                        broll_map[trigger_id] = dest_path
+                        continue
+            except Exception as ev_err:
+                print(f"  [ASSET_MANAGER] Web evidence capture fallback: {ev_err}")
 
         if not api_key:
             print("[!] Warning: PEXELS_API_KEY is not set. Cannot fetch B-roll.")
@@ -157,6 +188,138 @@ def fetch_broll_assets(
             print(f"[!] Failed to download B-roll file from {download_url[:60]}: {e}")
 
     return broll_map
+
+
+def search_single_broll_clip(
+    query: str,
+    aspect_ratio: str = "9:16",
+    duration_min: float = 3.0,
+    api_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Synchronously queries Pexels Video API for a single high-quality B-roll clip matching the query.
+    Extracts preview image/thumbnail, high-resolution direct video link, dimensions, and duration.
+    Falls back gracefully if offline, rate-limited, or query returns no results.
+    """
+    clean_query = query.strip()
+    orientation_map = {
+        "9:16": "portrait",
+        "16:9": "landscape",
+        "1:1": "square",
+        "4:5": "portrait",
+    }
+    orientation = orientation_map.get(aspect_ratio, "portrait")
+
+    if orientation == "portrait":
+        target_w, target_h = 1080, 1920
+    elif orientation == "landscape":
+        target_w, target_h = 1920, 1080
+    elif orientation == "square":
+        target_w, target_h = 1080, 1080
+    else:
+        target_w, target_h = 1080, 1920
+
+    key = api_key or getattr(settings, "PEXELS_API_KEY", "") or os.getenv("PEXELS_API_KEY", "")
+    if key:
+        url = "https://api.pexels.com/videos/search"
+        headers = {"Authorization": key}
+        params = {
+            "query": clean_query,
+            "orientation": orientation,
+            "per_page": 5,
+            "size": "medium",
+        }
+
+        try:
+            res = requests.get(url, headers=headers, params=params, timeout=8)
+            if res.status_code == 200:
+                videos = res.json().get("videos", [])
+
+                # If no videos, try fallback words
+                if not videos:
+                    words = [w for w in clean_query.split() if len(w) > 2]
+                    fallbacks = []
+                    if len(words) > 1:
+                        fallbacks.append(" ".join(words[:2]))
+                    if words:
+                        fallbacks.append(words[0])
+                    fallbacks.extend(["abstract background", "technology background"])
+
+                    for fb in fallbacks:
+                        params["query"] = fb
+                        fb_res = requests.get(url, headers=headers, params=params, timeout=8)
+                        if fb_res.status_code == 200 and fb_res.json().get("videos"):
+                            videos = fb_res.json().get("videos", [])
+                            break
+
+                if videos:
+                    for vid in videos:
+                        video_files = vid.get("video_files", [])
+                        best_file = None
+                        best_score = float("inf")
+                        for vf in video_files:
+                            if vf.get("file_type") == "video/mp4":
+                                w = vf.get("width", 0)
+                                h = vf.get("height", 0)
+                                score = abs(w - target_w) + abs(h - target_h)
+                                if score < best_score:
+                                    best_score = score
+                                    best_file = vf
+
+                        if best_file and best_file.get("link"):
+                            preview_url = vid.get("image") or best_file.get("link")
+                            vid_duration = float(vid.get("duration", duration_min))
+                            return {
+                                "video_id": f"pexels-{vid.get('id', uuid.uuid4().hex[:6])}",
+                                "title": clean_query.title(),
+                                "query": clean_query,
+                                "video_url": best_file.get("link"),
+                                "preview_url": preview_url,
+                                "width": best_file.get("width", target_w),
+                                "height": best_file.get("height", target_h),
+                                "duration": max(vid_duration, duration_min),
+                                "orientation": orientation,
+                                "is_fallback": False,
+                            }
+        except Exception as e:
+            print(f"[!] Pexels single search exception: {e}")
+
+    # Fallback asset catalog when Pexels is unreachable or API key is not present
+    fallback_clips = {
+        "portrait": {
+            "video_url": "https://assets.mixkit.co/videos/preview/mixkit-software-developer-working-on-code-42352-large.mp4",
+            "preview_url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=640",
+            "width": 1080,
+            "height": 1920,
+        },
+        "landscape": {
+            "video_url": "https://assets.mixkit.co/videos/preview/mixkit-software-developer-working-on-code-42352-large.mp4",
+            "preview_url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=640",
+            "width": 1920,
+            "height": 1080,
+        },
+        "square": {
+            "video_url": "https://assets.mixkit.co/videos/preview/mixkit-software-developer-working-on-code-42352-large.mp4",
+            "preview_url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=640",
+            "width": 1080,
+            "height": 1080,
+        },
+    }
+    fb = fallback_clips.get(orientation, fallback_clips["portrait"])
+    clip_id = f"broll-fallback-{abs(hash(clean_query)) % 100000}"
+    return {
+        "video_id": clip_id,
+        "title": clean_query.title(),
+        "query": clean_query,
+        "video_url": fb["video_url"],
+        "preview_url": fb["preview_url"],
+        "width": fb["width"],
+        "height": fb["height"],
+        "duration": max(3.5, duration_min),
+        "orientation": orientation,
+        "is_fallback": True,
+    }
+
 
 
 

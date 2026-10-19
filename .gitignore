@@ -65,3 +65,5 @@ Thumbs.db
 .turbo
 packages/motion-components/chrome/
 data/
+sample_video
+testing_video/

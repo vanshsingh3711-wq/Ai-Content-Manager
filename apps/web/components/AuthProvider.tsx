@@ -22,8 +22,10 @@ class ClerkErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.warn("[Auth] Clerk initialization note. Continuing in local dev mode.", error, errorInfo);
+  componentDidCatch(error: Error) {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[Auth] Clerk inactive or unconfigured; running in local dev mode.");
+    }
   }
 
   render() {
@@ -35,7 +37,7 @@ class ClerkErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
 
   if (clerkPubKey && clerkPubKey.startsWith("pk_") && !clerkPubKey.includes("your_clerk")) {
     return (

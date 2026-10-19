@@ -32,7 +32,7 @@ def _update_job(job_uuid: uuid.UUID, update_fn: Callable[[VideoJob], None], max_
             except Exception:
                 pass
     if last_err:
-        raise last_err
+        print(f"[JOB_MANAGER_WARN] Could not update job {job_uuid} status in DB: {last_err}")
 
 
 def set_job_status_downloading(job_uuid: uuid.UUID):

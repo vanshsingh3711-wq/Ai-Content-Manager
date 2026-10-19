@@ -45,13 +45,13 @@ OUTPUT SCHEMA (JSON):
 
             system_prompt += f"""
 \nBEAT SHEET INTEGRATION (STRICT):
-You have been provided with a pre-computed Beat Sheet in the Context. This is your absolute SOURCE OF TRUTH.
-1. TIMING: Align your 'b_roll' edits with the exact start and end times of the provided beats.
+You have been provided with a pre-computed Beat Sheet in the Context to guide pacing and stock footage.
+1. TIMING: Align your 'b_roll' edits with the start and end times of the provided beats.
 {treatment_rule}
 3. ROLE: Use the beat's 'role' (e.g. hook, transition, example) to guide the mood of the B-roll.
-4. EMPHASIS: Use the 'emphasis_words' from the beat to create concrete, punchy search queries for stock footage (e.g. "artificial intelligence neural network", "robotic arm assembly", "modern data center servers").
-5. TRIGGER ID: You must use the beat's ID formatted as 'beat_1', 'beat_2', etc. as the trigger_id instead of the transcript chunk IDs.
-6. The beat sheet is the master timeline.
+4. EMPHASIS: Use the 'emphasis_words' from the beat to create concrete, punchy search queries for stock footage.
+5. TRIGGER ID: Use the beat's ID (e.g. 'beat_1') or the transcript chunk IDs.
+6. STUMBLES & CUTS: You MUST ALSO output 'cut' actions to trim any speaker stumbles, false starts, or repeated takes identified in the transcript.
 """
     except Exception:
         pass

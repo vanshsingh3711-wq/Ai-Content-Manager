@@ -4,11 +4,11 @@ from services.ai_director import EditList, EditDecision
 
 # Deterministic SFX mapping based on visual action types (studio-quality curated sounds)
 SFX_ACTION_MAP = {
-    "motion_graphics": ["pop", "whoosh", "chime"],
-    "kinetic_text":    ["pop", "whoosh"],
-    "b_roll":          ["whoosh", "transition"],
-    "zoom_in":         ["riser", "whoosh"],
-    "character":       ["pop", "chime"],
+    "motion_graphics": ["whoosh-in", "pop", "hit", "ding"],
+    "kinetic_text":    ["pop", "whoosh-in"],
+    "b_roll":          ["whoosh-in", "whoosh-out"],
+    "zoom_in":         ["zoom", "impact"],
+    "character":       ["pop", "ding"],
 }
 
 def generate_sfx_plan(
@@ -41,8 +41,13 @@ def generate_sfx_plan(
         # Attach SFX to visual transition events
         if action in SFX_ACTION_MAP:
             if start_val - last_sfx_time >= MIN_SFX_SPACING:
-                sounds = SFX_ACTION_MAP[action]
-                chosen = random.choice(sounds)
+                if action in ("motion_graphics", "zoom_in"):
+                    from services.audio_sfx_synthesizer import recommend_sfx_for_action
+                    edit_dict = edit if isinstance(edit, dict) else (edit.model_dump() if hasattr(edit, "model_dump") else edit.__dict__)
+                    chosen = recommend_sfx_for_action(edit_dict)
+                else:
+                    sounds = SFX_ACTION_MAP[action]
+                    chosen = random.choice(sounds)
                 sfx_edits.append(
                     EditDecision(
                         action="sfx",

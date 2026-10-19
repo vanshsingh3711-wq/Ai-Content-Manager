@@ -18,7 +18,7 @@ class VisualBeat(BaseModel):
     animation_state: Optional[str] = Field(None, description="State of the animation (e.g. intro, idle, reacting, changing, exit)")
 
 class EditDecision(BaseModel):
-    action: Literal["cut", "b_roll", "zoom_in", "sfx", "motion_graphics", "character"] = Field(..., description="Editing action to apply.")
+    action: Literal["cut", "b_roll", "zoom_in", "sfx", "motion_graphics", "character", "transition"] = Field(..., description="Editing action to apply.")
     trigger_id: Optional[str] = Field(None, description="The chunk ID (e.g., ID_01) that triggers this action. Required for non-cut actions.")
     start: Optional[float] = Field(None, description="Start timestamp for cuts.")
     end: Optional[float] = Field(None, description="End timestamp for cuts.")
@@ -29,7 +29,8 @@ class EditDecision(BaseModel):
     motion_graphics_personality: Optional[str] = Field(None, description="Physics personality (e.g. energetic, premium, technical)")
     character_action: Optional[str] = Field(None, description="Action for 2D character (e.g., 'pointing', 'surprised', 'explaining') if action is 'character'.")
     transition: Optional[str] = Field(None, description="Transition type from previous scene (e.g., 'fade', 'slide', 'wipe', 'morph'). Leave null for a clean cut.")
-    visual_beats: Optional[List[VisualBeat]] = Field(None, description="List of visual beats/animation changes within this scene. A scene should have multiple beats if the dialogue changes topics.")
+    layer: Optional[str] = Field(None, description="Layer positioning: 'behind' to place graphics behind speaker shoulders in 3D space, or 'front'.")
+    depth: Optional[str] = Field(None, description="Depth positioning: 'behind' or 'front'.")
     reason: Optional[str] = Field(None, description="Required justification for the decision. Explains why it adds value here.")
 
 
@@ -90,7 +91,7 @@ def resolve_deepseek_model(model_pref: str) -> str:
     return DEEPSEEK_MODEL_MAP.get(clean, "deepseek-chat")
 
 def _call_llm(system_prompt: str, user_prompt: str, ai_model_pref: str = "DeepSeek V3", raw_output: bool = False):
-    deepseek_key = settings.DEEPSEEK_API_KEY or os.getenv("DEEPSEEK_API_KEY")
+    deepseek_key = getattr(settings, "DEEPSEEK_API_KEY", None) or os.getenv("DEEPSEEK_API_KEY")
 
     if not deepseek_key:
         raise ValueError("[!] No DEEPSEEK_API_KEY provided. Please set DEEPSEEK_API_KEY in your .env file.")
@@ -150,6 +151,12 @@ def _call_llm(system_prompt: str, user_prompt: str, ai_model_pref: str = "DeepSe
         raise last_error
 
     content = response.choices[0].message.content
+    msg = response.choices[0].message
+    if not content and getattr(msg, "reasoning_content", None):
+        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', msg.reasoning_content, re.DOTALL | re.IGNORECASE)
+        if match:
+            content = match.group(1).strip()
+
     if content:
         content = content.strip()
         # Clean reasoning tags if any leaked into content
@@ -178,6 +185,10 @@ def _call_llm(system_prompt: str, user_prompt: str, ai_model_pref: str = "DeepSe
         except Exception as e:
             print(f"[!] Failed to parse LLM output: {e}\nRaw output: {content}")
             return EditList(edits=[])
+
+    if target_model == "deepseek-reasoner":
+        print(f"[!] {target_model} returned empty content. Falling back to deepseek-chat...")
+        return _call_llm(system_prompt, user_prompt, ai_model_pref="deepseek-chat", raw_output=raw_output)
 
     print("[!] LLM returned empty content.")
     raise ValueError("LLM returned empty content")
