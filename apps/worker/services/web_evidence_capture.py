@@ -690,6 +690,22 @@ def record_interactive_web_action(
                             page.locator(f"text={target_lang}").first.click()
                             time.sleep(1.0)
 
+            # 1.5 Specialized News / Tech AI articles detection
+            if any(domain in url for domain in ["techcrunch.com", "theverge.com", "wired.com"]) or any(w in prompt_lower for w in ["news", "article", "articles"]):
+                if any(w in prompt_lower for w in ["ai", "artificial intelligence", "tech", "technology"]):
+                    try:
+                        ai_elem = page.locator("header a, nav a, a").filter(has_text=re.compile(r"^\s*AI\s*$", re.I)).first
+                        if ai_elem.count() > 0 and ai_elem.is_visible():
+                            ai_elem.click()
+                            try:
+                                page.wait_for_load_state("domcontentloaded", timeout=6000)
+                            except Exception:
+                                time.sleep(1.2)
+                        elif "techcrunch.com" in url and "/category/artificial-intelligence" not in page.url:
+                            page.goto("https://techcrunch.com/category/artificial-intelligence/", wait_until="domcontentloaded", timeout=10000)
+                    except Exception as news_err:
+                        print(f"[record_interactive_web_action] News AI nav note: {news_err}")
+
             # 2. General Clicks: "click on X" / "click X"
             click_match = re.search(r"click\s+(?:on\s+)?(?:the\s+)?[\"']?([^,\"'\n]+?)[\"']?(?:\s+(?:filter|tab|button|link|menu|dropdown))?(?:,|and|\.|$|for)", prompt_lower)
             if click_match and "github.com/trending" not in url:

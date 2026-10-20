@@ -163,7 +163,8 @@ def execute_web_capture(
     has_interactive_action = bool(
         action_prompt
         and any(kw in action_prompt.lower() for kw in [
-            "click", "filter", "select", "type", "press", "search", "choose", "scroll down", "scroll up"
+            "click", "filter", "select", "type", "press", "search", "choose",
+            "scroll down", "scroll up", "scroll", "find", "go to", "open", "explore", "articles", "article"
         ])
     )
 
@@ -805,10 +806,20 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
             "Add stock video footage",
         ]
 
-    # 2. DIRECT WEB EVIDENCE CAPTURE (URL in prompt)
-    elif URL_REGEX.search(clean_prompt):
+    # 2. DIRECT WEB EVIDENCE CAPTURE (URL in prompt or explicit website recording instruction)
+    elif URL_REGEX.search(clean_prompt) or any(kw in lower for kw in [
+        "go to news", "news website", "news site", "tech news", "techcrunch", "open website", "visit website",
+        "record: go to", "record go to", "hacker news", "the verge", "record website", "screen recording of"
+    ]):
         url_match = URL_REGEX.search(clean_prompt)
-        target_url = url_match.group(0).rstrip(".,;)")
+        if url_match:
+            target_url = url_match.group(0).rstrip(".,;)")
+        elif any(k in lower for k in ["hacker news", "ycombinator"]):
+            target_url = "https://news.ycombinator.com"
+        elif any(k in lower for k in ["news", "article", "articles", "tech", "ai", "techcrunch", "the verge"]):
+            target_url = "https://techcrunch.com"
+        else:
+            target_url = "https://news.ycombinator.com"
         start_time = extracted_start
         end_time = extracted_end
         duration_val = max(1.0, end_time - start_time)
