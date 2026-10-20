@@ -146,7 +146,23 @@
             if (characterPlan.edits) {
                 for (const edit of characterPlan.edits) {
                     if (edit.action === "character" || edit.character_action) {
-                        requiredAnims.add((edit.character_action || edit.action).toLowerCase());
+                        let beat = (edit.character_action || edit.action).toLowerCase();
+                        if (edit.visual_beats && edit.visual_beats.length > 0 && edit.visual_beats[0]) {
+                            const beatObj = edit.visual_beats[0];
+                            const beatStr = typeof beatObj === 'string' ? beatObj : (beatObj.emphasis || '');
+                            if (beatStr) {
+                                beat = beatStr.toLowerCase();
+                            }
+                        }
+                        if (beat.includes('point')) beat = 'pointing';
+                        else if (beat.includes('nod') || beat.includes('yes')) beat = 'thankful';
+                        else if (beat.includes('talk') || beat.includes('explain') || beat.includes('intro')) beat = 'talking';
+                        else if (beat.includes('argue') || beat.includes('gesture')) beat = 'standing-arguing';
+                        else if (beat.includes('jump') || beat.includes('surprise') || beat.includes('shock')) beat = 'jump';
+                        else if (beat.includes('clap')) beat = 'standing-clap';
+                        else if (beat.includes('cheer') || beat.includes('excite')) beat = 'cheering-while-sitting';
+                        else beat = 'idle';
+                        requiredAnims.add(beat);
                     }
                 }
             }
@@ -190,6 +206,23 @@
                     if (time >= edit.start && time <= edit.end) {
                         if (edit.action === "character" || edit.character_action) {
                             targetActionName = (edit.character_action || edit.action).toLowerCase();
+                            if (edit.visual_beats && edit.visual_beats.length > 0 && edit.visual_beats[0]) {
+                                const beatObj = edit.visual_beats[0];
+                                const beatStr = typeof beatObj === 'string' ? beatObj : (beatObj.emphasis || '');
+                                let beat = 'idle';
+                                if (beatStr) {
+                                    beat = beatStr.toLowerCase();
+                                }
+                                if (beat.includes('point')) beat = 'pointing';
+                                else if (beat.includes('nod') || beat.includes('yes')) beat = 'thankful';
+                                else if (beat.includes('talk') || beat.includes('explain') || beat.includes('intro')) beat = 'talking';
+                                else if (beat.includes('argue') || beat.includes('gesture')) beat = 'standing-arguing';
+                                else if (beat.includes('jump') || beat.includes('surprise') || beat.includes('shock')) beat = 'jump';
+                                else if (beat.includes('clap')) beat = 'standing-clap';
+                                else if (beat.includes('cheer') || beat.includes('excite')) beat = 'cheering-while-sitting';
+                                else beat = 'idle'; // fallback
+                                targetActionName = beat;
+                            }
                         }
                         if (edit.graphic) {
                             activeGraphic = edit.graphic;

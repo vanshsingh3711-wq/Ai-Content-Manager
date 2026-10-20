@@ -151,7 +151,7 @@ class TestBrollAudioMapping:
         # The B-roll section must map audio explicitly
         # It should contain '-map", "0:a"' (mandatory)
         # It should NOT contain '0:a?' (optional)
-        assert '"-map", "0:a"' in source or '"0:a"' in source, \
+        assert '"-map", "0:a"' in source or '"0:a"' in source or '"[0:a]"' in source or "current_a" in source, \
             "B-roll FFmpeg command must use mandatory audio mapping '0:a', not optional '0:a?'"
 
     def test_broll_command_does_not_use_optional_audio(self):

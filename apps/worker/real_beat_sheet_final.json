@@ -1,0 +1,245 @@
+{
+  "beats": [
+    {
+      "id": 1,
+      "start": 0.0,
+      "end": 4.18,
+      "start_word_index": 0,
+      "end_word_index": 10,
+      "text": "Welcome to a quick explainer on how artificial intelligence actually learns.",
+      "role": "hook",
+      "energy": "high",
+      "key_entities": [
+        "artificial intelligence"
+      ],
+      "focus_start_word_index": 7,
+      "focus_end_word_index": 10,
+      "focus_start": 2.1,
+      "focus_end": 4.18,
+      "emphasis_words": [
+        "artificial",
+        "intelligence",
+        "learns"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A glowing digital brain with neural connections forming",
+      "importance": 4
+    },
+    {
+      "id": 2,
+      "start": 5.3,
+      "end": 7.26,
+      "start_word_index": 11,
+      "end_word_index": 16,
+      "text": "You've probably heard of neural networks.",
+      "role": "setup",
+      "energy": "medium",
+      "key_entities": [
+        "neural networks"
+      ],
+      "focus_start_word_index": 15,
+      "focus_end_word_index": 16,
+      "focus_start": 6.36,
+      "focus_end": 7.26,
+      "emphasis_words": [
+        "neural",
+        "networks"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A network diagram with nodes and edges",
+      "importance": 2
+    },
+    {
+      "id": 3,
+      "start": 8.32,
+      "end": 11.72,
+      "start_word_index": 17,
+      "end_word_index": 26,
+      "text": "They are mathematical models loosely inspired by the human brain.",
+      "role": "definition",
+      "energy": "medium",
+      "key_entities": [
+        "mathematical models",
+        "human brain"
+      ],
+      "focus_start_word_index": 19,
+      "focus_end_word_index": 22,
+      "focus_start": 8.64,
+      "focus_end": 10.62,
+      "emphasis_words": [
+        "mathematical",
+        "models",
+        "human"
+      ],
+      "concreteness": "mixed",
+      "visual_potential": "Side-by-side of a brain scan and a neural network diagram",
+      "importance": 3
+    },
+    {
+      "id": 4,
+      "start": 12.72,
+      "end": 17.08,
+      "start_word_index": 27,
+      "end_word_index": 39,
+      "text": "Instead of being programmed with explicit rules, they learn by looking at examples.",
+      "role": "process",
+      "energy": "medium",
+      "key_entities": [
+        "explicit rules",
+        "examples"
+      ],
+      "focus_start_word_index": 32,
+      "focus_end_word_index": 39,
+      "focus_start": 14.24,
+      "focus_end": 17.08,
+      "emphasis_words": [
+        "explicit",
+        "rules",
+        "examples"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A robot reading a rulebook vs. a child looking at picture cards",
+      "importance": 4
+    },
+    {
+      "id": 5,
+      "start": 18.22,
+      "end": 25.5,
+      "start_word_index": 40,
+      "end_word_index": 58,
+      "text": "Imagine showing a toddler thousands of pictures of cats and dogs. Over time, the toddler learns the subtle differences.",
+      "role": "analogy",
+      "energy": "high",
+      "key_entities": [
+        "toddler",
+        "pictures",
+        "cats",
+        "dogs"
+      ],
+      "focus_start_word_index": 43,
+      "focus_end_word_index": 46,
+      "focus_start": 19.3,
+      "focus_end": 20.56,
+      "emphasis_words": [
+        "toddler",
+        "cats",
+        "dogs"
+      ],
+      "concreteness": "concrete",
+      "visual_potential": "A toddler flipping through flashcards of cats and dogs",
+      "importance": 5
+    },
+    {
+      "id": 6,
+      "start": 26.34,
+      "end": 32.5,
+      "start_word_index": 59,
+      "end_word_index": 76,
+      "text": "AI does the exact same thing, but it uses massive amounts of data and adjusts numbers called weights.",
+      "role": "comparison",
+      "energy": "medium",
+      "key_entities": [
+        "AI",
+        "data",
+        "weights"
+      ],
+      "focus_start_word_index": 59,
+      "focus_end_word_index": 76,
+      "focus_start": 26.34,
+      "focus_end": 32.5,
+      "emphasis_words": [
+        "AI",
+        "data",
+        "weights"
+      ],
+      "concreteness": "mixed",
+      "visual_potential": "A split screen: toddler with flashcards vs. a computer processing data",
+      "importance": 3
+    },
+    {
+      "id": 7,
+      "start": 33.54,
+      "end": 39.18,
+      "start_word_index": 77,
+      "end_word_index": 95,
+      "text": "When it makes a mistake, an algorithm called back propagation tweaks those weights so it does better next time.",
+      "role": "process",
+      "energy": "medium",
+      "key_entities": [
+        "algorithm",
+        "back propagation",
+        "weights"
+      ],
+      "focus_start_word_index": 83,
+      "focus_end_word_index": 89,
+      "focus_start": 35.06,
+      "focus_end": 37.86,
+      "emphasis_words": [
+        "algorithm",
+        "back",
+        "propagation"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "An animated flowchart showing error correction and weight adjustment",
+      "importance": 3
+    },
+    {
+      "id": 8,
+      "start": 40.0,
+      "end": 45.94,
+      "start_word_index": 96,
+      "end_word_index": 113,
+      "text": "After millions of cycles, the AI can recognize a cat, write a poem, or even drive a car.",
+      "role": "list",
+      "energy": "high",
+      "key_entities": [
+        "millions",
+        "cycles",
+        "AI",
+        "cat",
+        "poem",
+        "car"
+      ],
+      "focus_start_word_index": 103,
+      "focus_end_word_index": 113,
+      "focus_start": 42.66,
+      "focus_end": 45.94,
+      "emphasis_words": [
+        "recognize",
+        "cat",
+        "poem"
+      ],
+      "concreteness": "mixed",
+      "visual_potential": "A montage: AI identifying a cat, generating a poem, and a self-driving car",
+      "importance": 5
+    },
+    {
+      "id": 9,
+      "start": 46.9,
+      "end": 48.64,
+      "start_word_index": 114,
+      "end_word_index": 119,
+      "text": "That's the magic of machine learning.",
+      "role": "conclusion",
+      "energy": "high",
+      "key_entities": [
+        "magic",
+        "machine learning"
+      ],
+      "focus_start_word_index": 116,
+      "focus_end_word_index": 119,
+      "focus_start": 47.44,
+      "focus_end": 48.64,
+      "emphasis_words": [
+        "magic",
+        "machine",
+        "learning"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A sparkling neural network with a 'magic' effect",
+      "importance": 3
+    }
+  ],
+  "total_duration": 48.64,
+  "language": "en"
+}

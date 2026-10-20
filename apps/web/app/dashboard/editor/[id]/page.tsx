@@ -6,11 +6,14 @@ import { EditorTopNav } from "@/components/editor/EditorTopNav";
 import { PlayerMonitor } from "@/components/editor/PlayerMonitor";
 import { TimelineToolbar } from "@/components/editor/TimelineToolbar";
 import { TimelineContainer } from "@/components/editor/TimelineContainer";
-import { MediaDrawer } from "@/components/editor/MediaDrawer";
+import { MediaDrawer, MediaDrawerTab } from "@/components/editor/MediaDrawer";
 import { InspectorPanel } from "@/components/editor/InspectorPanel";
 import { MobileBottomBar } from "@/components/editor/MobileBottomBar";
+import { ChatAssistantDrawer } from "@/components/editor/ChatAssistantDrawer";
+import { RenderExportModal } from "@/components/editor/RenderExportModal";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { TimelineProject } from "@/lib/timeline-types";
+import { convertVisualTimelineToSafeZones } from "@/lib/layout/subject-avoidance";
 import { CheckCircle2, X } from "lucide-react";
 
 export default function StudioEditorPage() {
@@ -18,15 +21,28 @@ export default function StudioEditorPage() {
   const projectId = (params?.id as string) || "new";
 
   const { project, initProject } = useTimelineStore();
-  const [activeDrawerTab, setActiveDrawerTab] = useState<"media" | "captions" | "broll" | "audio">("media");
+  const [activeDrawerTab, setActiveDrawerTab] = useState<MediaDrawerTab>("media");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isDesktopDrawerOpen, setIsDesktopDrawerOpen] = useState(true);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Global Cmd+K / Ctrl+K listener for AI Assistant
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsAssistantOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Initialize or load project
@@ -39,71 +55,144 @@ export default function StudioEditorPage() {
       return;
     }
 
-    // Default sample project to let users play immediately
-    const sampleProject: TimelineProject = {
-      id: projectId,
-      title: "Viral TikTok Reel",
-      aspectRatio: "9:16",
-      duration: 12.0,
-      fps: 30,
-      tracks: {
-        videoTrack: [
+    const loadProject = async () => {
+      // Default sample project to let users play immediately
+      const sampleProject: TimelineProject = {
+        id: projectId,
+        title: "Viral TikTok Reel",
+        aspectRatio: "9:16",
+        duration: 12.0,
+        fps: 30,
+        tracks: {
+          videoTrack: [
+            {
+              id: "clip-demo-1",
+              sourceUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+              name: "Main Talking Head",
+              start: 0,
+              end: 12.0,
+              sourceStart: 0,
+              sourceEnd: 12.0,
+              speed: 1,
+              volume: 100,
+              zoomFactor: 1.0,
+            },
+          ],
+          brollTrack: [
+            {
+              id: "broll-demo-1",
+              sourceUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+              name: "Tech Overlay",
+              start: 3.5,
+              end: 7.0,
+              opacity: 100,
+              fitMode: "cover",
+            },
+          ],
+          textTrack: [
+            {
+              id: "caption-demo-1",
+              text: "WELCOME TO THE FUTURE",
+              start: 0.5,
+              end: 3.5,
+              stylePreset: "tiktok_yellow",
+              positionY: 75,
+            },
+            {
+              id: "caption-demo-2",
+              text: "BUILD LIKE A PRO",
+              start: 4.0,
+              end: 8.0,
+              stylePreset: "hormozi_bold",
+              positionY: 75,
+            },
+          ],
+          audioTrack: [],
+        },
+        safeZones: [
           {
-            id: "clip-demo-1",
-            sourceUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-            name: "Main Talking Head",
-            start: 0,
-            end: 12.0,
-            sourceStart: 0,
-            sourceEnd: 12.0,
-            speed: 1,
-            volume: 100,
-            zoomFactor: 1.0,
+            id: "sample-presenter-sz-1",
+            timestamp: 0,
+            duration: 12.0,
+            x: 25,
+            y: 35,
+            width: 50,
+            height: 55,
+            confidence: 0.96,
+            type: "subject",
           },
         ],
-        brollTrack: [
-          {
-            id: "broll-demo-1",
-            sourceUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-            name: "Tech Overlay",
-            start: 3.5,
-            end: 7.0,
-            opacity: 100,
-            fitMode: "cover",
+        transcript: {
+          videoId: projectId,
+          words: [
+            { word: "Welcome", start: 0.5, end: 1.1, probability: 0.98 },
+            { word: "to", start: 1.15, end: 1.35, probability: 0.99 },
+            { word: "the", start: 1.4, end: 1.6, probability: 0.99 },
+            { word: "future", start: 1.65, end: 2.3, probability: 0.97 },
+            { word: "of", start: 2.35, end: 2.55, probability: 0.99 },
+            { word: "automated", start: 2.6, end: 3.2, probability: 0.96 },
+            { word: "video", start: 3.25, end: 3.7, probability: 0.98 },
+            { word: "creation.", start: 3.75, end: 4.3, probability: 0.95 },
+            { word: "Build", start: 4.5, end: 5.0, probability: 0.99 },
+            { word: "viral", start: 5.05, end: 5.5, probability: 0.97 },
+            { word: "clips", start: 5.55, end: 6.0, probability: 0.98 },
+            { word: "like", start: 6.05, end: 6.35, probability: 0.99 },
+            { word: "a", start: 6.4, end: 6.55, probability: 0.99 },
+            { word: "pro", start: 6.6, end: 7.2, probability: 0.98 },
+            { word: "with", start: 7.3, end: 7.6, probability: 0.99 },
+            { word: "synchronized", start: 7.65, end: 8.4, probability: 0.95 },
+            { word: "motion", start: 8.45, end: 9.0, probability: 0.97 },
+            { word: "graphics.", start: 9.05, end: 9.8, probability: 0.96 },
+            { word: "Subscribe", start: 10.0, end: 10.7, probability: 0.99 },
+            { word: "for", start: 10.75, end: 11.0, probability: 0.99 },
+            { word: "more!", start: 11.05, end: 11.8, probability: 0.98 },
+          ],
+          beatSheet: {
+            beats: [
+              { id: 1, start: 0.5, end: 4.3, text: "Welcome to the future of automated video creation", role: "hook", energy: "high", importance: 5 },
+              { id: 2, start: 4.5, end: 9.8, text: "Build viral clips like a pro with synchronized motion graphics", role: "story", energy: "medium", importance: 4 },
+              { id: 3, start: 10.0, end: 12.0, text: "Subscribe for more content", role: "cta", energy: "high", importance: 5 },
+            ],
           },
-        ],
-        textTrack: [
-          {
-            id: "caption-demo-1",
-            text: "WELCOME TO THE FUTURE",
-            start: 0.5,
-            end: 3.5,
-            stylePreset: "tiktok_yellow",
-            positionY: 75,
-          },
-          {
-            id: "caption-demo-2",
-            text: "BUILD LIKE A PRO",
-            start: 4.0,
-            end: 8.0,
-            stylePreset: "hormozi_bold",
-            positionY: 75,
-          },
-        ],
-        audioTrack: [],
-      },
+          text: "Welcome to the future of automated video creation. Build viral clips like a pro with synchronized motion graphics. Subscribe for more!",
+        },
+      };
+
+      // If opening an existing video project from API, fetch pre-computed visual timeline & transcript
+      if (projectId && projectId !== "new") {
+        try {
+          const [visualRes, transcriptRes] = await Promise.all([
+            fetch(`/api/v1/videos/${projectId}/visual-timeline`).catch(() => null),
+            fetch(`/api/v1/videos/${projectId}/transcript`).catch(() => null),
+          ]);
+
+          if (visualRes && visualRes.ok) {
+            const visualData = await visualRes.json();
+            const convertedZones = convertVisualTimelineToSafeZones(visualData, sampleProject.duration);
+            if (convertedZones.length > 0) {
+              sampleProject.safeZones = convertedZones;
+            }
+          }
+
+          if (transcriptRes && transcriptRes.ok) {
+            const transcriptData = await transcriptRes.json();
+            if (transcriptData && Array.isArray(transcriptData.words) && transcriptData.words.length > 0) {
+              sampleProject.transcript = transcriptData;
+            }
+          }
+        } catch {
+          // Graceful fallback to default sample project when offline or testing
+        }
+      }
+
+      initProject(sampleProject);
     };
 
-    initProject(sampleProject);
+    loadProject();
   }, [mounted, projectId, initProject]);
 
   const handleExport = () => {
-    setIsExporting(true);
-    // Simulate local render completion
-    setTimeout(() => {
-      setIsExporting(false);
-      setExportModalOpen(true);
-    }, 2500);
+    setExportModalOpen(true);
   };
 
   const handleOpenDrawer = (tab: "media" | "captions" | "broll" | "audio") => {
@@ -127,6 +216,8 @@ export default function StudioEditorPage() {
         isExporting={isExporting}
         isDrawerOpen={isDesktopDrawerOpen}
         onToggleDrawer={() => setIsDesktopDrawerOpen(!isDesktopDrawerOpen)}
+        isAssistantOpen={isAssistantOpen}
+        onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
       />
 
       {/* 2. Workspace Body */}
@@ -162,45 +253,18 @@ export default function StudioEditorPage() {
       {/* 3. Mobile Bottom Action Tray (for screens < 768px) */}
       <MobileBottomBar onOpenDrawer={handleOpenDrawer} />
 
-      {/* Export Success Modal */}
-      {exportModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-neutral-950 border border-neutral-900 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <CheckCircle2 className="w-5 h-5" />
-                <span>Export Recipe Ready!</span>
-              </div>
-              <button
-                onClick={() => setExportModalOpen(false)}
-                className="text-neutral-500 hover:text-white p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Production Render & NLE Export Modal */}
+      <RenderExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        project={project}
+      />
 
-            <p className="text-xs text-neutral-300 leading-relaxed">
-              Your CapCut-style timeline has been compiled into high-resolution compositing instructions (cuts: {project.tracks.videoTrack.length}, captions: {project.tracks.textTrack.length}, overlays: {project.tracks.brollTrack.length}).
-            </p>
-
-            <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 font-mono text-[11px] text-neutral-300 max-h-32 overflow-y-auto">
-              <pre>{JSON.stringify({
-                aspectRatio: project.aspectRatio,
-                duration: `${project.duration.toFixed(1)}s`,
-                videoClips: project.tracks.videoTrack.length,
-                captions: project.tracks.textTrack.map((t) => t.text),
-              }, null, 2)}</pre>
-            </div>
-
-            <button
-              onClick={() => setExportModalOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-white hover:bg-neutral-200 font-bold text-xs text-black shadow-lg transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
+      {/* AI Assistant Drawer (Cmd+K) */}
+      <ChatAssistantDrawer
+        isOpen={isAssistantOpen}
+        onClose={() => setIsAssistantOpen(false)}
+      />
     </div>
   );
 }

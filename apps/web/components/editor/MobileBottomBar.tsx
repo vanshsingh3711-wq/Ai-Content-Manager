@@ -28,10 +28,10 @@ export function MobileBottomBar({ onOpenDrawer }: MobileBottomBarProps) {
   })));
 
   const handleSplit = () => {
-    if (selectedItem?.type === "video") {
-      splitClipAtPlayhead(selectedItem.id);
+    if (selectedItem) {
+      splitClipAtPlayhead(selectedItem.type, selectedItem.id);
     } else {
-      splitClipAtPlayhead();
+      splitClipAtPlayhead("video");
     }
   };
 

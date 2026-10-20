@@ -17,6 +17,7 @@ def start_server(port, directory):
         def log_message(self, format, *args):
             pass
 
+    socketserver.TCPServer.allow_reuse_address = True
     httpd = socketserver.TCPServer(("", port), Handler)
     httpd.serve_forever()
 
@@ -42,8 +43,7 @@ async def main():
     targets = props.get("targets", {})
 
     print(f"[HTMLRender] Resolving keyframes via TSX...")
-    worker_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    root_dir = os.path.dirname(os.path.dirname(worker_dir))
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
     motion_dir = os.path.join(root_dir, 'packages', 'motion-components')
     
     # We run the typescript resolver using npx tsx
@@ -74,14 +74,15 @@ async def main():
         
     print(f"[HTMLRender] Starting Offline Rendering: {frames} frames at {fps} FPS (Piping to FFmpeg)...")
     
-    # Setup FFmpeg for transparent video
     ffmpeg_cmd = [
-        "ffmpeg", "-y",
+        "ffmpeg", "-y", "-hide_banner",
+        "-threads", "2",
         "-f", "image2pipe",
         "-vcodec", "png",
         "-r", str(fps),
         "-i", "-",
         "-c:v", "qtrle",
+        "-pix_fmt", "argb",
         out_path
     ]
     
@@ -116,9 +117,38 @@ async def main():
             "([targets, keyframes]) => window.injectData(targets, keyframes)",
             [targets, keyframes_json]
         )
+        
+        # Wait for any dynamically injected images to load
+        await page.evaluate('''
+            async () => {
+                const imgs = Array.from(document.images);
+                await Promise.all(imgs.map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve; // Continue even if an image fails
+                    });
+                }));
+            }
+        ''')
+
+        print("[HTMLRender] Forcing transparent background...")
+        await page.add_style_tag(content="""
+            body, html { background: transparent !important; background-color: transparent !important; }
+            .bg-grid { display: none !important; }
+            canvas#webgl-canvas { display: none !important; }
+            svg > rect[fill='url(#grad)'] { display: none !important; }
+            svg > rect[fill='url(#grid)'] { display: none !important; }
+        """)
 
         for i in range(frames):
             await page.evaluate(f"window.renderFrame({i})")
+            
+            # Universal Exit Animation (Fade out in the last 15 frames)
+            if i > frames - 15:
+                opacity = (frames - i) / 15.0
+                await page.evaluate(f"document.body.style.opacity = '{opacity}'")
+
             frame_bytes = await page.screenshot(type="png", omit_background=True)
             process.stdin.write(frame_bytes)
             

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Sliders,
   Volume2,
@@ -11,6 +11,9 @@ import {
   Trash2,
   MoveVertical,
   Diamond,
+  BrainCircuit,
+  Check,
+  Layers,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -46,7 +49,90 @@ function KeyframeToggle({ clip, trackType, property, currentValue }: { clip: any
   );
 }
 
-function TransformControls({ clip, trackType, updateFn }: { clip: any, trackType: "video"|"broll"|"caption", updateFn: Function }) {
+function FeedbackUI({ type, original, current }: { type: string, original: any, current: any }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await fetch("http://localhost:8000/api/v1/jobs/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          niche: "educational_explainer", // Hardcoded for demo
+          original: original,
+          correction: current,
+          reason: reason
+        })
+      });
+      setSuccess(true);
+      setTimeout(() => {
+        setIsOpen(false);
+        setSuccess(false);
+        setReason("");
+      }, 2000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="w-full py-2 px-3 mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-center gap-2 text-emerald-400 text-xs font-bold">
+        <Check className="w-4 h-4" /> Feedback Learned!
+      </div>
+    );
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="w-full py-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all mt-4"
+      >
+        <BrainCircuit className="w-3.5 h-3.5" />
+        <span>Train AI (Submit Correction)</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="w-full mt-4 p-3 bg-neutral-900 border border-indigo-500/30 rounded-lg space-y-2 text-xs">
+      <div className="text-indigo-300 font-bold flex items-center gap-1.5 mb-2">
+        <BrainCircuit className="w-3.5 h-3.5" /> 
+        Explain Correction
+      </div>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Why did you change this?"
+        className="w-full bg-black/50 border border-neutral-800 rounded p-2 text-white outline-none focus:border-indigo-500 resize-none h-16"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={() => setIsOpen(false)}
+          className="flex-1 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-white font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={!reason || submitting}
+          className="flex-1 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium disabled:opacity-50"
+        >
+          {submitting ? "Sending..." : "Submit"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TransformControls({ clip, trackType, updateFn }: { clip: any, trackType: "video"|"broll"|"caption"|"graphic", updateFn: Function }) {
   const { playheadTime } = useTimelineStore();
   const commitHistory = () => {
     useTimelineStore.getState().commitHistory();
@@ -160,6 +246,7 @@ export function InspectorPanel() {
     updateVideoClip,
     updateCaption,
     updateBRollClip,
+    updateGraphicElement,
     deleteClip,
     setSelectedItem,
     playheadTime,
@@ -170,6 +257,7 @@ export function InspectorPanel() {
     updateVideoClip: state.updateVideoClip,
     updateCaption: state.updateCaption,
     updateBRollClip: state.updateBRollClip,
+    updateGraphicElement: state.updateGraphicElement,
     deleteClip: state.deleteClip,
     setSelectedItem: state.setSelectedItem,
     playheadTime: state.playheadTime,
@@ -406,6 +494,12 @@ export function InspectorPanel() {
           <TransformControls clip={caption} trackType="caption" updateFn={updateCaption} />
         </div>
 
+        <FeedbackUI 
+          type="caption" 
+          original={{ preset: "unknown", text: "unknown" }} 
+          current={{ preset: caption.stylePreset, text: caption.text }} 
+        />
+
         <button
           onClick={() => deleteClip("caption", caption.id)}
           className="w-full py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all mt-4"
@@ -493,6 +587,12 @@ export function InspectorPanel() {
           
           <TransformControls clip={broll} trackType="broll" updateFn={updateBRollClip} />
         </div>
+        
+        <FeedbackUI 
+          type="broll" 
+          original={{ fitMode: "unknown" }} 
+          current={{ fitMode: broll.fitMode }} 
+        />
 
         <button
           onClick={() => deleteClip("broll", broll.id)}
@@ -500,6 +600,58 @@ export function InspectorPanel() {
         >
           <Trash2 className="w-3.5 h-3.5" />
           <span>Delete Overlay</span>
+        </button>
+      </aside>
+    );
+  }
+
+  // Selected: Graphic Element
+  if (selectedItem.type === "graphic") {
+    const graphic = (project.tracks.graphicsTrack || []).find((g) => g.id === selectedItem.id);
+    if (!graphic) return null;
+
+    return (
+      <aside className="w-64 border-l border-neutral-900 bg-neutral-950 p-4 flex flex-col select-none text-slate-300">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-900 mb-4">
+          <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5" />
+            <span>Graphic Element</span>
+          </h3>
+          <button
+            onClick={() => setSelectedItem(null)}
+            className="text-[10px] text-neutral-500 hover:text-white cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="space-y-4 text-xs flex-1 overflow-y-auto">
+          <div>
+            <label className="block text-neutral-500 mb-1">Name</label>
+            <input
+              type="text"
+              value={graphic.name}
+              onChange={(e) => updateGraphicElement(graphic.id, { name: e.target.value })}
+              className="w-full bg-slate-900 border border-neutral-800 rounded-lg p-2 text-xs text-white outline-none focus:border-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-neutral-500 mb-1">Composition</label>
+            <div className="p-2 rounded bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-yellow-400">
+              {graphic.compositionId}
+            </div>
+          </div>
+
+          <TransformControls clip={graphic} trackType="graphic" updateFn={updateGraphicElement} />
+        </div>
+
+        <button
+          onClick={() => deleteClip("graphic", graphic.id)}
+          className="w-full py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all mt-4 cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Delete Graphic</span>
         </button>
       </aside>
     );

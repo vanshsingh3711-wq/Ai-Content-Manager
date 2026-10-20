@@ -18,7 +18,7 @@ class VisualBeat(BaseModel):
     animation_state: Optional[str] = Field(None, description="State of the animation (e.g. intro, idle, reacting, changing, exit)")
 
 class EditDecision(BaseModel):
-    action: Literal["cut", "b_roll", "zoom_in", "sfx", "motion_graphics", "character"] = Field(..., description="Editing action to apply.")
+    action: Literal["cut", "b_roll", "zoom_in", "sfx", "motion_graphics", "character", "transition"] = Field(..., description="Editing action to apply.")
     trigger_id: Optional[str] = Field(None, description="The chunk ID (e.g., ID_01) that triggers this action. Required for non-cut actions.")
     start: Optional[float] = Field(None, description="Start timestamp for cuts.")
     end: Optional[float] = Field(None, description="End timestamp for cuts.")
@@ -29,7 +29,8 @@ class EditDecision(BaseModel):
     motion_graphics_personality: Optional[str] = Field(None, description="Physics personality (e.g. energetic, premium, technical)")
     character_action: Optional[str] = Field(None, description="Action for 2D character (e.g., 'pointing', 'surprised', 'explaining') if action is 'character'.")
     transition: Optional[str] = Field(None, description="Transition type from previous scene (e.g., 'fade', 'slide', 'wipe', 'morph'). Leave null for a clean cut.")
-    visual_beats: Optional[List[VisualBeat]] = Field(None, description="List of visual beats/animation changes within this scene. A scene should have multiple beats if the dialogue changes topics.")
+    layer: Optional[str] = Field(None, description="Layer positioning: 'behind' to place graphics behind speaker shoulders in 3D space, or 'front'.")
+    depth: Optional[str] = Field(None, description="Depth positioning: 'behind' or 'front'.")
     reason: Optional[str] = Field(None, description="Required justification for the decision. Explains why it adds value here.")
 
 
@@ -49,81 +50,146 @@ def _wait_for_internet_retry(func):
                 attempt += 1
     return wrapper
 
+def _load_style_profile(style_pref: str) -> str:
+    # ai_director.py is at apps/worker/services/ → go 3 levels up to reach project root
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    knowledge_dir = os.path.join(base_dir, "data", "styles", "knowledge")
+    # Try exact name first, then common suffixes (e.g. "viral" → "viral_documentary")
+    candidates = [style_pref, f"{style_pref}_documentary", f"{style_pref}_style"]
+    for candidate in candidates:
+        path = os.path.join(knowledge_dir, f"{candidate}.md")
+        if os.path.exists(path):
+            print(f"[StyleLoader] Loaded style profile: {candidate}.md")
+            with open(path, "r") as f:
+                return f.read()
+    print(f"[StyleLoader] ⚠️  No style file found for '{style_pref}' (tried: {candidates}). Using default.")
+    return "No explicit style profile provided. Default to a fast-paced viral style."
 
-def _call_llm(system_prompt: str, user_prompt: str) -> EditList:
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    openrouter_key = settings.OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY")
-    deepseek_key = settings.DEEPSEEK_API_KEY or os.getenv("DEEPSEEK_API_KEY")
-    mistral_key = settings.MISTRAL_API_KEY or os.getenv("MISTRAL_API_KEY")
+DEEPSEEK_MODEL_MAP = {
+    # Reasoning models (R1)
+    "deepseek-reasoner": "deepseek-reasoner",
+    "deepseek-r1": "deepseek-reasoner",
+    "r1": "deepseek-reasoner",
+    "deepseek r1": "deepseek-reasoner",
+    "deepseek-reasoner-pro": "deepseek-reasoner",
+    "deepseek v4 pro": "deepseek-reasoner",
+    "deepseek-v4-pro": "deepseek-reasoner",
+    # Chat / fast models (V3 & V4)
+    "deepseek-chat": "deepseek-chat",
+    "deepseek v3": "deepseek-chat",
+    "deepseek-v3": "deepseek-chat",
+    "v3": "deepseek-chat",
+    "deepseek-chat-v3": "deepseek-chat",
+    "deepseek v4": "deepseek-chat",
+    "deepseek-v4": "deepseek-chat",
+    "deepseek-hybrid": "deepseek-chat",
+}
 
-    configs = []
-    if mistral_key:
-        configs.append({"key": mistral_key, "url": "https://api.mistral.ai/v1", "model": "mistral-large-latest"})
-    if gemini_key:
-        configs.append({"key": gemini_key, "url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "gemini-3.5-flash"})
-        configs.append({"key": gemini_key, "url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "gemini-3.6-flash"})
-    if openrouter_key:
-        configs.append({"key": openrouter_key, "url": "https://openrouter.ai/api/v1", "model": "google/gemini-3.5-flash"})
-        configs.append({"key": openrouter_key, "url": "https://openrouter.ai/api/v1", "model": "google/gemini-3.6-flash"})
-    if deepseek_key:
-        configs.append({"key": deepseek_key, "url": "https://api.deepseek.com/v1", "model": "deepseek-chat"})
+def resolve_deepseek_model(model_pref: str) -> str:
+    """Map user/internal model preference to exact DeepSeek model ID."""
+    clean = (model_pref or "deepseek-chat").strip().lower()
+    return DEEPSEEK_MODEL_MAP.get(clean, "deepseek-chat")
 
-    if not configs:
-        raise ValueError("[!] No API keys provided for LLM.")
+def _call_llm(system_prompt: str, user_prompt: str, ai_model_pref: str = "DeepSeek V3", raw_output: bool = False):
+    deepseek_key = getattr(settings, "DEEPSEEK_API_KEY", None) or os.getenv("DEEPSEEK_API_KEY")
+
+    if not deepseek_key:
+        raise ValueError("[!] No DEEPSEEK_API_KEY provided. Please set DEEPSEEK_API_KEY in your .env file.")
+
+    target_model = resolve_deepseek_model(ai_model_pref)
+    base_url = "https://api.deepseek.com/v1"
 
     last_error = None
     response = None
 
-    for config in configs:
-        client = OpenAI(api_key=config["key"], base_url=config["url"])
+    import time
+    client = OpenAI(api_key=deepseek_key, base_url=base_url, timeout=60.0)
+
+    for attempt in range(3):
         try:
-            print(f"[*] Attempting LLM call with model: {config['model']}")
-            response = client.chat.completions.create(
-                model=config["model"],
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.3,
-                max_tokens=8000,
-            )
-            break
+            print(f"[*] Attempting DeepSeek call with model: {target_model} (Attempt {attempt+1}/3)")
+
+            # deepseek-reasoner (R1) does not support response_format or custom temperature
+            if target_model == "deepseek-reasoner":
+                response = client.chat.completions.create(
+                    model=target_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt + "\n\nYou MUST output your final answer as a valid JSON object wrapped in ```json ... ``` markdown code block."},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=8000,
+                )
+            else:
+                response = client.chat.completions.create(
+                    model=target_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=8000,
+                )
+
+            if not hasattr(response, 'choices') or not response.choices:
+                raise ValueError(f"LLM Response missing choices: {response}")
+
+            # Log thinking if R1
+            msg = response.choices[0].message
+            if getattr(msg, "reasoning_content", None):
+                snippet = msg.reasoning_content[:120].replace("\n", " ")
+                print(f"[DeepSeek R1 Thinking] {snippet}...")
+
+            break  # Success
         except Exception as e:
-            print(f"[!] Failed with {config['model']} - Error: {type(e).__name__}")
+            print(f"[!] Failed with {target_model} - Error: {type(e).__name__}: {e}")
             last_error = e
+            response = None
+            time.sleep(2)
 
     if response is None:
         raise last_error
 
     content = response.choices[0].message.content
+    msg = response.choices[0].message
+    if not content and getattr(msg, "reasoning_content", None):
+        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', msg.reasoning_content, re.DOTALL | re.IGNORECASE)
+        if match:
+            content = match.group(1).strip()
+
     if content:
         content = content.strip()
-        # More robust markdown extraction
+        # Clean reasoning tags if any leaked into content
+        if "<think>" in content and "</think>" in content:
+            content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+
+        # Markdown extraction
         match = re.search(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL | re.IGNORECASE)
         if match:
             content = match.group(1).strip()
-            
+
+        if raw_output:
+            return content
+
         try:
             parsed_json = json.loads(content)
-            print(f"[LLM: PARSED JSON] Successfully decoded JSON block from LLM.")
+            print(f"[LLM: PARSED JSON] Successfully decoded JSON block from {target_model}.")
             if isinstance(parsed_json, list):
                 parsed_json = {"edits": parsed_json}
-            
-            # Additional detailed logging of the exact decisions parsed
+
             print(f"[LLM: DECISIONS EXTRACTED] Found {len(parsed_json.get('edits', []))} edits.")
             for idx, edit in enumerate(parsed_json.get('edits', [])):
                 print(f"  -> Decision #{idx+1} [Action: {edit.get('action')}] | Trigger: {edit.get('trigger_id')}")
-                if 'reason' in edit and edit['reason']:
-                     print(f"     Reasoning: {edit['reason']}")
-                if 'visual_beats' in edit and edit['visual_beats']:
-                     print(f"     Beats ({len(edit['visual_beats'])}): {[b.get('emphasis') for b in edit['visual_beats']]}")
-            
+
             return EditList.model_validate(parsed_json)
         except Exception as e:
             print(f"[!] Failed to parse LLM output: {e}\nRaw output: {content}")
             return EditList(edits=[])
-    
+
+    if target_model == "deepseek-reasoner":
+        print(f"[!] {target_model} returned empty content. Falling back to deepseek-chat...")
+        return _call_llm(system_prompt, user_prompt, ai_model_pref="deepseek-chat", raw_output=raw_output)
+
     print("[!] LLM returned empty content.")
     raise ValueError("LLM returned empty content")
 
@@ -143,8 +209,23 @@ def generate_edit_decisions(unified_analysis_json: str) -> EditList:
     print("[*] Generating Motion Graphics Plan...")
     mg_plan = generate_motion_graphics_plan(unified_analysis_json)
     
-    print("[*] Generating Character Plan...")
-    char_plan = generate_character_plan(unified_analysis_json)
+    # Check if the user requested a faceless documentary style
+    is_faceless = False
+    try:
+        analysis_data = json.loads(unified_analysis_json)
+        # Look for faceless hints in style or metadata
+        if "faceless" in str(analysis_data).lower() or "documentary" in str(analysis_data).lower():
+            is_faceless = True
+    except Exception:
+        pass
+        
+    if is_faceless:
+        print("[*] 'Faceless' mode detected. Skipping Character Plan...")
+        from services.ai_director import EditList
+        char_plan = EditList(edits=[])
+    else:
+        print("[*] Generating Character Plan...")
+        char_plan = generate_character_plan(unified_analysis_json)
     
     print("[*] Resolving Master Blueprint...")
     final_plan = resolve_master_blueprint(

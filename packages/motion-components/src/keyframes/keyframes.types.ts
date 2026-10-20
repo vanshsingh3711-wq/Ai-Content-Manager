@@ -1,4 +1,4 @@
-export type AnimatableProperty = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'width' | 'height' | 'blur' | 'translateX' | 'translateY';
+export type AnimatableProperty = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'width' | 'height' | 'blur' | 'translateX' | 'translateY' | 'translateZ' | 'rotateX' | 'rotateY';
 
 export interface Keyframe<T = number> {
   id: string;

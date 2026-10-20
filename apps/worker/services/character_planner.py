@@ -1,10 +1,14 @@
-from services.ai_director import EditList, _call_llm, _wait_for_internet_retry
+from services.ai_director import EditList, _call_llm, _wait_for_internet_retry, _load_style_profile
 
 @_wait_for_internet_retry
-def generate_character_plan(unified_analysis_json: str) -> EditList:
-    system_prompt = """You are the 2D Character Planner for a video editing pipeline.
+def generate_character_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:
+    style_context = _load_style_profile(style_pref)
+    system_prompt = f"""You are the 2D Character Planner for a video editing pipeline.
 You only focus on one action: 'character' (placing a 2D character reaction/animation on screen).
 Do NOT output any other actions.
+
+STYLE PROFILE INSTRUCTIONS:
+{style_context}
 
 RULES:
 1. 'character': Use when the script calls for an emotional reaction (surprised, explaining, pointing). 
@@ -13,23 +17,24 @@ RULES:
 4. **Transitions**: Provide a `transition` (e.g., "fade", "slide", "wipe", "morph") if the character should enter smoothly. Leave null for a clean cut.
 
 OUTPUT SCHEMA (JSON):
-{
+OUTPUT SCHEMA (JSON):
+{{
   "edits": [
-    {
+    {{
       "action": "character",
       "trigger_id": "ID_01 (Required)",
       "character_action": "explaining",
       "transition": "fade",
       "visual_beats": [
-        { "timestamp": 0.0, "text": "Let me explain", "emphasis": "intro", "animation_state": "explaining" },
-        { "timestamp": 2.5, "text": "Wow!", "emphasis": "jump", "animation_state": "surprised" }
+        {{ "timestamp": 0.0, "text": "Let me explain", "emphasis": "intro", "animation_state": "explaining" }},
+        {{ "timestamp": 2.5, "text": "Wow!", "emphasis": "jump", "animation_state": "surprised" }}
       ],
       "reason": "Why this character reaction fits the tone here"
-    }
+    }}
   ]
-}
+}}
 """
-    print("\n[CHARACTER PLANNER] Asking LLM to plan character emotions and gestures...")
-    result = _call_llm(system_prompt, f"Context:\n{unified_analysis_json}")
+    print(f"\n[CHARACTER PLANNER] Asking LLM ({ai_model_pref}) to plan character emotions and gestures...")
+    result = _call_llm(system_prompt, f"Context:\n{unified_analysis_json}", ai_model_pref)
     print(f"[CHARACTER PLANNER] LLM proposed {len(result.edits)} character reaction events.")
     return result

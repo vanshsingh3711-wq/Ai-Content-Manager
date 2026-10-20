@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import {
   Play,
   Pause,
@@ -10,13 +10,25 @@ import {
   SkipBack,
   SkipForward,
   Diamond,
+  Sparkles,
+  UserCheck,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
 import { AspectRatio } from "@/lib/timeline-types";
 import { cn } from "@/lib/utils";
 import { TransformableOverlay } from "./TransformableOverlay";
+import { SnapGuidesOverlay } from "./SnapGuidesOverlay";
+import { SubjectOverlay } from "./SubjectOverlay";
+import { GraphicCanvasRenderer } from "./GraphicCanvasRenderer";
 import { evaluatePropertyAtTime, getExactKeyframe } from "@/lib/keyframes";
+import { getSafeZoneForAspectRatio } from "@/lib/layout/aspect-ratio-reflow";
+import {
+  EDITOR_DRAG_MIME,
+  deserializeDragPayload,
+  projectPointerToCanvasCoordinates,
+  createAddElementOperationFromDrop,
+} from "@/lib/editor/drag-drop-types";
 
 export function PlayerMonitor() {
   const {
@@ -24,28 +36,38 @@ export function PlayerMonitor() {
     playheadTime,
     isPlaying,
     safeZoneVisible,
+    subjectOverlayVisible,
+    toggleSubjectOverlay,
     selectedItem,
     setPlayheadTime,
     setIsPlaying,
     togglePlay,
     setKeyframe,
     removeKeyframe,
+    dispatchOperation,
+    setSelectedItem,
   } = useTimelineStore(useShallow((state) => ({
     project: state.project,
     playheadTime: state.playheadTime,
     isPlaying: state.isPlaying,
     safeZoneVisible: state.safeZoneVisible,
+    subjectOverlayVisible: state.subjectOverlayVisible,
+    toggleSubjectOverlay: state.toggleSubjectOverlay,
     selectedItem: state.selectedItem,
     setPlayheadTime: state.setPlayheadTime,
     setIsPlaying: state.setIsPlaying,
     togglePlay: state.togglePlay,
     setKeyframe: state.setKeyframe,
     removeKeyframe: state.removeKeyframe,
+    dispatchOperation: state.dispatchOperation,
+    setSelectedItem: state.setSelectedItem,
   })));
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const brollVideoRef = useRef<HTMLVideoElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Find the active main video clip at current playhead
   const activeVideoClip = project.tracks.videoTrack.find(
@@ -62,12 +84,79 @@ export function PlayerMonitor() {
     (t) => playheadTime >= t.start && playheadTime < t.end
   ) || null;
 
+  // Derive active Graphic element directly
+  const activeGraphic = (project.tracks.graphicsTrack || []).find(
+    (g) => playheadTime >= g.start && playheadTime < g.end
+  ) || null;
+
+  // Derive active transition across video cuts (Phase 4)
+  const activeTransition = useMemo(() => {
+    const transitions = project.transitions || [];
+    for (const trans of transitions) {
+      const fromClip = project.tracks.videoTrack.find((c) => c.id === trans.fromClipId);
+      const toClip = project.tracks.videoTrack.find((c) => c.id === trans.toClipId);
+      if (!fromClip || !toClip) continue;
+
+      const cutTime = fromClip.end;
+      const halfDur = (trans.duration || 0.5) / 2;
+      let startWindow = cutTime - halfDur;
+      let endWindow = cutTime + halfDur;
+
+      if (trans.alignment === "start") {
+        startWindow = cutTime;
+        endWindow = cutTime + (trans.duration || 0.5);
+      } else if (trans.alignment === "end") {
+        startWindow = cutTime - (trans.duration || 0.5);
+        endWindow = cutTime;
+      }
+
+      if (playheadTime >= startWindow && playheadTime <= endWindow) {
+        const dur = Math.max(0.01, endWindow - startWindow);
+        const progress = Math.min(1, Math.max(0, (playheadTime - startWindow) / dur));
+        return {
+          transition: trans,
+          fromClip,
+          toClip,
+          progress,
+          preset: trans.preset,
+        };
+      }
+    }
+    return null;
+  }, [project.transitions, project.tracks.videoTrack, playheadTime]);
+
+  const getTransitionStyle = (): React.CSSProperties => {
+    if (!activeTransition) return {};
+    const { preset, progress } = activeTransition;
+    if (preset === "crossfade") {
+      return { opacity: activeVideoClip?.id === activeTransition.fromClip.id ? 1 - progress : progress };
+    }
+    if (preset === "fade_to_black") {
+      const op = progress < 0.5 ? 1 - progress * 2 : (progress - 0.5) * 2;
+      return { opacity: op };
+    }
+    if (preset === "wipe_left") {
+      return { clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)` };
+    }
+    if (preset === "wipe_right") {
+      return { clipPath: `inset(0 0 0 ${progress * 100}%)` };
+    }
+    if (preset === "slide_up") {
+      return { transform: `translateY(${-(1 - progress) * 100}%)` };
+    }
+    if (preset === "zoom_in") {
+      return { transform: `scale(${1 + progress * 0.25})` };
+    }
+    return {};
+  };
+
   // Global keyframe detection and toggling
   let activeSelectedClip: any = null;
   if (selectedItem) {
     if (selectedItem.type === "video") activeSelectedClip = project.tracks.videoTrack.find((c) => c.id === selectedItem.id);
     else if (selectedItem.type === "broll") activeSelectedClip = project.tracks.brollTrack.find((c) => c.id === selectedItem.id);
     else if (selectedItem.type === "caption") activeSelectedClip = project.tracks.textTrack.find((c) => c.id === selectedItem.id);
+    else if (selectedItem.type === "graphic") activeSelectedClip = (project.tracks.graphicsTrack || []).find((c) => c.id === selectedItem.id);
   }
 
   const selectedLocalTime = activeSelectedClip ? playheadTime - activeSelectedClip.start : 0;
@@ -241,32 +330,107 @@ export function PlayerMonitor() {
     <div className="flex-1 flex flex-col items-center justify-center p-2 md:p-4 bg-black relative overflow-hidden select-none">
       {/* Viewport Frame */}
       <div
+        ref={viewportRef}
         onPointerDown={() => useTimelineStore.getState().setSelectedItem(null)}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget === e.target) {
+            setIsDragOver(false);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+
+          const rawData =
+            e.dataTransfer.getData(EDITOR_DRAG_MIME) ||
+            e.dataTransfer.getData("text/plain");
+          if (!rawData) return;
+
+          const payload = deserializeDragPayload(rawData);
+          if (!payload) return;
+
+          // Audio belongs on the timeline tracks
+          if (payload.type === "audio") return;
+
+          const rect = viewportRef.current?.getBoundingClientRect();
+          const position = rect
+            ? projectPointerToCanvasCoordinates(e.clientX, e.clientY, rect)
+            : { x: 50, y: 50 };
+
+          const operation = createAddElementOperationFromDrop(payload, {
+            timestamp: playheadTime,
+            position,
+            durationLimit: project.duration,
+          });
+
+          dispatchOperation(operation);
+
+          if ((operation as any).element?.id) {
+            setSelectedItem({
+              type: payload.type as any,
+              id: (operation as any).element.id,
+            });
+          }
+        }}
         className={cn(
-          "relative bg-black rounded-xl overflow-hidden shadow-2xl border border-neutral-900 flex items-center justify-center transition-all duration-300",
+          "relative bg-black rounded-xl overflow-hidden shadow-2xl border flex items-center justify-center transition-all duration-300",
+          isDragOver
+            ? "border-yellow-400 ring-4 ring-yellow-400/20"
+            : "border-neutral-900",
           getAspectRatioClasses(project.aspectRatio)
         )}
       >
+        {isDragOver && (
+          <div className="absolute inset-0 z-50 pointer-events-none bg-yellow-400/10 backdrop-blur-xs flex flex-col items-center justify-center border-2 border-dashed border-yellow-400">
+            <div className="px-3.5 py-1.5 rounded-full bg-neutral-950/90 border border-yellow-400 text-yellow-400 text-xs font-bold shadow-2xl flex items-center gap-1.5 animate-pulse">
+              <Sparkles className="w-4 h-4" />
+              <span>Drop onto Canvas ({playheadTime.toFixed(1)}s)</span>
+            </div>
+          </div>
+        )}
+        {/* Active Transition Indicator Badge */}
+        {activeTransition && (
+          <div
+            data-testid="active-transition-indicator"
+            className="absolute top-3 left-3 z-40 px-2.5 py-1 rounded-md bg-neutral-950/80 border border-yellow-400/50 backdrop-blur-md text-[10px] text-yellow-400 font-mono flex items-center gap-1.5 shadow-lg pointer-events-none"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-ping" />
+            <span>
+              Transition: {activeTransition.preset} ({(activeTransition.progress * 100).toFixed(0)}%)
+            </span>
+          </div>
+        )}
+
         {/* Main Video Layer */}
         {activeVideoClip ? (
           <TransformableOverlay
             id={activeVideoClip.id}
             type="video"
             clip={activeVideoClip}
-            positionX={activeVideoClip.positionX ?? 50}
-            positionY={activeVideoClip.positionY ?? 50}
+            positionX={activeVideoClip.positionX ?? activeVideoClip.position?.x ?? 50}
+            positionY={activeVideoClip.positionY ?? activeVideoClip.position?.y ?? 50}
             scale={activeVideoClip.scale ?? activeVideoClip.zoomFactor ?? 1.0}
             rotation={activeVideoClip.rotation ?? 0}
             isSelected={selectedItem?.id === activeVideoClip.id}
           >
-            <video
-              ref={videoRef}
-              src={activeVideoClip.sourceUrl}
-              muted={isMuted}
-              playsInline
-              preload="auto"
-              className="w-full h-full object-cover"
-            />
+            <div className="w-full h-full transition-all duration-75" style={getTransitionStyle()}>
+              <video
+                ref={videoRef}
+                src={activeVideoClip.sourceUrl}
+                muted={isMuted}
+                playsInline
+                preload="auto"
+                className="w-full h-full object-cover"
+              />
+            </div>
           </TransformableOverlay>
         ) : (
           <div className="flex flex-col items-center justify-center text-neutral-500 p-6 text-center">
@@ -281,15 +445,15 @@ export function PlayerMonitor() {
             id={activeBroll.id}
             type="broll"
             clip={activeBroll}
-            positionX={activeBroll.positionX ?? 50}
-            positionY={activeBroll.positionY ?? 50}
+            positionX={activeBroll.positionX ?? activeBroll.position?.x ?? 50}
+            positionY={activeBroll.positionY ?? activeBroll.position?.y ?? 50}
             scale={activeBroll.scale ?? 1.0}
             rotation={activeBroll.rotation ?? 0}
             isSelected={selectedItem?.id === activeBroll.id}
           >
             <div
               className="w-full h-full transition-opacity duration-200"
-              style={{ opacity: evaluatePropertyAtTime(activeBroll.animation?.opacity, playheadTime - activeBroll.start, activeBroll.opacity ?? 100) / 100 }}
+              style={{ opacity: evaluatePropertyAtTime(activeBroll.animation, "opacity", playheadTime - activeBroll.start, activeBroll.opacity ?? 100) / 100 }}
             >
               <video
                 ref={brollVideoRef}
@@ -313,30 +477,30 @@ export function PlayerMonitor() {
             id={activeCaption.id}
             type="caption"
             clip={activeCaption}
-            positionX={activeCaption.positionX ?? 50}
-            positionY={activeCaption.positionY ?? 75}
+            positionX={activeCaption.positionX ?? activeCaption.position?.x ?? 50}
+            positionY={activeCaption.positionY ?? activeCaption.position?.y ?? 75}
             scale={activeCaption.scale ?? 1.0}
             rotation={activeCaption.rotation ?? 0}
             isSelected={selectedItem?.id === activeCaption.id}
           >
             <div className="flex justify-center transition-all duration-150">
               {activeCaption.stylePreset === "tiktok_yellow" && (
-                <span className="font-extrabold uppercase tracking-wide text-center text-xl md:text-2xl text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] px-3 py-1 bg-black/50 backdrop-blur-xs rounded-lg border border-yellow-400/30">
+                <span className="font-extrabold uppercase tracking-wide text-center text-xl md:text-2xl text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] px-3 py-1 bg-black/50 backdrop-blur-xs rounded-lg border border-yellow-400/30 whitespace-pre-line">
                   {activeCaption.text}
                 </span>
               )}
               {activeCaption.stylePreset === "hormozi_bold" && (
-                <span className="font-black uppercase tracking-tight text-center text-2xl md:text-3xl text-white drop-shadow-[0_4px_8px_rgba(0,0,0,1)] px-4 py-1.5 bg-red-600 rounded-md border-2 border-white shadow-xl rotate-[-1deg]">
+                <span className="font-black uppercase tracking-tight text-center text-2xl md:text-3xl text-white drop-shadow-[0_4px_8px_rgba(0,0,0,1)] px-4 py-1.5 bg-red-600 rounded-md border-2 border-white shadow-xl rotate-[-1deg] whitespace-pre-line">
                   {activeCaption.text}
                 </span>
               )}
               {activeCaption.stylePreset === "clean_white" && (
-                <span className="font-semibold text-center text-lg md:text-xl text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] px-3 py-0.5 bg-black/40 rounded-md">
+                <span className="font-semibold text-center text-lg md:text-xl text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] px-3 py-0.5 bg-black/40 rounded-md whitespace-pre-line">
                   {activeCaption.text}
                 </span>
               )}
               {activeCaption.stylePreset === "neon_glow" && (
-                <span className="font-bold text-center text-xl md:text-2xl text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)] px-3 py-1 bg-neutral-950/70 rounded-lg border border-cyan-400/50">
+                <span className="font-bold text-center text-xl md:text-2xl text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)] px-3 py-1 bg-neutral-950/70 rounded-lg border border-cyan-400/50 whitespace-pre-line">
                   {activeCaption.text}
                 </span>
               )}
@@ -344,20 +508,68 @@ export function PlayerMonitor() {
           </TransformableOverlay>
         )}
 
-        {/* Safe Zone Overlay (Shorts/Reels) */}
-        {safeZoneVisible && (
-          <div className="absolute inset-0 pointer-events-none z-30 border-2 border-dashed border-red-500/40 m-2 rounded-lg flex flex-col justify-between p-3 text-[10px] text-red-400/80 font-mono">
-            <div className="flex justify-between">
-              <span>SAFE ZONE TOP</span>
-              <span>CAMERA CUTOUT</span>
-            </div>
-            <div className="self-end mr-1 space-y-3 text-right">
-              <div className="p-1 bg-red-950/60 rounded border border-red-500/30">LIKE / COMMENTS</div>
-              <div className="p-1 bg-red-950/60 rounded border border-red-500/30">SHARE / SOUND</div>
-            </div>
-            <div>SAFE ZONE BOTTOM (CAPTION & PROFILE)</div>
-          </div>
+        {/* Graphics Overlay Layer */}
+        {activeGraphic && (
+          <TransformableOverlay
+            id={activeGraphic.id}
+            type="graphic"
+            clip={activeGraphic}
+            positionX={activeGraphic.positionX ?? activeGraphic.position?.x ?? 50}
+            positionY={activeGraphic.positionY ?? activeGraphic.position?.y ?? 50}
+            scale={activeGraphic.scale ?? 1.0}
+            rotation={activeGraphic.rotation ?? 0}
+            isSelected={selectedItem?.id === activeGraphic.id}
+          >
+            <GraphicCanvasRenderer graphic={activeGraphic} playheadTime={playheadTime} />
+          </TransformableOverlay>
         )}
+
+        {/* Dynamic Safe Zone Overlay */}
+        {safeZoneVisible && (() => {
+          const zone = getSafeZoneForAspectRatio(project.aspectRatio);
+          return (
+            <div
+              data-testid="safe-zone-overlay"
+              className="absolute pointer-events-none z-30 border-2 border-dashed border-red-500/60 rounded-lg flex flex-col justify-between p-2 text-[9px] text-red-400 font-mono transition-all duration-200"
+              style={{
+                left: `${zone.minX}%`,
+                top: `${zone.minY}%`,
+                width: `${zone.maxX - zone.minX}%`,
+                height: `${zone.maxY - zone.minY}%`,
+              }}
+            >
+              <div className="flex justify-between items-center opacity-85">
+                <span className="bg-red-950/80 px-1 py-0.5 rounded border border-red-500/40">
+                  TOP ({zone.minY}%)
+                </span>
+                <span className="bg-red-950/80 px-1 py-0.5 rounded border border-red-500/40 font-bold">
+                  {zone.label}
+                </span>
+              </div>
+              {project.aspectRatio === "9:16" && (
+                <div className="self-end space-y-1 text-right opacity-85">
+                  <div className="p-1 bg-red-950/80 rounded border border-red-500/40 text-[8px]">
+                    ACTIONS RAIL (18%)
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-between items-center opacity-85">
+                <span className="bg-red-950/80 px-1 py-0.5 rounded border border-red-500/40">
+                  BOTTOM ({100 - zone.maxY}%)
+                </span>
+                <span className="text-[8px] text-red-300/80">
+                  MAX {zone.maxCharsPerCaptionLine} CHR/LINE
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Subject Safe Zone Overlay (MediaPipe presenter avoidance boundaries) */}
+        <SubjectOverlay />
+
+        {/* Snap Guides Overlay (Magnetic alignment lines & center crosshair) */}
+        <SnapGuidesOverlay />
       </div>
 
       {/* Playback Controls Bar */}
@@ -396,8 +608,24 @@ export function PlayerMonitor() {
           </button>
         </div>
 
-        {/* Volume & Fullscreen */}
+        {/* Subject Overlay, Volume & Keyframes */}
         <div className="flex items-center gap-1 text-neutral-500">
+          <button
+            onClick={toggleSubjectOverlay}
+            data-testid="toggle-subject-overlay-btn"
+            title={subjectOverlayVisible ? "Hide Presenter Safe Zones" : "Show Presenter Safe Zones"}
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              subjectOverlayVisible
+                ? "text-emerald-400 bg-emerald-950/60 border border-emerald-500/40"
+                : "hover:text-white hover:bg-neutral-900"
+            )}
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="h-3 w-[1px] bg-neutral-800 mx-0.5" />
+
           <button
             onClick={toggleGlobalKeyframe}
             disabled={!activeSelectedClip || isSelectedOutOfBounds}

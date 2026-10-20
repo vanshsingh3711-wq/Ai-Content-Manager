@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@1,600&family=Fira+Code:wght@400;600&display=swap');
+    
+    :root {
+      --bg: #030303;
+      --fg: #ffffff;
+      --muted: rgba(255, 255, 255, 0.4);
+      --grid: rgba(255, 255, 255, 0.03);
+      --accent: #ffffff;
+      --accent-pop: #a78bfa; /* Purple for deltas/highlights */
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      color: var(--fg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Minimalist Grid Background */
+    .bg-grid {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+    }
+
+    /* Motion Graphics UI Frame */
+    .ui-frame {
+      position: absolute;
+      width: 1400px;
+      height: 800px;
+      z-index: 1;
+    }
+
+    .ui-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1.5;
+    }
+
+    /* Content Layout */
+    #content-container {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 1200px;
+      padding-left: 100px;
+    }
+
+    .mask {
+      overflow: hidden;
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+
+    .word {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity;
+    }
+
+    /* --- SPECIFIC SCENE CSS --- */
+
+    /* Hero Reveal */
+    #label, #beforeLabel, #afterLabel {
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: 6px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    #headline {
+      font-weight: 300;
+      font-size: 140px;
+      line-height: 1.1;
+      letter-spacing: -4px;
+    }
+    #accent {
+      font-weight: 800;
+      font-size: 140px;
+      line-height: 1.1;
+      letter-spacing: -4px;
+      color: transparent;
+      -webkit-text-stroke: 2px rgba(255,255,255,0.9);
+    }
+    #supporting, #description {
+      font-weight: 400;
+      font-size: 24px;
+      color: var(--muted);
+      margin-top: 30px;
+      max-width: 800px;
+      line-height: 1.5;
+    }
+
+    /* Quote Reveal */
+    #quote {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 64px;
+      line-height: 1.2;
+      margin-bottom: 40px;
+      max-width: 1000px;
+    }
+    #author {
+      font-weight: 800;
+      font-size: 24px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+    #role {
+      font-weight: 400;
+      font-size: 18px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    /* Metric Reveal */
+    #metric {
+      font-weight: 800;
+      font-size: 200px;
+      line-height: 1;
+      letter-spacing: -8px;
+    }
+    #delta {
+      font-weight: 600;
+      font-size: 48px;
+      color: var(--accent-pop);
+      margin-top: 20px;
+    }
+
+    /* Step Sequence */
+    #title {
+      font-weight: 300;
+      font-size: 80px;
+      letter-spacing: -2px;
+      margin-bottom: 60px;
+    }
+    #step1, #step2, #step3, #step4 {
+      font-weight: 600;
+      font-size: 48px;
+      color: var(--muted);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+    }
+    /* We make active steps white later in animation, but base is muted */
+
+    /* Before / After */
+    #before, #after {
+      font-weight: 600;
+      font-size: 64px;
+      margin-bottom: 60px;
+    }
+
+    /* Code / Icons */
+    #code {
+      font-family: 'Fira Code', monospace;
+      font-size: 28px;
+      color: #a78bfa;
+      background: rgba(167, 139, 250, 0.05);
+      padding: 40px;
+      border: 1px solid rgba(167, 139, 250, 0.2);
+      border-radius: 10px;
+      line-height: 1.6;
+    }
+    #filename {
+      font-family: 'Fira Code', monospace;
+      font-size: 16px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- The Animated Background Grid -->
+  <svg class="bg-grid" width="100%" height="100%">
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="var(--grid)" stroke-width="1"/>
+    </pattern>
+    <rect width="100%" height="100%" fill="url(#grid)" />
+    <radialGradient id="grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#030303" stop-opacity="0" />
+      <stop offset="100%" stop-color="#030303" stop-opacity="1" />
+    </radialGradient>
+    <rect width="100%" height="100%" fill="url(#grad)" />
+  </svg>
+
+  <!-- The Vector Motion Graphics -->
+  <svg class="ui-frame" viewBox="0 0 1400 800">
+    <rect id="frame-border" x="0" y="0" width="1400" height="800" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+    <path class="ui-path corner" d="M 0 40 L 0 0 L 40 0" />
+    <path class="ui-path corner" d="M 1360 0 L 1400 0 L 1400 40" />
+    <path class="ui-path corner" d="M 1400 760 L 1400 800 L 1360 800" />
+    <path class="ui-path corner" d="M 40 800 L 0 800 L 0 760" />
+    <path class="ui-path data-line" d="M 100 0 L 100 800" stroke="rgba(255,255,255,0.05)"/>
+    <path class="ui-path data-line" d="M 0 150 L 1400 150" stroke="rgba(255,255,255,0.05)"/>
+    <path class="ui-path cross" d="M 95 150 L 105 150 M 100 145 L 100 155" />
+    <path class="ui-path cross" d="M 1295 150 L 1305 150 M 1300 145 L 1300 155" />
+  </svg>
+
+  <div id="content-container">
+     <!-- Dynamically injected by JS -->
+  </div>
+
+  <script>
+    function splitText(text) {
+      if (!text) return '';
+      return text.split(' ').map(word => `<span class="word">${word} </span>`).join('');
+    }
+
+    let masterTl = gsap.timeline({ paused: true });
+    window.animationData = {};
+
+    window.injectData = (targets, keyframesJson) => {
+        window.animationData = JSON.parse(keyframesJson);
+        const container = document.getElementById('content-container');
+        container.innerHTML = '';
+
+        // 1. Populate HTML dynamically based on targets
+        for (const [id, text] of Object.entries(targets)) {
+            const el = document.createElement('div');
+            el.id = id;
+            el.className = 'mask';
+            if (text.includes('<') || id === 'code') {
+                el.innerHTML = `<span class="word" style="display:block; width:100%;">${text.replace(/\\n/g, '<br/>')}</span>`;
+            } else {
+                el.innerHTML = splitText(text);
+            }
+            container.appendChild(el);
+        }
+
+        // 2. Animate the SVG Vector Graphics
+        const corners = document.querySelectorAll('.corner');
+        const crosses = document.querySelectorAll('.cross');
+        const lines = document.querySelectorAll('.data-line');
+        
+        corners.forEach(p => { const l = p.getTotalLength(); p.style.strokeDasharray = l; p.style.strokeDashoffset = l; });
+        lines.forEach(p => { const l = p.getTotalLength(); p.style.strokeDasharray = l; p.style.strokeDashoffset = l; });
+        
+        masterTl.to(lines, { strokeDashoffset: 0, duration: 1.5, ease: "power3.inOut", stagger: 0.2 }, 0);
+        masterTl.to(corners, { strokeDashoffset: 0, duration: 1.0, ease: "power2.out", stagger: 0.1 }, 0.5);
+        masterTl.fromTo(crosses, { opacity: 0, scale: 0, transformOrigin: "center" }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 1.0);
+
+        // 3. Animate the Text Staggers
+        for (const [id, text] of Object.entries(targets)) {
+            const tracks = window.animationData[id];
+            if (!tracks) continue;
+
+            const opacityTrack = tracks.filter(t => t.property === 'opacity');
+            if (opacityTrack.length > 1) {
+                opacityTrack.sort((a, b) => a.frame - b.frame);
+                const startFrame = opacityTrack[0].frame;
+                const endFrame = opacityTrack[1].frame;
+                const startTime = startFrame / 30.0;
+                const duration = (endFrame - startFrame) / 30.0;
+
+                const words = document.querySelectorAll(`#${id} .word`);
+                gsap.set(words, { y: 100, opacity: 0, rotationX: 45 });
+                masterTl.to(words, {
+                    y: 0, opacity: 1, rotationX: 0,
+                    duration: duration, ease: "power4.out", stagger: 0.05
+                }, startTime);
+            }
+        }
+        
+        // Handle step sequence active state logic generically
+        if (targets.step1 || targets.step2) {
+           for (const [id, tracks] of Object.entries(window.animationData)) {
+              if (id.startsWith('step')) {
+                 const scaleTrack = tracks.filter(t => t.property === 'scale');
+                 if (scaleTrack.length > 1) {
+                    scaleTrack.sort((a, b) => a.frame - b.frame);
+                    masterTl.to(`#${id}`, { color: "#ffffff", duration: 0.5 }, scaleTrack[0].frame / 30.0);
+                 }
+              }
+           }
+        }
+    };
+
+    window.renderFrame = (frame) => {
+        masterTl.time(frame / 30.0);
+    };
+  </script>
+</body>
+</html>

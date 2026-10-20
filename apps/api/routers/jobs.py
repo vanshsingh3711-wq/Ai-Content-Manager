@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session, select, desc
@@ -8,6 +8,9 @@ from config import get_settings
 from database import get_session
 from models import VideoJob, VideoJobStatus
 from storage import get_presigned_url_from_full_url
+import subprocess
+import json
+import os
 
 settings = get_settings()
 
@@ -63,6 +66,12 @@ class DispatchJobResponse(BaseModel):
     queue: str
     message: str
 
+class FeedbackRequest(BaseModel):
+    niche: str
+    original: dict
+    correction: dict
+    reason: str
+
 
 def dispatch_job_to_celery(job_id: uuid.UUID) -> str:
     """Dispatches a job to the Celery worker queue or provides a dev fallback."""
@@ -98,6 +107,51 @@ def dispatch_job(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Video job with ID {job_id} not found",
         )
+    
+@router.post("/feedback")
+def submit_feedback(request: FeedbackRequest):
+    """
+    Submits a style correction for the AI Director to learn from (Phase 5).
+    """
+    try:
+        # Call the feedback script using subprocess
+        # In a real app we'd import it, but it's in a different root package currently.
+        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "worker", "style_learning", "feedback.py"))
+        
+        # We can write a quick wrapper to invoke the function since it doesn't have a direct CLI command for raw data yet,
+        # or we just write directly to the JSON file from the API.
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        feedback_path = os.path.join(base_dir, "data", "styles", "knowledge", "feedback.json")
+        
+        feedbacks = []
+        if os.path.exists(feedback_path):
+            with open(feedback_path, "r") as f:
+                feedbacks = json.load(f)
+                
+        from datetime import datetime
+        new_record = {
+            "timestamp": datetime.now().isoformat(),
+            "niche": request.niche,
+            "original": request.original,
+            "correction": request.correction,
+            "reason": request.reason
+        }
+        
+        feedbacks.append(new_record)
+        
+        with open(feedback_path, "w") as f:
+            json.dump(feedbacks, f, indent=2)
+            
+        # Trigger apply_feedback_to_profile via subprocess
+        niche_count = len([f for f in feedbacks if f.get("niche") == request.niche])
+        # Apply every 5 corrections (simulating the 20+ rule)
+        if niche_count > 0 and niche_count % 5 == 0:
+            import sys
+            subprocess.run([sys.executable, script_path, "apply", "--niche", request.niche], check=True)
+            
+        return {"status": "success", "message": "Feedback recorded."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     if job.status not in [VideoJobStatus.QUEUED, VideoJobStatus.FAILED]:
         print(f"[API: JOBS] ⚠️ Job {job_id} is in state '{job.status}' (must be QUEUED or FAILED)")

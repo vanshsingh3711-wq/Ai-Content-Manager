@@ -6,6 +6,9 @@ import { stepSequenceComposition } from './stepSequence';
 import { quoteRevealComposition } from './quoteReveal';
 import { ctaRevealComposition } from './ctaReveal';
 import { beforeAfterComposition } from './beforeAfter';
+import { iconRevealComposition } from './iconReveal';
+import { mediaRevealComposition } from './mediaReveal';
+import { codeRevealComposition } from './codeReveal';
 import { registerComposition } from '../registry';
 
 export const compositions = {
@@ -17,6 +20,9 @@ export const compositions = {
   quoteReveal: quoteRevealComposition,
   ctaReveal: ctaRevealComposition,
   beforeAfter: beforeAfterComposition,
+  iconReveal: iconRevealComposition,
+  mediaReveal: mediaRevealComposition,
+  codeReveal: codeRevealComposition,
 };
 
 // Auto-register all compositions
@@ -30,3 +36,6 @@ export * from './stepSequence';
 export * from './quoteReveal';
 export * from './ctaReveal';
 export * from './beforeAfter';
+export * from './iconReveal';
+export * from './mediaReveal';
+export * from './codeReveal';

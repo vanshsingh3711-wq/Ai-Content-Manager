@@ -12,6 +12,7 @@ import {
   Download,
   ShieldCheck,
   PanelLeft,
+  Sparkles,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -23,9 +24,18 @@ interface EditorTopNavProps {
   isExporting?: boolean;
   isDrawerOpen?: boolean;
   onToggleDrawer?: () => void;
+  isAssistantOpen?: boolean;
+  onToggleAssistant?: () => void;
 }
 
-export function EditorTopNav({ onExport, isExporting, isDrawerOpen, onToggleDrawer }: EditorTopNavProps) {
+export function EditorTopNav({
+  onExport,
+  isExporting,
+  isDrawerOpen,
+  onToggleDrawer,
+  isAssistantOpen,
+  onToggleAssistant,
+}: EditorTopNavProps) {
   const {
     project,
     aspectRatio,
@@ -176,12 +186,31 @@ export function EditorTopNav({ onExport, isExporting, isDrawerOpen, onToggleDraw
         </button>
       </div>
 
-      {/* Right: Export Button */}
+      {/* Right: AI Copilot & Export Buttons */}
       <div className="flex items-center gap-2">
+        {onToggleAssistant && (
+          <button
+            onClick={onToggleAssistant}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-sm",
+              isAssistantOpen
+                ? "bg-yellow-400/20 border-yellow-400 text-yellow-400 shadow-yellow-400/10"
+                : "border-neutral-800 bg-neutral-900/80 text-neutral-300 hover:text-white hover:border-neutral-700"
+            )}
+            title="Toggle AI Assistant (Cmd+K)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+            <span className="hidden sm:inline">AI Copilot</span>
+            <kbd className="hidden md:inline-block text-[9px] px-1 py-0.2 rounded bg-neutral-800/80 text-neutral-400 font-mono">
+              ⌘K
+            </kbd>
+          </button>
+        )}
+
         <button
           onClick={onExport}
           disabled={isExporting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-black hover:bg-neutral-200 shadow-md shadow-white/5 active:scale-95 transition-all disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-black hover:bg-neutral-200 shadow-md shadow-white/5 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
         >
           {isExporting ? (
             <>

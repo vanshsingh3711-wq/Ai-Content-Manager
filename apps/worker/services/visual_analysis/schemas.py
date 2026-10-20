@@ -42,3 +42,4 @@ class UnifiedAnalysis(BaseModel):
     transcript: str
     audio_analysis: dict = {}
     visual_analysis: UnifiedVisualTimeline
+    beat_sheet: Optional[dict] = {}

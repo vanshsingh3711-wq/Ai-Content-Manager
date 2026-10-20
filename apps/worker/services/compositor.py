@@ -1,23 +1,11 @@
-"""
-Video Compositor Service — Phase 5
-Applies AI edit decisions to the raw video using FFmpeg:
-  - Removes segments marked as 'cut'
-  - Overlays B-roll clips on 'b_roll' segments (visual only — audio ownership preserved)
-  - Applies zoom keyframes on 'zoom_in' segments
-  - Burns in ASS subtitles
-  - Encodes to 1080x1920 vertical MP4
-
-AUDIO OWNERSHIP RULE:
-  The original/enhanced speech audio is the PRIMARY audio timeline.
-  B-roll insertion affects ONLY the visual layer.
-  B-roll audio is ALWAYS discarded unless explicitly requested.
-"""
 
 import os
 import shutil
 import subprocess
 import tempfile
 import json
+import sys
+import math
 from typing import Any, Dict, List, Optional, Tuple
 from services.media_extractor import get_ffmpeg_binary_path
 from services.editing_config import EDITING_CONFIG
@@ -46,29 +34,53 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     result = subprocess.run(final_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         stderr_text = result.stderr or ""
-        # The actual error is usually at the end of the FFmpeg output
-        stderr_preview = stderr_text[-2000:] if len(stderr_text) > 2000 else stderr_text
-        _log("STDERR", f"({label}) {stderr_preview}")
+        # Write full cmd and stderr to a temp file for debugging
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".log", mode="w") as f:
+            f.write("CMD:\n" + " ".join(final_cmd) + "\n\nSTDERR:\n" + stderr_text)
+            log_path = f.name
+        
+        stderr_preview = stderr_text[-3000:]
+        _log("STDERR", f"({label}) Failed! Debug log saved to {log_path}\n{stderr_preview}")
         raise RuntimeError(
-            f"FFmpeg failed for '{label}' (exit code {result.returncode}):\n{stderr_preview}"
+            f"FFmpeg failed for '{label}' (exit code {result.returncode}). Log: {log_path}\n{stderr_preview}"
         )
     return result
 
 def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, fps: float, width: int, height: int, temp_dir: str, prefix: str) -> Optional[str]:
-    """Spawns Node.js Canvas renderer to generate a transparent WebM overlay."""
+    """Renders motion graphic overlay using Remotion (with HTML Playwright fallback)."""
     out_path = os.path.join(temp_dir, f"{prefix}.mov")
+
+    # 1. Try Remotion (high quality React animations)
+    try:
+        from services.remotion_renderer import render_remotion_canvas
+        remotion_out = render_remotion_canvas(
+            comp_id=comp_id,
+            props=props,
+            duration_sec=duration_sec,
+            fps=fps,
+            width=width,
+            height=height,
+            out_path=out_path
+        )
+        if remotion_out and os.path.exists(remotion_out) and os.path.getsize(remotion_out) > 0:
+            _log("REMOTION", f"Successfully rendered Remotion '{comp_id}' -> {remotion_out}")
+            return remotion_out
+    except Exception as e:
+        _log("REMOTION_WARN", f"Remotion failed: {e}. Falling back to HTML renderer...")
+
+    # 2. Fallback to HTML Playwright renderer
     frames = int(duration_sec * fps)
-    
-    # Add componentId to props so the Node script knows what to draw
-    props["componentId"] = comp_id
-    props_json = json.dumps(props)
-    
-    motion_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../packages/motion-components"))
-    if not os.path.exists(motion_dir):
-        motion_dir = "/app/packages/motion-components"
-        
+    html_props = {
+        "type": comp_id,
+        "targets": {k: v for k, v in props.items() if k != "componentId"}
+    }
+    props_json = json.dumps(html_props)
+
+    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "motion_html/render_html_motion.py"))
+
     cmd = [
-        "node", "render_canvas.js",
+        sys.executable, script_path,
         out_path,
         str(frames),
         str(int(fps)),
@@ -76,9 +88,9 @@ def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, f
         str(height),
         props_json
     ]
-    
-    _log("CANVAS", f"Rendering {comp_id} to {out_path} ({frames} frames @ {fps}fps)")
-    result = subprocess.run(cmd, cwd=motion_dir, capture_output=True, text=True)
+
+    _log("CANVAS", f"Rendering HTML {comp_id} to {out_path} ({frames} frames @ {fps}fps)")
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         _log("CANVAS_ERR", result.stderr or result.stdout)
         return None
@@ -270,6 +282,7 @@ def _build_segment_timeline(
     edits: List[Dict[str, Any]],
     timestamp_map: Dict[str, Any],
     total_duration: float,
+    settings: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Build an ordered timeline of segments from the transcript chunks and edit decisions.
@@ -318,16 +331,42 @@ def _build_segment_timeline(
     if current_time < total_duration:
         kept_intervals.append((current_time, total_duration))
 
-    # 2. Build base chronological timeline of gaps and chunks
-    chunks = []
-    for chunk_id, chunk_data in timestamp_map.items():
-        chunks.append({
+    # 2. Build base chronological timeline of non-overlapping chunks
+    # Filter out secondary/injected triggers (like beat_*) if transcript chunks (chunk_* or ID_*) exist
+    has_transcript_chunks = any(not str(k).startswith("beat_") for k in timestamp_map.keys())
+    candidate_items = [
+        (cid, cdata) for cid, cdata in timestamp_map.items()
+        if not (has_transcript_chunks and str(cid).startswith("beat_"))
+    ]
+    if not candidate_items:
+        candidate_items = list(timestamp_map.items())
+
+    raw_chunks = []
+    for chunk_id, chunk_data in candidate_items:
+        raw_chunks.append({
             "id": chunk_id,
-            "start": chunk_data.get("start", 0.0),
-            "end": chunk_data.get("end", 0.0),
+            "start": float(chunk_data.get("start", 0.0)),
+            "end": float(chunk_data.get("end", 0.0)),
             "text": chunk_data.get("text", ""),
         })
-    chunks.sort(key=lambda c: c["start"])
+    raw_chunks.sort(key=lambda c: c["start"])
+
+    # Ensure strictly non-overlapping, strictly increasing chunks
+    chunks = []
+    current_end = 0.0
+    for c in raw_chunks:
+        c_start = max(0.0, c["start"])
+        c_end = min(total_duration, c["end"])
+        if c_end <= c_start:
+            continue
+        if c_start < current_end:
+            if c_end <= current_end:
+                continue
+            c_start = current_end
+        c["start"] = c_start
+        c["end"] = c_end
+        chunks.append(c)
+        current_end = c_end
 
     base_timeline = []
     
@@ -426,6 +465,52 @@ def _build_segment_timeline(
                     "is_cut": True
                 })
 
+    use_granular = settings.get("USE_GRANULAR_OVERLAYS", False) if settings else False
+
+    if use_granular:
+        # Clear legacy actions
+        for seg in timeline:
+            seg["actions"] = []
+            
+        non_cut_edits = [e for e in edits if e.get("action") != "cut"]
+        for edit in non_cut_edits:
+            e_start = edit.get("start")
+            e_end = edit.get("end")
+            
+            if e_start is None or e_end is None:
+                tid = edit.get("trigger_id")
+                if tid and tid in timestamp_map:
+                    e_start = timestamp_map[tid].get("start", 0.0)
+                    e_end = timestamp_map[tid].get("end", total_duration)
+                else:
+                    e_start, e_end = 0.0, total_duration
+                    
+            dur = e_end - e_start
+            
+            for seg in timeline:
+                if seg.get("is_cut"):
+                    continue
+                
+                seg_start = seg["start"]
+                seg_end = seg["end"]
+                
+                # An overlap occurs if the edit starts before the segment ends AND ends after the segment starts.
+                if e_start < seg_end and e_end > seg_start:
+                    overlap_start = max(seg_start, e_start)
+                    overlap_end = min(seg_end, e_end)
+                    frag_dur = overlap_end - overlap_start
+                    
+                    min_frag_dur = settings.get("MIN_FRAGMENT_DURATION", 0.1) if settings else 0.1
+                    if frag_dur < min_frag_dur and dur >= min_frag_dur:
+                        continue
+                        
+                    cloned = dict(edit)
+                    cloned["original_start"] = e_start
+                    cloned["original_end"] = e_end
+                    cloned["seg_overlap_start"] = overlap_start
+                    cloned["seg_overlap_end"] = overlap_end
+                    seg["actions"].append(cloned)
+                    
     return timeline
 
 
@@ -454,6 +539,10 @@ def render_video_pipeline(
     timestamp_map = timestamp_map or {}
     settings = settings or {}
 
+    for idx, e in enumerate(edits):
+        if isinstance(e, dict) and "_edit_id" not in e:
+            e["_edit_id"] = f"edit_{idx}"
+
     target_aspect = settings.get("aspect_ratio", "9:16")
     if target_aspect == "16:9": target_w, target_h = 1920, 1080
     elif target_aspect == "1:1": target_w, target_h = 1080, 1080
@@ -478,13 +567,128 @@ def render_video_pipeline(
     source_has_audio = input_streams["has_audio"]
     source_fps = input_streams.get("fps", 30.0)
 
-    timeline = _build_segment_timeline(edits, timestamp_map, total_duration)
+    timeline = _build_segment_timeline(edits, timestamp_map, total_duration, settings)
     kept_segments = [s for s in timeline if not s["is_cut"]]
 
-    temp_dir = os.path.dirname(os.path.abspath(output_mp4_path))
+    import tempfile
+    temp_dir = tempfile.mkdtemp(prefix="ai_compositor_")
+
+    # Pre-synthesize procedural SFX kit calibrated to dialog volume
+    speech_db = -21.0
+    sfx_kit_dir = os.path.join(temp_dir, ".sfx")
+    try:
+        from services.audio_sfx_synthesizer import measure_speech_db, synthesize_project_sfx_library
+        speech_db = measure_speech_db(raw_video_path)
+        synthesize_project_sfx_library(sfx_kit_dir, speech_db)
+        _log("SFX", f"Pre-synthesized procedural SFX kit calibrated to speech ({speech_db:.1f} dBFS)")
+    except Exception as e:
+        _log("SFX_WARN", f"Procedural SFX kit pre-synthesis skipped: {e}")
 
     if not kept_segments:
         kept_segments = [{"start": 0.0, "end": total_duration, "chunk_id": "FULL", "actions": [], "is_cut": False}]
+
+    use_granular = settings.get("USE_GRANULAR_OVERLAYS", False)
+
+    # Pre-render MG overlays if using granular overlays
+    if use_granular:
+        for edit in edits:
+            if edit.get("action") == "motion_graphics" or edit.get("motion_graphics_text"):
+                e_start = edit.get("start")
+                e_end = edit.get("end")
+                if e_start is None or e_end is None:
+                    tid = edit.get("trigger_id")
+                    if tid and tid in timestamp_map:
+                        e_start = timestamp_map[tid].get("start", 0.0)
+                        e_end = timestamp_map[tid].get("end", total_duration)
+                    else:
+                        e_start, e_end = 0.0, total_duration
+                dur = e_end - e_start
+                if dur <= 0.05: continue
+                
+                if edit.get("motion_graphics_type"):
+                    mg_template = edit.get("motion_graphics_type")
+                    mg_props = edit.get("motion_graphics_targets", {})
+                else:
+                    mg_template = edit.get("template", "MotionGraphicsPreview")
+                    mg_props = {"text": edit.get("motion_graphics_text")}
+                
+                if edit.get("visual_beats"): mg_props["visual_beats"] = edit.get("visual_beats")
+                if edit.get("transition"): mg_props["transition"] = edit.get("transition")
+                
+                import uuid
+                mg_id = str(uuid.uuid4())[:8]
+                mg_path = _render_canvas_composition(
+                    mg_template, mg_props,
+                    dur, source_fps, target_w, target_h, temp_dir, f"mg_pre_{mg_id}"
+                )
+                edit["_pre_mg_path"] = mg_path
+
+    # Studio Depth Matting: pre-render speaker cutouts for any behind cards
+    try:
+        from services.depth_matting import (
+            extract_behind_ranges,
+            cut_range_to_prores,
+            is_depth_matting_available
+        )
+        behind_ranges = extract_behind_ranges(edits, timestamp_map, total_duration, fps=source_fps)
+        if behind_ranges and is_depth_matting_available():
+            _log("DEPTH_MATTE", f"Found {len(behind_ranges)} behind range(s). Pre-rendering studio depth cutouts...")
+            for r_idx, rng in enumerate(behind_ranges):
+                cutout_path = os.path.join(temp_dir, f"cutout_{r_idx:02d}.mov")
+                try:
+                    cut_range_to_prores(
+                        video_path=raw_video_path,
+                        start_s=rng["start"],
+                        end_s=rng["end"],
+                        output_mov_path=cutout_path,
+                        fps=source_fps,
+                        width=target_w,
+                        height=target_h
+                    )
+                    for edit in edits:
+                        eid = str(edit.get("_edit_id") or edit.get("trigger_id") or "")
+                        if eid in rng["edit_ids"] or (
+                            (str(edit.get("layer", "")).lower() == "behind" or str(edit.get("depth", "")).lower() == "behind")
+                            and edit.get("start", 0.0) >= rng["start"] - 0.1
+                            and edit.get("end", total_duration) <= rng["end"] + 0.1
+                        ):
+                            edit["_pre_cutout_path"] = cutout_path
+                            edit["_cutout_start"] = rng["start"]
+                            edit["_cutout_end"] = rng["end"]
+                except Exception as ex:
+                    _log("DEPTH_MATTE_WARN", f"Failed to render cutout for range {rng['start']:.2f}-{rng['end']:.2f}: {ex}")
+    except Exception as e:
+        _log("DEPTH_MATTE_WARN", f"Depth matting initialization skipped: {e}")
+
+    # Propagate _pre_mg_path and _pre_cutout_path from original edits into the shallow-copied
+    # action clones inside each segment (build_segment_timeline clones before
+    # pre-render runs, so the clones miss pre-renders without this step).
+    for seg in kept_segments:
+        for a in seg.get("actions", []):
+            a_eid = a.get("_edit_id")
+            tid = a.get("trigger_id")
+            a_act = a.get("action")
+            matched_edit = None
+            if a_eid:
+                for edit in edits:
+                    if edit.get("_edit_id") == a_eid:
+                        matched_edit = edit
+                        break
+            if not matched_edit and tid:
+                for edit in edits:
+                    if edit.get("trigger_id") == tid and (
+                        edit.get("action") == a_act or
+                        (a_act in ["motion_graphics", "kinetic_text"] and edit.get("action") in ["motion_graphics", "kinetic_text"])
+                    ):
+                        matched_edit = edit
+                        break
+            if matched_edit:
+                if not a.get("_pre_mg_path") and matched_edit.get("_pre_mg_path"):
+                    a["_pre_mg_path"] = matched_edit["_pre_mg_path"]
+                if not a.get("_pre_cutout_path") and matched_edit.get("_pre_cutout_path"):
+                    a["_pre_cutout_path"] = matched_edit["_pre_cutout_path"]
+                    a["_cutout_start"] = matched_edit.get("_cutout_start")
+                    a["_cutout_end"] = matched_edit.get("_cutout_end")
 
     _log("RENDER", f"Chunked rendering of {len(kept_segments)} segments to prevent OOM...")
     segment_files = []
@@ -515,34 +719,159 @@ def render_video_pipeline(
 
         base_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
         if "zoom_in" in action_types:
-            zoom_w, zoom_h = int(target_w * 1.15), int(target_h * 1.15)
-            base_scale = f"scale={zoom_w}:{zoom_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+            zoom_frames = max(1, int(duration * source_fps))
+            fps_val = int(round(source_fps)) if source_fps else 30
+            base_scale = (
+                f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},"
+                f"zoompan=z='min(1.0+0.15*(in/{zoom_frames}),1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={target_w}x{target_h}:fps={fps_val}"
+            )
             
         filter_str.append(f"[base_v]{base_scale}[norm_v];")
         current_v = "[norm_v]"
 
-        broll_path = None
-        if "b_roll" in action_types:
-            for a in seg["actions"]:
-                if a["action"] == "b_roll" and a.get("trigger_id") in broll_map:
-                    candidate = broll_map[a["trigger_id"]]
-                    if os.path.exists(candidate) and os.path.getsize(candidate) > 1024:
-                        broll_path = candidate
-                        break
+        if use_granular:
+            mg_count = 0
+            broll_count = 0
+            # Multi-layer sandwich order:
+            # 0: Fullscreen B-roll background
+            # 1: Behind B-roll (background with cutout overlay)
+            # 2: Behind motion graphics (card sits behind speaker, cutout placed on top)
+            # 3: Character / avatar overlay
+            # 4: Front motion graphics (card sits IN FRONT of speaker, never covered by cutout)
+            def _action_layer_order(act_dict: dict) -> int:
+                act = act_dict.get("action", "")
+                is_behind = (
+                    str(act_dict.get("layer", "")).lower() == "behind"
+                    or str(act_dict.get("depth", "")).lower() == "behind"
+                    or bool(act_dict.get("_pre_cutout_path"))
+                )
+                if act == "b_roll":
+                    return 1 if is_behind else 0
+                if act == "motion_graphics" or act_dict.get("motion_graphics_text"):
+                    return 2 if is_behind else 4
+                if act == "character":
+                    return 3
+                return 4
 
-        motion_graphics_text = None
+            actions_sorted = sorted(
+                seg["actions"],
+                key=lambda x: (
+                    _action_layer_order(x),
+                    x.get("seg_overlap_start", seg["start"])
+                )
+            )
+            
+            for a in actions_sorted:
+                action_type = a.get("action")
+                rel_start = a.get("seg_overlap_start", seg["start"]) - seg["start"]
+                rel_end = a.get("seg_overlap_end", seg["end"]) - seg["start"]
+                
+                if action_type == "motion_graphics" or a.get("motion_graphics_text"):
+                    mg_path = a.get("_pre_mg_path")
+                    if mg_path and os.path.exists(mg_path):
+                        offset = a.get("seg_overlap_start", seg["start"]) - a.get("original_start", seg["start"])
+                        cmd.extend(["-ss", str(max(0, offset)), "-t", str(rel_end - rel_start), "-i", mg_path])
+                        
+                        mg_v = f"[mg_{mg_count}_v]"
+                        filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{mg_v};")
+                        filter_str.append(f"{current_v}{mg_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_mg_{mg_count}];")
+                        current_v = f"[with_mg_{mg_count}]"
+                        input_idx += 1
+
+                        # Studio Depth Matting: layer-2 cutout overlay
+                        cutout_path = a.get("_pre_cutout_path")
+                        if cutout_path and os.path.exists(cutout_path):
+                            cutout_start = a.get("_cutout_start", seg["start"])
+                            cutout_offset = a.get("seg_overlap_start", seg["start"]) - cutout_start
+                            cmd.extend(["-ss", str(max(0, cutout_offset)), "-t", str(rel_end - rel_start), "-i", cutout_path])
+                            cutout_v = f"[cutout_mg_{mg_count}_v]"
+                            filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{cutout_v};")
+                            filter_str.append(f"{current_v}{cutout_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_cutout_mg_{mg_count}];")
+                            current_v = f"[with_cutout_mg_{mg_count}]"
+                            input_idx += 1
+                        
+                        mg_count += 1
+                        
+                elif action_type == "b_roll":
+                    tid = a.get("trigger_id")
+                    if tid and tid in broll_map:
+                        broll_path_a = broll_map[tid]
+                        if os.path.exists(broll_path_a) and os.path.getsize(broll_path_a) > 1024:
+                            offset = a.get("seg_overlap_start", seg["start"]) - a.get("original_start", seg["start"])
+                            cmd.extend(["-ss", str(max(0, offset)), "-an", "-t", str(rel_end - rel_start), "-i", broll_path_a])
+                            bv = f"[broll_{broll_count}_v]"
+                            broll_transition = a.get("transition")
+                            
+                            broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                            if broll_transition in ["fade", "crossfade", "morph"]:
+                                broll_filter += f",fade=t=in:st=0:d=0.5"
+                            broll_filter += f",setpts=PTS-STARTPTS+{rel_start}/TB{bv};"
+                            filter_str.append(broll_filter)
+                            
+                            overlay_x, overlay_y = "0", "0"
+                            if broll_transition == "slide" or broll_transition == "push":
+                                overlay_x = f"'if(lte(t,{rel_start}+0.5), -w+(w/0.5)*(t-{rel_start}), 0)'"
+                                
+                            filter_str.append(f"{current_v}{bv}overlay=x={overlay_x}:y={overlay_y}:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_broll_{broll_count}];")
+                            current_v = f"[with_broll_{broll_count}]"
+                            input_idx += 1
+
+                            # Studio Depth Matting for behind B-roll
+                            cutout_path = a.get("_pre_cutout_path")
+                            if cutout_path and os.path.exists(cutout_path):
+                                cutout_start = a.get("_cutout_start", seg["start"])
+                                cutout_offset = a.get("seg_overlap_start", seg["start"]) - cutout_start
+                                cmd.extend(["-ss", str(max(0, cutout_offset)), "-t", str(rel_end - rel_start), "-i", cutout_path])
+                                cutout_v = f"[cutout_br_{broll_count}_v]"
+                                filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{cutout_v};")
+                                filter_str.append(f"{current_v}{cutout_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_cutout_br_{broll_count}];")
+                                current_v = f"[with_cutout_br_{broll_count}]"
+                                input_idx += 1
+
+                            broll_count += 1
+                            
+            # To ensure the legacy block doesn't trigger when using granular overlays:
+            broll_path = None
+            mg_path = None
+        else:
+            broll_path = None
+            if "b_roll" in action_types:
+                for a in seg["actions"]:
+                    if a["action"] == "b_roll" and a.get("trigger_id") in broll_map:
+                        candidate = broll_map[a["trigger_id"]]
+                        if os.path.exists(candidate) and os.path.getsize(candidate) > 1024:
+                            broll_path = candidate
+                            break
+
+            mg_path = None
+            mg_action = None
+            for a in seg["actions"]:
+                if a.get("action") == "motion_graphics" or a.get("motion_graphics_text") or a.get("motion_graphics_type"):
+                    mg_action = a
+                    break
+            
+            if mg_action:
+                if mg_action.get("motion_graphics_type"):
+                    mg_template = mg_action.get("motion_graphics_type")
+                    mg_props = mg_action.get("motion_graphics_targets", {})
+                else:
+                    mg_template = mg_action.get("template", "MotionGraphicsPreview")
+                    mg_props = {"text": mg_action.get("motion_graphics_text")}
+                
+                if mg_action.get("visual_beats"): mg_props["visual_beats"] = mg_action.get("visual_beats")
+                if mg_action.get("transition"): mg_props["transition"] = mg_action.get("transition")
+                
+                mg_path = _render_canvas_composition(
+                    mg_template, mg_props,
+                    duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"
+                )
+
         character_action = None
         has_sfx = False
         sfx_keyword = "pop"
+        sfx_delay_ms = 0
 
         for a in seg["actions"]:
-            if a.get("action") == "motion_graphics" or a.get("motion_graphics_text"):
-                motion_graphics_text = a.get("motion_graphics_text")
-                mg_template = a.get("template", "MotionGraphicsPreview")
-                mg_props = {"text": motion_graphics_text}
-                if a.get("visual_beats"): mg_props["visual_beats"] = a.get("visual_beats")
-                if a.get("transition"): mg_props["transition"] = a.get("transition")
-            
             if a.get("action") == "character" or a.get("character_action"):
                 character_action = a.get("character_action")
                 char_props_overrides = {}
@@ -552,13 +881,24 @@ def render_video_pipeline(
             if a.get("action") == "sfx" or a.get("sound_effect"):
                 has_sfx = True
                 sfx_keyword = a.get("sound_effect", "pop")
+                rel_s = max(0.0, a.get("seg_overlap_start", seg["start"]) - seg["start"])
+                sfx_delay_ms = int(round(rel_s * 1000))
 
-        mg_path = None
-        if motion_graphics_text:
-            mg_path = _render_canvas_composition(
-                mg_template, mg_props,
-                duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"
-            )
+        # Procedural SFX: automatically pair sound cues with motion graphics and zoom_in
+        if not has_sfx:
+            if mg_path or (use_granular and mg_count > 0):
+                from services.audio_sfx_synthesizer import recommend_sfx_for_action
+                for a in seg.get("actions", []):
+                    if a.get("action") == "motion_graphics" or a.get("motion_graphics_text"):
+                        sfx_keyword = recommend_sfx_for_action(a)
+                        has_sfx = True
+                        rel_s = max(0.0, a.get("seg_overlap_start", seg["start"]) - seg["start"])
+                        sfx_delay_ms = int(round(rel_s * 1000))
+                        break
+            elif "zoom_in" in action_types:
+                sfx_keyword = "zoom"
+                has_sfx = True
+                sfx_delay_ms = 0
 
         broll_transition = None
         for a in seg["actions"]:
@@ -577,7 +917,7 @@ def render_video_pipeline(
             overlay_x = "0"
             overlay_y = "0"
             if broll_transition == "slide" or broll_transition == "push":
-                overlay_x = "if(lte(t,0.5), -w+(w/0.5)*t, 0)"
+                overlay_x = "'if(lte(t,0.5), -w+(w/0.5)*t, 0)'"
                 
             filter_str.append(f"{current_v}[broll_v]overlay=x={overlay_x}:y={overlay_y}:eof_action=pass[with_broll];")
             current_v = "[with_broll]"
@@ -589,6 +929,14 @@ def render_video_pipeline(
             filter_str.append(f"{current_v}[mg_v]overlay=x=0:y=0:eof_action=pass[with_mg];")
             current_v = "[with_mg]"
             input_idx += 1
+
+            cutout_path = mg_action.get("_pre_cutout_path") if mg_action else None
+            if cutout_path and os.path.exists(cutout_path):
+                cmd.extend(["-i", cutout_path])
+                filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[cutout_v];")
+                filter_str.append(f"{current_v}[cutout_v]overlay=x=0:y=0:eof_action=pass[with_cutout];")
+                current_v = "[with_cutout]"
+                input_idx += 1
             
         if character_video_path and os.path.exists(character_video_path):
             cmd.extend(["-i", character_video_path])
@@ -598,8 +946,12 @@ def render_video_pipeline(
             
             char_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
             if "zoom_in" in action_types:
-                zoom_w, zoom_h = int(target_w * 1.15), int(target_h * 1.15)
-                char_scale = f"scale={zoom_w}:{zoom_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                zoom_frames = max(1, int(duration * source_fps))
+                fps_val = int(round(source_fps)) if source_fps else 30
+                char_scale = (
+                    f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},"
+                    f"zoompan=z='min(1.0+0.15*(in/{zoom_frames}),1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={target_w}x{target_h}:fps={fps_val}"
+                )
                 
             filter_str.append(f"[char_v_trim]{char_scale}[char_v_scaled];")
             filter_str.append(f"{current_v}[char_v_scaled]overlay=x=0:y=0:eof_action=pass[with_char];")
@@ -607,13 +959,19 @@ def render_video_pipeline(
             input_idx += 1
             
         if has_sfx:
-            sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
-            sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
-            if not sfx_fetched:
-                sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../apps/web/public/assets/audio/pop.wav"))
+            from services.audio_sfx_synthesizer import resolve_cue_name
+            cue_resolved = resolve_cue_name(sfx_keyword)
+            cached_sfx = os.path.join(sfx_kit_dir, f"{cue_resolved}.wav")
+            if os.path.exists(cached_sfx):
+                sfx_path = cached_sfx
+            else:
+                sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
+                sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
+                if not sfx_fetched:
+                    sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", "pop.wav"))
             if os.path.exists(sfx_path):
                 cmd.extend(["-i", sfx_path])
-                filter_str.append(f"[{input_idx}:a]adelay=0|0[sfx_a];")
+                filter_str.append(f"[{input_idx}:a]adelay={sfx_delay_ms}|{sfx_delay_ms}[sfx_a];")
                 filter_str.append(f"{current_a}[sfx_a]amix=inputs=2:duration=first:dropout_transition=2[a_out_sfx];")
                 current_a = "[a_out_sfx]"
                 input_idx += 1
@@ -687,7 +1045,8 @@ def render_video_pipeline(
         for file in files:
             if (file.endswith('.mov') and (file.startswith('char_') or file.startswith('mg_'))) or file.startswith('segment_') or file.startswith('filter_'):
                 try:
-                    os.remove(os.path.join(root, file))
+                    # os.remove(os.path.join(root, file))
+                    pass
                 except OSError:
                     pass
 
@@ -779,3 +1138,74 @@ def _validate_rendered_output(ffmpeg_bin: str, output_path: str, source_has_audi
 
     _log("DONE", f"Final video: {final_size:,} bytes ({final_size / 1024 / 1024:.2f} MB) | "
          f"Duration: {final_duration:.2f}s | Audio: {'OK' if output_streams['has_audio'] else 'NONE'}")
+
+
+def build_faceless_background_video(
+    clips: List[str],
+    total_duration: float,
+    audio_path: str,
+    output_path: str,
+    target_w: int = 1080,
+    target_h: int = 1920,
+    ffmpeg_bin: Optional[str] = None,
+) -> bool:
+    """
+    Builds a continuous, seamless stock footage background video for faceless shorts.
+    Loops / concatenates available stock footage clips so the video is never black,
+    applies subtle contrast and cinematic darkening so foreground text/motion graphics pop,
+    and muxes with the speech audio track.
+    """
+    if not clips or total_duration <= 0:
+        return False
+
+    ffmpeg_bin = ffmpeg_bin or get_ffmpeg_binary_path()
+    valid_clips = [c for c in clips if os.path.exists(c) and os.path.getsize(c) > 1024]
+    if not valid_clips:
+        return False
+
+    # Repeat list of clips if needed to ensure total footage duration >= total_duration
+    expanded_clips = valid_clips * max(1, int(math.ceil(total_duration / max(10.0, len(valid_clips) * 5.0))))
+
+    inputs = []
+    filter_parts = []
+    for i, c in enumerate(expanded_clips):
+        inputs.extend(["-i", c])
+        filter_parts.append(
+            f"[{i}:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+            f"crop={target_w}:{target_h},fps=30,setsar=1[v{i}];"
+        )
+
+    concat_inputs = "".join(f"[v{i}]" for i in range(len(expanded_clips)))
+    filter_parts.append(f"{concat_inputs}concat=n={len(expanded_clips)}:v=1:a=0,eq=brightness=-0.05:contrast=1.05[vout]")
+
+    tmp_out = output_path + ".tmp_base.mp4"
+    cmd = [
+        ffmpeg_bin, "-y",
+        *inputs,
+        "-i", audio_path,
+        "-filter_complex", "".join(filter_parts),
+        "-map", "[vout]",
+        "-map", f"{len(expanded_clips)}:a",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:a", "aac",
+        "-t", str(round(total_duration, 3)),
+        tmp_out
+    ]
+
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if res.returncode == 0 and os.path.exists(tmp_out) and os.path.getsize(tmp_out) > 1024:
+            os.replace(tmp_out, output_path)
+            _log("FACELESS", f"Created continuous stock background ({os.path.getsize(output_path)} bytes, {total_duration:.2f}s)")
+            return True
+        else:
+            _log("WARN", f"build_faceless_background_video failed (rc={res.returncode}): {res.stderr[-300:]}")
+            if os.path.exists(tmp_out):
+                os.remove(tmp_out)
+            return False
+    except Exception as e:
+        _log("WARN", f"build_faceless_background_video exception: {e}")
+        if os.path.exists(tmp_out):
+            os.remove(tmp_out)
+        return False
+

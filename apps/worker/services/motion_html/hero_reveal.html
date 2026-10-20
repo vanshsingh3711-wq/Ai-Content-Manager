@@ -3,113 +3,192 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@700;900&display=swap');
-    
-    :root {
-      --primary: #ffffff;
-      --accent: #facc15;
-      --bg-glass: rgba(15, 15, 20, 0.65);
-      --border-glass: rgba(255, 255, 255, 0.15);
-    }
-    
+
+    /* Premium Vector Motion Background */
     body {
       margin: 0;
       padding: 0;
-      width: 1080px;
-      height: 1920px;
-      background: transparent; /* Must be transparent for video overlay */
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      width: 100vw;
+      height: 100vh;
       overflow: hidden;
-      font-family: 'Inter', sans-serif;
-      color: white;
-      -webkit-font-smoothing: antialiased;
+      background: #030303 !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-
-    #background {
+    
+    .bg-grid {
       position: absolute;
-      width: 900px;
-      height: 450px;
-      background: var(--bg-glass);
-      backdrop-filter: blur(40px) saturate(150%);
-      -webkit-backdrop-filter: blur(40px) saturate(150%);
-      border-radius: 40px;
-      border: 1px solid var(--border-glass);
-      box-shadow: 
-        0 25px 50px -12px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 60px;
-      box-sizing: border-box;
-      transform-origin: center;
-      will-change: transform, opacity, filter;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: -10;
     }
-
-    /* Clipping container for sliding text up from baseline */
-    .clip-mask {
-      overflow: hidden;
-      display: inline-block;
-      vertical-align: top;
-      padding-bottom: 10px;
+    .ui-frame {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      z-index: -5;
     }
-
-    #label {
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 24px;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 20px;
-      will-change: transform, opacity;
-      transform-origin: bottom center;
+    .ui-path {
+      fill: none;
+      stroke: rgba(255,255,255,0.8);
+      stroke-width: 1.5;
     }
-
-    .title-row {
-      display: flex;
-      flex-direction: row;
-      align-items: baseline;
-      gap: 20px;
-    }
-
-    #headline, #accent {
-      font-family: 'Outfit', sans-serif;
-      font-weight: 900;
-      font-size: 110px;
-      line-height: 1.1;
-      text-transform: uppercase;
-      will-change: transform, opacity, filter;
-      text-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-
-    #accent {
-      background: linear-gradient(135deg, #facc15, #f59e0b);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    #supporting {
-      margin-top: 30px;
-      font-size: 32px;
-      font-weight: 400;
-      color: rgba(255, 255, 255, 0.7);
-      text-align: center;
-      max-width: 80%;
-      line-height: 1.4;
-      will-change: transform, opacity;
-    }
-
-    /* Fallback styles for missing elements */
-    .hidden {
+    
+    #noise-bg, #fog-layer, #webgl-canvas {
       display: none !important;
     }
-  </style>
+
+    /* Unified Glassmorphism Component Style */
+    #window, #container, .card, .quote-box, .stat-box, #background, #content-container {
+        background: rgba(15, 15, 20, 0.6) !important;
+        backdrop-filter: blur(40px) saturate(200%) brightness(1.2) !important;
+        -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 
+            inset 0 0 0 1px rgba(255, 255, 255, 0.05), 
+            0 40px 100px rgba(0, 0, 0, 0.8),
+            0 10px 40px rgba(167, 139, 250, 0.1) !important;
+        border-radius: 24px;
+        padding: 60px;
+        transform-style: preserve-3d;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 600px;
+        max-width: 1200px;
+        text-align: center;
+    }
+
+    /* Specific Typography */
+    #label, .title {
+        font-size: 24px;
+        letter-spacing: 6px;
+        text-transform: uppercase;
+        color: #a78bfa;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+
+    #metric, #quote, #headline, .value {
+        font-size: 120px;
+        font-weight: 800;
+        letter-spacing: -3px;
+        line-height: 1.1;
+        margin: 20px 0;
+        background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    #delta, #author, #supporting {
+        font-size: 32px;
+        color: #10b981;
+        font-weight: 500;
+        margin-top: 10px;
+        padding: 10px 20px;
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 12px;
+    }
+
+    #author, #supporting {
+        color: #94a3b8;
+        background: none;
+        border: none;
+        font-size: 36px;
+    }
+
+    /* Code Window specific */
+    #window {
+        padding: 0;
+        align-items: flex-start;
+        text-align: left;
+        width: 1000px;
+    }
+    #titlebar {
+        width: 100%;
+        height: 50px;
+        background: rgba(0, 0, 0, 0.4);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        border-radius: 24px 24px 0 0;
+    }
+    .dot {
+        width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;
+    }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+    
+    #code-container {
+        padding: 40px;
+        font-family: "JetBrains Mono", "Fira Code", monospace;
+        font-size: 32px;
+        color: #e2e8f0;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+    
+    /* Steps specific */
+    .step {
+        display: flex;
+        align-items: center;
+        margin-bottom: 30px;
+        font-size: 40px;
+        font-weight: 600;
+        background: rgba(255,255,255,0.05);
+        padding: 20px 40px;
+        border-radius: 16px;
+        width: 100%;
+    }
+    .step-num {
+        color: #a78bfa;
+        margin-right: 20px;
+        font-size: 48px;
+    }
+
+</style>
+
+  <!-- Load Three.js and GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
 </head>
 <body>
+
+  <!-- The Animated Background Grid -->
+  <svg class="bg-grid" width="100%" height="100%">
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+    </pattern>
+    <rect width="100%" height="100%" fill="url(#grid)" />
+    <radialGradient id="grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#030303" stop-opacity="0" />
+      <stop offset="100%" stop-color="#030303" stop-opacity="1" />
+    </radialGradient>
+    <rect width="100%" height="100%" fill="url(#grad)" />
+  </svg>
+  <!-- The Vector Motion Graphics Frame -->
+  <svg class="ui-frame" viewBox="0 0 1920 1080">
+    <rect id="frame-border" x="40" y="40" width="1840" height="1000" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+    <path class="ui-path corner" d="M 40 80 L 40 40 L 80 40" />
+    <path class="ui-path corner" d="M 1840 80 L 1840 40 L 1880 40" />
+    <path class="ui-path corner" d="M 1880 1040 L 1880 1000 L 1840 1000" />
+    <path class="ui-path corner" d="M 80 1040 L 40 1040 L 40 1000" />
+    <path class="ui-path cross" d="M 100 100 L 110 100 M 105 95 L 105 105" />
+    <path class="ui-path cross" d="M 1810 100 L 1820 100 M 1815 95 L 1815 105" />
+  </svg>
+
+  <!-- Opus Background -->
+  <div id="noise-bg"></div>
+  <div id="fog-layer"></div>
+
 
   <div id="background">
     <div class="clip-mask">
@@ -179,12 +258,18 @@
         return left.value + (right.value - left.value) * eased;
     }
 
+    
+    
+    
+    
+    
     function applyMotionState(elementId, keyframes, frame) {
+        if (!keyframes) return;
         const el = document.getElementById(elementId);
         if (!el) return;
 
         let scale = 1, opacity = 1, translateY = 0, blur = 0, translateX = 0;
-        let transformStr = "";
+        let rotateX = 0, rotateY = 0, translateZ = 0;
 
         for (const track of keyframes) {
             const val = evaluateTrack(track, frame);
@@ -195,10 +280,35 @@
             else if (track.property === 'translateY') translateY = val;
             else if (track.property === 'translateX') translateX = val;
             else if (track.property === 'blur') blur = val;
+            else if (track.property === 'rotateX') rotateX = val;
+            else if (track.property === 'rotateY') rotateY = val;
+            else if (track.property === 'translateZ') translateZ = val;
         }
 
-        if (translateY !== 0 || translateX !== 0) transformStr += `translate(${translateX}px, ${translateY}px) `;
+        // Opus Engine: Phase 2 Continuous Drift Logic
+        const time = frame / 30.0;
+
+        // Add extreme 3D depth to main containers based on scale entry
+        if (['background', 'window', 'container'].includes(elementId) || el.classList.contains('card')) {
+            const driftX = Math.sin(time) * 2;
+            const driftY = Math.cos(time) * 2;
+            
+            // Map opacity or scale into 3D fly-in
+            const entryP = opacity; 
+            rotateX += (1 - entryP) * 40 + driftX;
+            rotateY += (1 - entryP) * -40 + driftY;
+            translateZ += (1 - entryP) * -500;
+        } 
+        // Text elements pop out
+        else {
+             translateZ += 50; 
+        }
+
+        let transformStr = "";
+        if (translateZ !== 0 || translateY !== 0 || translateX !== 0) transformStr += `translate3d(${translateX}px, ${translateY}px, ${translateZ}px) `;
         if (scale !== 1) transformStr += `scale(${scale}) `;
+        if (rotateX !== 0) transformStr += `rotateX(${rotateX}deg) `;
+        if (rotateY !== 0) transformStr += `rotateY(${rotateY}deg) `;
 
         el.style.opacity = opacity;
         el.style.transform = transformStr;
@@ -206,7 +316,9 @@
         else el.style.filter = 'none';
     }
 
-    // Called by Playwright
+
+
+
     window.injectData = (targets, keyframesJson) => {
         window.animationData = JSON.parse(keyframesJson);
         
@@ -234,5 +346,75 @@
         }
     };
   </script>
+<script>
+
+    
+</script>
+<script>
+
+    
+</script>
+<script>
+
+    
+</script>
+<script>
+
+    // --- Premium Vector / GSAP Injection ---
+    let masterTl = gsap.timeline({ paused: true });
+    
+    // Draw SVG Frame Elements
+    const corners = document.querySelectorAll('.corner');
+    const crosses = document.querySelectorAll('.cross');
+    corners.forEach(p => { const l = p.getTotalLength(); p.style.strokeDasharray = l; p.style.strokeDashoffset = l; });
+    masterTl.to(corners, { strokeDashoffset: 0, duration: 1.0, ease: "power2.out", stagger: 0.1 }, 0.5);
+    masterTl.fromTo(crosses, { opacity: 0, scale: 0, transformOrigin: "center" }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 1.0);
+
+    window.injectData = (targets, keyframesJson) => {
+        window.animationData = JSON.parse(keyframesJson);
+        // Populate text targets
+        for (const [id, text] of Object.entries(targets)) {
+            const el = document.getElementById(id);
+            if (el && id !== 'code') el.innerHTML = text;
+        }
+            // Apply split text to large text headers for stagger
+            document.querySelectorAll('h1, h2, #quote, #metric, #before, #after').forEach(el => {
+                if (el.innerText.length > 0 && !el.innerHTML.includes('<span class="word"')) {
+                    el.innerHTML = el.innerText.split(' ').map(w => `<span class="word" style="display:inline-block; will-change:transform, opacity">${w}&nbsp;</span>`).join('');
+                }
+            });
+
+            // Physics: Cards bounce in
+            const cards = document.querySelectorAll('#container, .card, .window, .quote-box, .stat-box');
+            if (cards.length > 0) {
+                masterTl.fromTo(cards, 
+                    { scale: 0.8, opacity: 0, y: 100, rotationX: 10 }, 
+                    { scale: 1, opacity: 1, y: 0, rotationX: 0, duration: 1.5, ease: "elastic.out(1, 0.5)" }, 0
+                );
+            }
+
+            // Physics: Words stagger cascade
+            const words = document.querySelectorAll('.word');
+            if (words.length > 0) {
+                masterTl.fromTo(words, 
+                    { y: 50, opacity: 0, rotationX: 45 }, 
+                    { y: 0, opacity: 1, rotationX: 0, duration: 1, ease: "power4.out", stagger: 0.05 }, 0.5
+                );
+            }
+
+            // Physics: Icons and smaller elements pop
+            const icons = document.querySelectorAll('.ph, #label, #author, #filename');
+            if (icons.length > 0) {
+                masterTl.fromTo(icons, 
+                    { scale: 0.5, opacity: 0 }, 
+                    { scale: 1, opacity: 1, duration: 1, ease: "back.out(1.5)", stagger: 0.1 }, 0.8
+                );
+            }
+    };
+
+    window.renderFrame = (frame) => {
+        masterTl.time(frame / 30.0);
+    };
+
+</script>
 </body>
-</html>

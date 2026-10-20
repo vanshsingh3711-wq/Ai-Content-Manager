@@ -88,8 +88,12 @@ export default function VideosPage() {
     character: "sarah",
     niche: "Education",
     theme: "dark" as "dark" | "light",
-    ratio: "9:16" as "9:16" | "16:9" | "1:1",
+    ratio: "9:16" as "9:16" | "1:1" | "16:9",
     mood: "Energetic",
+    audioFile: null as File | null,
+    audioUrl: "",
+    aiModel: "DeepSeek-Hybrid",
+    use3DAvatar: false,
   });
 
   // Upload creation state
@@ -101,7 +105,7 @@ export default function VideosPage() {
     niche: "Education",
   });
 
-  async function fetchVideos() {
+  async function fetchVideos(retryCount = 0) {
     setLoading(true);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     try {
@@ -109,11 +113,25 @@ export default function VideosPage() {
       if (res.ok) {
         const data = await res.json();
         setVideos(data);
+        setLoading(false);
+        return;
+      } else if (retryCount < 2) {
+        // Neon database may be spinning up from cold sleep; wait 1.5s and retry
+        console.warn(`[VIDEOS] Database warming up (status ${res.status}), retrying in 1.5s...`);
+        setTimeout(() => fetchVideos(retryCount + 1), 1500);
+        return;
       }
     } catch (err) {
+      if (retryCount < 2) {
+        console.warn("[VIDEOS] Initial connection warming up, retrying in 1.5s...", err);
+        setTimeout(() => fetchVideos(retryCount + 1), 1500);
+        return;
+      }
       console.error("Failed to fetch videos:", err);
     } finally {
-      setLoading(false);
+      if (retryCount >= 2) {
+        setLoading(false);
+      }
     }
   }
 
@@ -147,8 +165,8 @@ export default function VideosPage() {
   }
 
   async function handleCreateFaceless() {
-    if (!facelessForm.topic && !facelessForm.script) {
-      alert("Please provide a topic or a script.");
+    if (!facelessForm.topic && !facelessForm.script && !facelessForm.audioFile) {
+      alert("Please provide a topic, a script, or an audio file.");
       return;
     }
     
@@ -156,11 +174,38 @@ export default function VideosPage() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     
     try {
+      let uploadedAudioUrl = "";
+      if (facelessForm.audioFile) {
+        // Upload audio file first
+        const presignRes = await fetch(`${apiUrl}/api/v1/storage/presigned-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: facelessForm.audioFile.name,
+            content_type: facelessForm.audioFile.type || "audio/mpeg",
+            file_size_bytes: facelessForm.audioFile.size,
+            user_id: "default_user",
+          }),
+        });
+
+        if (!presignRes.ok) throw new Error("Failed to get presigned URL for audio.");
+        const { upload_url, source_url } = await presignRes.json();
+
+        const uploadRes = await fetch(upload_url, {
+          method: "PUT",
+          headers: { "Content-Type": facelessForm.audioFile.type || "audio/mpeg" },
+          body: facelessForm.audioFile,
+        });
+
+        if (!uploadRes.ok) throw new Error("Failed to upload audio file.");
+        uploadedAudioUrl = source_url;
+      }
+
       const res = await fetch(`${apiUrl}/api/v1/videos/create-job`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: facelessForm.topic || "Faceless AI Video",
+          title: facelessForm.topic || facelessForm.audioFile?.name || "Faceless AI Video",
           source_url: "",
           video_type: "faceless_short",
           clerk_id: "user_default",
@@ -173,6 +218,9 @@ export default function VideosPage() {
             theme: facelessForm.theme,
             aspect_ratio: facelessForm.ratio,
             mood: facelessForm.mood,
+            audio_url: uploadedAudioUrl,
+            ai_model: facelessForm.aiModel,
+            use_3d_avatar: facelessForm.use3DAvatar,
           },
         }),
       });
@@ -187,7 +235,7 @@ export default function VideosPage() {
       }
     } catch (err) {
       console.error(err);
-      alert("Network error. Is the backend running?");
+      alert("Error: " + (err instanceof Error ? err.message : "Network error."));
     } finally {
       setIsSubmitting(false);
     }
@@ -303,6 +351,16 @@ export default function VideosPage() {
                     className="w-full h-64 bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 text-sm text-white placeholder:text-neutral-700 focus:border-neutral-600 outline-none transition-colors resize-none font-mono leading-relaxed"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Or Upload Audio Recording</label>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={e => setFacelessForm(p => ({ ...p, audioFile: e.target.files?.[0] || null }))}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-white file:text-black hover:file:bg-neutral-200 transition-colors"
+                  />
+                  {facelessForm.audioFile && <p className="text-xs text-neutral-500 mt-2">Selected: {facelessForm.audioFile.name}</p>}
+                </div>
               </div>
 
               {/* Right: Options */}
@@ -332,6 +390,85 @@ export default function VideosPage() {
                           <div className="text-sm font-medium">{c.name}</div>
                           <div className="text-[11px] text-neutral-600">{c.desc}</div>
                         </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3D Avatar Toggle */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">3D Avatar</label>
+                  <button
+                    onClick={() => setFacelessForm(p => ({ ...p, use3DAvatar: !p.use3DAvatar }))}
+                    className={cn(
+                      "w-full text-left p-3 rounded-lg border transition-all flex items-center justify-between",
+                      facelessForm.use3DAvatar
+                        ? "border-white bg-white/5"
+                        : "border-neutral-800 bg-neutral-950 hover:border-neutral-700"
+                    )}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className={cn("text-sm font-medium", facelessForm.use3DAvatar ? "text-white" : "text-neutral-300")}>
+                        Enable 3D Character Rendering
+                      </span>
+                      <span className="text-xs text-neutral-500">Render an animated 3D WebGL avatar</span>
+                    </div>
+                    <div className={cn("w-10 h-6 rounded-full relative transition-colors flex items-center", facelessForm.use3DAvatar ? "bg-white" : "bg-neutral-800")}>
+                      <div className={cn("w-4 h-4 rounded-full transition-all duration-300", facelessForm.use3DAvatar ? "bg-black translate-x-5" : "bg-neutral-500 translate-x-1")} />
+                    </div>
+                  </button>
+                </div>
+
+                {/* AI Model */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">AI Director Model</label>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      {
+                        id: "DeepSeek-Hybrid",
+                        label: "DeepSeek Auto-Hybrid (Recommended)",
+                        desc: "R1 reasoning for story & graphics + V3 speed for footage (Best quality & value)",
+                        badge: "SMART ROUTING",
+                      },
+                      {
+                        id: "DeepSeek-Reasoner",
+                        label: "DeepSeek R1 (Deep Reasoning)",
+                        desc: "Maximum analytical depth & reasoning across all pipeline planners",
+                        badge: "DEEP THINKING",
+                      },
+                      {
+                        id: "DeepSeek-Chat",
+                        label: "DeepSeek V3 (Fast & Ultra-Cheap)",
+                        desc: "Instant turnaround for high-volume content at near-zero cost",
+                        badge: "HIGH SPEED",
+                      },
+                    ].map(model => (
+                      <button
+                        key={model.id}
+                        onClick={() => setFacelessForm(p => ({ ...p, aiModel: model.id }))}
+                        className={cn(
+                          "w-full text-left p-3 rounded-lg border transition-all flex flex-col gap-1 relative overflow-hidden",
+                          facelessForm.aiModel === model.id
+                            ? "border-white bg-white/5 shadow-sm"
+                            : "border-neutral-800 text-neutral-400 hover:border-neutral-700 hover:bg-neutral-900/50"
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={cn("text-sm font-medium", facelessForm.aiModel === model.id ? "text-white" : "text-neutral-300")}>
+                            {model.label}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded",
+                              facelessForm.aiModel === model.id
+                                ? "bg-white text-black"
+                                : "bg-neutral-800 text-neutral-400"
+                            )}
+                          >
+                            {model.badge}
+                          </span>
+                        </div>
+                        <span className="text-xs text-neutral-500">{model.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -625,7 +762,7 @@ export default function VideosPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchVideos}
+            onClick={() => fetchVideos()}
             className="p-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-neutral-800 transition-all"
             title="Refresh"
           >

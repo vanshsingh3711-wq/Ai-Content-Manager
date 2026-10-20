@@ -2,8 +2,19 @@ import pytest
 import sys
 from unittest.mock import patch, MagicMock
 
-sys.modules["cv2"] = MagicMock()
-sys.modules["mediapipe"] = MagicMock()
+# Safely provide mock for missing optional modules without poisoning real packages
+if "cv2" not in sys.modules:
+    try:
+        import cv2
+    except ImportError:
+        sys.modules["cv2"] = MagicMock()
+
+for mod in ["mediapipe", "mediapipe.tasks", "mediapipe.tasks.python", "mediapipe.tasks.python.vision"]:
+    if mod not in sys.modules:
+        try:
+            __import__(mod)
+        except ImportError:
+            sys.modules[mod] = MagicMock()
 
 from services.visual_analysis.schemas import UnifiedVisualTimeline, SubjectEvent, BoundingBox
 from services.visual_analysis.composition_analyzer import analyze_composition

@@ -1,0 +1,247 @@
+{
+  "beats": [
+    {
+      "id": 1,
+      "start": 0.0,
+      "end": 4.18,
+      "start_word_index": 0,
+      "end_word_index": 10,
+      "text": "Welcome to a quick explainer on how artificial intelligence actually learns.",
+      "role": "hook",
+      "energy": "high",
+      "key_entities": [
+        "artificial intelligence"
+      ],
+      "emphasis_words": [
+        "artificial",
+        "intelligence",
+        "learns"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A glowing brain with digital circuits",
+      "importance": 5
+    },
+    {
+      "id": 2,
+      "start": 5.3,
+      "end": 7.26,
+      "start_word_index": 11,
+      "end_word_index": 16,
+      "text": "You've probably heard of neural networks.",
+      "role": "transition",
+      "energy": "medium",
+      "key_entities": [
+        "neural networks"
+      ],
+      "emphasis_words": [
+        "neural",
+        "networks"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A network of interconnected nodes",
+      "importance": 3
+    },
+    {
+      "id": 3,
+      "start": 8.32,
+      "end": 11.72,
+      "start_word_index": 17,
+      "end_word_index": 26,
+      "text": "They are mathematical models loosely inspired by the human brain.",
+      "role": "claim",
+      "energy": "medium",
+      "key_entities": [
+        "mathematical models",
+        "human brain"
+      ],
+      "emphasis_words": [
+        "mathematical",
+        "models",
+        "human",
+        "brain"
+      ],
+      "concreteness": "mixed",
+      "visual_potential": "A side-by-side of a brain and a mathematical graph",
+      "importance": 4
+    },
+    {
+      "id": 4,
+      "start": 12.72,
+      "end": 17.08,
+      "start_word_index": 27,
+      "end_word_index": 39,
+      "text": "Instead of being programmed with explicit rules, they learn by looking at examples.",
+      "role": "claim",
+      "energy": "medium",
+      "key_entities": [
+        "explicit rules",
+        "examples"
+      ],
+      "emphasis_words": [
+        "programmed",
+        "explicit",
+        "rules",
+        "learn",
+        "examples"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A robot looking at a stack of photos",
+      "importance": 4
+    },
+    {
+      "id": 5,
+      "start": 18.22,
+      "end": 21.7,
+      "start_word_index": 40,
+      "end_word_index": 50,
+      "text": "Imagine showing a toddler thousands of pictures of cats and dogs.",
+      "role": "example",
+      "energy": "medium",
+      "key_entities": [
+        "toddler",
+        "pictures",
+        "cats",
+        "dogs"
+      ],
+      "emphasis_words": [
+        "toddler",
+        "thousands",
+        "cats",
+        "dogs"
+      ],
+      "concreteness": "concrete",
+      "visual_potential": "A toddler looking at a picture book of cats and dogs",
+      "importance": 4
+    },
+    {
+      "id": 6,
+      "start": 22.66,
+      "end": 25.5,
+      "start_word_index": 51,
+      "end_word_index": 58,
+      "text": "Over time, the toddler learns the subtle differences.",
+      "role": "example",
+      "energy": "medium",
+      "key_entities": [
+        "toddler",
+        "differences"
+      ],
+      "emphasis_words": [
+        "learns",
+        "subtle",
+        "differences"
+      ],
+      "concreteness": "mixed",
+      "visual_potential": "A toddler pointing at a cat and dog",
+      "importance": 3
+    },
+    {
+      "id": 7,
+      "start": 26.34,
+      "end": 32.5,
+      "start_word_index": 59,
+      "end_word_index": 76,
+      "text": "AI does the exact same thing, but it uses massive amounts of data and adjusts numbers called weights.",
+      "role": "comparison",
+      "energy": "medium",
+      "key_entities": [
+        "AI",
+        "data",
+        "weights"
+      ],
+      "emphasis_words": [
+        "AI",
+        "exact",
+        "same",
+        "massive",
+        "data",
+        "weights"
+      ],
+      "concreteness": "mixed",
+      "visual_potential": "A server room with blinking lights and data streams",
+      "importance": 4
+    },
+    {
+      "id": 8,
+      "start": 33.54,
+      "end": 39.18,
+      "start_word_index": 77,
+      "end_word_index": 95,
+      "text": "When it makes a mistake, an algorithm called back propagation tweaks those weights so it does better next time.",
+      "role": "statistic",
+      "energy": "medium",
+      "key_entities": [
+        "mistake",
+        "algorithm",
+        "back propagation",
+        "weights"
+      ],
+      "emphasis_words": [
+        "mistake",
+        "back",
+        "propagation",
+        "tweaks",
+        "weights",
+        "better"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A flowchart with arrows adjusting numbers",
+      "importance": 4
+    },
+    {
+      "id": 9,
+      "start": 40.0,
+      "end": 45.94,
+      "start_word_index": 96,
+      "end_word_index": 113,
+      "text": "After millions of cycles, the AI can recognize a cat, write a poem, or even drive a car.",
+      "role": "list",
+      "energy": "high",
+      "key_entities": [
+        "millions of cycles",
+        "AI",
+        "cat",
+        "poem",
+        "car"
+      ],
+      "emphasis_words": [
+        "millions",
+        "cycles",
+        "AI",
+        "recognize",
+        "cat",
+        "write",
+        "poem",
+        "drive",
+        "car"
+      ],
+      "concreteness": "mixed",
+      "visual_potential": "Split screen: AI recognizing a cat, writing a poem, driving a car",
+      "importance": 5
+    },
+    {
+      "id": 10,
+      "start": 46.9,
+      "end": 48.64,
+      "start_word_index": 114,
+      "end_word_index": 119,
+      "text": "That's the magic of machine learning.",
+      "role": "cta",
+      "energy": "high",
+      "key_entities": [
+        "magic",
+        "machine learning"
+      ],
+      "emphasis_words": [
+        "magic",
+        "machine",
+        "learning"
+      ],
+      "concreteness": "abstract",
+      "visual_potential": "A sparkling neural network with the text 'Machine Learning'",
+      "importance": 5
+    }
+  ],
+  "total_duration": 48.64,
+  "language": "en"
+}

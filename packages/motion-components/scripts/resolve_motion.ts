@@ -20,8 +20,21 @@ const type = props.type || 'hero_reveal';
 const targets = props.targets || { text: 'text-1' };
 const personality = props.personality || 'premium';
 
-// Dummy Scene that maps targets to elements
-const elements = Object.values(targets).map(id => ({ id: String(id), type: 'text' as const }));
+// Map the payload keys to themselves so that the keyframes target the HTML element IDs (e.g., "title", "step1").
+// Also include standard layout IDs that the compositions might animate even if they aren't passed in the payload.
+const mappedTargets: Record<string, string> = {
+  background: 'background',
+  window: 'window',
+  container: 'container',
+  titlebar: 'titlebar',
+  content: 'content'
+};
+Object.keys(targets).forEach(key => {
+  mappedTargets[key] = key;
+});
+
+// Create elements for all mapped targets
+const elements = Object.values(mappedTargets).map(id => ({ id, type: 'text' as const }));
 const mockScene: SceneDefinition = {
   id: 'dynamic-scene',
   elements
@@ -29,7 +42,7 @@ const mockScene: SceneDefinition = {
 
 const intent: MotionIntent = {
   type: type as any,
-  targets: targets,
+  targets: mappedTargets,
   personality: personality as any,
   durationInFrames: props.durationInFrames || 90
 };

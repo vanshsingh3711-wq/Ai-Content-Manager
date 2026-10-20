@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    /* Ultra-Premium Soft SaaS Aesthetic (Inspired by Jitter.video / Acme AI) */
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f8f9fc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Soft, ethereal background gradient */
+    .bg-gradient {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1200px;
+      height: 1200px;
+      background: radial-gradient(circle, rgba(230,220,255,0.8) 0%, rgba(240,245,255,0.4) 40%, rgba(248,249,252,0) 70%);
+      filter: blur(100px);
+      z-index: -10;
+    }
+
+    /* The Search Bar Pill */
+    #search-bar {
+      position: absolute;
+      width: 800px;
+      height: 72px;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 36px;
+      box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.03),
+        0 1px 3px rgba(0, 0, 0, 0.05),
+        inset 0 0 0 1px rgba(255, 255, 255, 1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px 0 32px;
+      z-index: 10;
+      transform-origin: center;
+    }
+
+    #search-text {
+      font-size: 20px;
+      color: #94a3b8;
+      font-weight: 400;
+      letter-spacing: -0.2px;
+    }
+    
+    .cursor-blink {
+      display: inline-block;
+      width: 2px;
+      height: 24px;
+      background: #334155;
+      margin-left: 4px;
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    #ask-btn {
+      height: 48px;
+      padding: 0 24px;
+      background: #f1f5f9;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #0f172a;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.02);
+    }
+    
+    #ask-btn svg { width: 18px; height: 18px; }
+
+    /* The Chat Window */
+    #chat-window {
+      position: absolute;
+      width: 600px;
+      height: 700px;
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border-radius: 32px;
+      box-shadow: 
+        0 40px 80px rgba(100, 90, 150, 0.08),
+        0 10px 20px rgba(0, 0, 0, 0.03),
+        inset 0 0 0 1px rgba(255, 255, 255, 1);
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      z-index: 5;
+      opacity: 0;
+      transform: scale(0.9) translateY(40px);
+    }
+
+    #chat-header {
+      font-size: 24px;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 30px;
+    }
+    #chat-header span {
+      font-weight: 400;
+      color: #8b5cf6;
+    }
+
+    .chat-bubble {
+      background: rgba(237, 233, 254, 0.8);
+      border-radius: 20px 20px 20px 4px;
+      padding: 20px 24px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: #4c1d95;
+      margin-bottom: 20px;
+      width: 85%;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    
+    .chat-toolbar {
+      margin-top: auto;
+      display: flex;
+      gap: 16px;
+      color: #94a3b8;
+    }
+    .chat-toolbar svg { width: 20px; height: 20px; cursor: pointer; }
+
+    /* The Mouse Cursor */
+    #mouse-cursor {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      z-index: 100;
+      top: 700px;
+      left: 1200px;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+    }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/TextPlugin.min.js"></script>
+</head>
+<body>
+
+  <div class="bg-gradient"></div>
+
+  <!-- Search Pill -->
+  <div id="search-bar">
+    <div id="search-text"></div>
+    <div id="ask-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18m9-9H3" stroke-linecap="round"/></svg>
+      Ask AI
+    </div>
+  </div>
+
+  <!-- Chat Window -->
+  <div id="chat-window">
+    <div id="chat-header">acme <span>AI</span></div>
+    
+    <div class="chat-bubble" id="bubble-1"></div>
+    <div class="chat-bubble" id="bubble-2"></div>
+    
+    <div class="chat-toolbar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+  </div>
+
+  <!-- SVG Cursor -->
+  <svg id="mouse-cursor" viewBox="0 0 24 24" fill="black" stroke="white" stroke-width="1.5">
+    <path d="M3 3l7 18 2-7 7-2-18-9z"/>
+  </svg>
+
+  <script>
+    gsap.registerPlugin(TextPlugin);
+    let masterTl = gsap.timeline({ paused: true });
+
+    // Build the choreography matching 16-9.mp4
+    function buildAnimation(queryText, bubble1Text, bubble2Text) {
+      
+      // 1. Typing the search query
+      masterTl.to("#search-text", {
+        duration: 1.5, 
+        text: queryText,
+        ease: "none"
+      }, 0.5);
+
+      // 2. Cursor moves to the Ask AI button
+      // Calculate position of button
+      const btn = document.getElementById("ask-btn").getBoundingClientRect();
+      // Assume screen is 1920x1080, center is 960, 540
+      masterTl.to("#mouse-cursor", {
+        x: (btn.left + 50) - 1200, // relative to starting CSS
+        y: (btn.top + 24) - 700,
+        duration: 1.2,
+        ease: "power3.inOut"
+      }, 1.5);
+
+      // 3. Click effect
+      masterTl.to("#ask-btn", { scale: 0.95, duration: 0.1 }, 2.7);
+      masterTl.to("#ask-btn", { scale: 1, duration: 0.1 }, 2.8);
+      masterTl.to("#mouse-cursor", { opacity: 0, duration: 0.2 }, 2.9);
+
+      // 4. Search bar collapses and morphs out
+      masterTl.to("#search-bar", {
+        scale: 0.8,
+        opacity: 0,
+        y: -30,
+        duration: 0.6,
+        ease: "power3.in"
+      }, 3.0);
+
+      // 5. Chat window elegantly expands in
+      masterTl.to("#chat-window", {
+        scale: 1,
+        opacity: 1,
+        y: 0,
+        duration: 1.0,
+        ease: "elastic.out(1, 0.7)"
+      }, 3.3);
+
+      // 6. Bubble 1 appears and types
+      masterTl.to("#bubble-1", { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 3.8);
+      masterTl.to("#bubble-1", {
+        duration: 2.0,
+        text: bubble1Text,
+        ease: "none"
+      }, 4.0);
+
+      // 7. Bubble 2 appears and types
+      masterTl.to("#bubble-2", { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 6.2);
+      masterTl.to("#bubble-2", {
+        duration: 1.5,
+        text: bubble2Text,
+        ease: "none"
+      }, 6.4);
+    }
+
+    // Default mock data if Python doesn't inject it
+    buildAnimation(
+      "How can I get started with motion design?",
+      "A good way to start with motion design is to first learn the basics of design — color, typography, layout — and then pick up simple animation principles.",
+      "Next, get hands-on with animation tools and practice different styles."
+    );
+
+    window.renderFrame = (frame) => {
+        masterTl.time(frame / 30.0);
+    };
+  </script>
+</body>
+</html>

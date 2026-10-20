@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from config import get_settings
 from database import get_session, init_db
 from models import VideoJob, User
-from routers import storage, videos, jobs
+from routers import storage, videos, jobs, copilot
 
 settings = get_settings()
 
@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(storage.router)
 app.include_router(videos.router)
 app.include_router(jobs.router)
+app.include_router(copilot.router)
 
 
 @app.get("/health", tags=["System"])

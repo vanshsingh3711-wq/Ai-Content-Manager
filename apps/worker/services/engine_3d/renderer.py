@@ -19,47 +19,32 @@ def start_server(port, directory):
     httpd = socketserver.TCPServer(("", port), Handler)
     httpd.serve_forever()
 
-async def main():
+async def render_3d_character(ai_plan, output_video_path: str, duration: int = 10, fps: int = 60):
     print("[3D RENDERER] Booting Headless WebGL Engine (OFFLINE RENDERER)...")
     
     # Start local HTTP server
     port = 8081
-    server_dir = os.path.abspath('apps/worker/services/engine_3d')
+    server_dir = os.path.dirname(os.path.abspath(__file__))
     server_thread = threading.Thread(target=start_server, args=(port, server_dir), daemon=True)
     server_thread.start()
     
-    ai_plan = {
-        "edits": [
-            {"start": 0, "end": 2, "character_action": "idle"},
-            {"start": 2, "end": 5, "character_action": "pointing", "graphic": {"text": "Data-Driven Graphics!", "attach_to": "leftHand"}},
-            {"start": 5, "end": 8, "character_action": "talking-while-standing", "graphic": {"text": "Perfect Bone Tracking", "attach_to": "rightHand"}},
-            {"start": 8, "end": 10, "character_action": "happy-idle", "graphic": {"text": "Flawless Offline Render", "attach_to": "head"}}
-        ]
-    }
-    
-    total_duration_seconds = 10
-    fps = 60
-    total_frames = total_duration_seconds * fps
+    total_frames = int(duration * fps)
     delta_time = 1.0 / fps
 
-    output_path = os.path.abspath('apps/worker/services/engine_3d/output.mp4')
-    if os.path.exists(output_path):
-        os.remove(output_path)
+    if os.path.exists(output_video_path):
+        os.remove(output_video_path)
         
     print(f"[3D RENDERER] Starting Offline Rendering: {total_frames} frames at {fps} FPS (Piping to FFmpeg)...")
     
-    # Spawn FFmpeg waiting for raw PNG data on stdin
     ffmpeg_cmd = [
         'ffmpeg', '-y',
         '-f', 'image2pipe',
         '-vcodec', 'png',
         '-r', str(fps),
         '-i', '-', # Read from stdin
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',
-        '-crf', '18', # High quality
-        '-preset', 'fast',
-        output_path
+        '-c:v', 'qtrle',
+        '-pix_fmt', 'argb',
+        output_video_path
     ]
     
     process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
@@ -115,7 +100,14 @@ async def main():
     process.stdin.close()
     process.wait()
     
-    print(f"[3D RENDERER] Offline recording complete! Saved flawlessly in {time.time() - start_time:.1f} seconds to: {output_path}")
+    print(f"[3D RENDERER] Offline recording complete! Saved flawlessly in {time.time() - start_time:.1f} seconds to: {output_video_path}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Test execution
+    test_plan = {
+        "edits": [
+            {"start": 0, "end": 2, "character_action": "idle"},
+            {"start": 2, "end": 5, "character_action": "pointing", "graphic": {"text": "Data-Driven Graphics!", "attach_to": "leftHand"}}
+        ]
+    }
+    asyncio.run(render_3d_character(test_plan, os.path.abspath('apps/worker/services/engine_3d/output.mp4'), 5, 60))

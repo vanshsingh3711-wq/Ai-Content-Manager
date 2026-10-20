@@ -37,6 +37,7 @@ def validate_blueprint(
     timestamp_map: Dict[str, Any],
     video_duration: float,
     config: Optional[Any] = None,
+    is_faceless: bool = False,
 ) -> Tuple[List[Dict[str, Any]], ValidationReport]:
     """
     Validates and filters AI-generated editing decisions.
@@ -46,16 +47,19 @@ def validate_blueprint(
         timestamp_map: Mapping of chunk IDs to {start, end, text, words}.
         video_duration: Total duration of the original video in seconds.
         config: Optional EditingConfig override (uses EDITING_CONFIG singleton by default).
+        is_faceless: True if the video is faceless (allows higher B-roll budgets).
 
     Returns:
         Tuple of (validated_edits, validation_report).
         validated_edits contains only the edits that passed validation.
     """
     cfg = config or EDITING_CONFIG
+    max_broll_count = getattr(cfg, "MAX_BROLL_COUNT_FACELESS", 20) if is_faceless else cfg.MAX_BROLL_COUNT
     report = ValidationReport(original_count=len(edits))
 
     # Calculate B-roll budget
-    max_broll_duration = video_duration * cfg.MAX_BROLL_DURATION_RATIO
+    broll_ratio = getattr(cfg, "MAX_BROLL_DURATION_RATIO_FACELESS", 1.0) if is_faceless else cfg.MAX_BROLL_DURATION_RATIO
+    max_broll_duration = video_duration * broll_ratio
     report.broll_budget_max = round(max_broll_duration, 2)
 
     validated: List[Dict[str, Any]] = []
@@ -192,11 +196,11 @@ def validate_blueprint(
 
             # 2. Count limit
             broll_count_so_far = len([e for e in validated if e.get("action") == "b_roll"])
-            if broll_count_so_far >= cfg.MAX_BROLL_COUNT:
+            if broll_count_so_far >= max_broll_count:
                 report.issues.append(ValidationIssue(
                     trigger_id=trigger_id,
                     action=action,
-                    issue=f"B-roll count limit reached ({cfg.MAX_BROLL_COUNT})",
+                    issue=f"B-roll count limit reached ({max_broll_count})",
                 ))
                 report.rejected_count += 1
                 continue
@@ -249,13 +253,14 @@ def validate_blueprint(
 
             # 6. Minimum spacing from previous B-roll
             if broll_events:
+                min_broll_spacing = getattr(cfg, "MIN_BROLL_SPACING_SEC_FACELESS", 0.0) if is_faceless else cfg.MIN_BROLL_SPACING_SEC
                 last_broll_end = broll_events[-1]["end"]
                 spacing = chunk_start - last_broll_end
-                if spacing < cfg.MIN_BROLL_SPACING_SEC:
+                if spacing < min_broll_spacing:
                     report.issues.append(ValidationIssue(
                         trigger_id=trigger_id,
                         action=action,
-                        issue=f"B-roll spacing {spacing:.2f}s below minimum {cfg.MIN_BROLL_SPACING_SEC}s",
+                        issue=f"B-roll spacing {spacing:.2f}s below minimum {min_broll_spacing}s",
                     ))
                     report.rejected_count += 1
                     continue
@@ -278,8 +283,118 @@ def validate_blueprint(
             report.accepted_count += 1
             continue
 
-        # ── zoom_in / sfx / character / motion_graphics — lightweight validation ────────────────────
-        if action in ("zoom_in", "sfx", "character", "motion_graphics"):
+        # ── zoom_in / sfx / character — lightweight validation ────────────────────
+        if action in ("zoom_in", "sfx", "character"):
+            validated.append(edit)
+            report.accepted_count += 1
+            continue
+
+        # ── motion_graphics — validate template + required keys ───────
+        if action == "motion_graphics":
+            from services.motion_graphic_planner import ALLOWED_TEMPLATES
+
+            TEMPLATE_REQUIRED_KEYS = {
+                "hero_reveal":         {"label", "headline", "supporting"},
+                "metric_reveal":       {"label", "metric"},
+                "quote_reveal":        {"quote"},
+                "step_sequence":       {"title", "step1", "step2"},
+                "before_after":        {"beforeLabel", "before", "afterLabel", "after"},
+                "chart_reveal":        {"title", "dataPoint1"},
+                "icon_reveal":         {"concept", "label"},
+                "code_reveal":         {"code"},
+                "stat_card_highlight": {"label", "stat"},
+                "browser_walkthrough": {"url", "tabTitle"},
+                "vscode_code_typing":  {"title", "activeFile", "code"},
+                "kinetic_text":        {"text"},
+                "cooked_likes":        {"label"},
+                "cooked_terminal":     {"command"},
+                "cooked_social_post":  {"text"},
+                "cooked_chat":         {"messages"},
+                "cooked_notes":        {"items"},
+                "cooked_progress":     {"progress"},
+                "cooked_toasts":       {"title"},
+                "cooked_flow":         {"nodes"},
+            }
+
+            KEY_DEFAULTS = {
+                "beforeLabel": "BEFORE",
+                "afterLabel": "AFTER",
+                "delta": "",
+                "author": "",
+                "language": "python",
+                "url": "https://example.com",
+                "tabTitle": "Overview",
+                "title": "KEY TAKEAWAY",
+                "label": "KEY INSIGHT",
+                "concept": "💡",
+                "activeFile": "main.py",
+                "command": "npm run dev",
+                "output": "Ready on http://localhost:3000",
+                "name": "Creator",
+                "handle": "@creator",
+                "highlight": "game changer",
+                "likes": "42.8K",
+                "messages": [{"from": "them", "text": "How did you build this?"}, {"from": "me", "text": "Automated workflow pipelines."}],
+                "items": ["Record take", "Run AI editing pipeline", "Publish high retention video"],
+                "progress": 85,
+                "nodes": [{"label": "Input Data"}, {"label": "AI Transform"}, {"label": "Final Output"}],
+            }
+
+            mg_type = edit.get("motion_graphics_type", "")
+            if mg_type not in ALLOWED_TEMPLATES:
+                # Auto-correct to hero_reveal rather than reject
+                edit["motion_graphics_type"] = "hero_reveal"
+                report.issues.append(ValidationIssue(
+                    trigger_id=trigger_id,
+                    action=action,
+                    issue=f"Unknown template '{mg_type}' → corrected to hero_reveal",
+                    severity="modified",
+                ))
+                report.modified_count += 1
+
+            targets = edit.get("motion_graphics_targets") or {}
+            required = TEMPLATE_REQUIRED_KEYS.get(edit.get("motion_graphics_type", ""), set())
+            missing = required - set(targets.keys())
+            if missing:
+                # Fill in missing keys with sensible defaults from motion_graphics_text, reason, or semantic defaults
+                fallback_text = edit.get("motion_graphics_text") or edit.get("reason", "")
+                for key in missing:
+                    if key in KEY_DEFAULTS:
+                        targets[key] = KEY_DEFAULTS[key]
+                    else:
+                        targets[key] = fallback_text[:60] if fallback_text else "..."
+                edit["motion_graphics_targets"] = targets
+                report.issues.append(ValidationIssue(
+                    trigger_id=trigger_id,
+                    action=action,
+                    issue=f"Missing keys {missing} for {edit.get('motion_graphics_type')} filled with fallbacks",
+                    severity="modified",
+                ))
+                report.modified_count += 1
+
+            # ── Studio Depth Matting: normalize layer / depth ─────────────
+            raw_layer = edit.get("layer") or edit.get("depth")
+            norm_layer = "front"
+            if raw_layer and str(raw_layer).lower() in ("behind", "back", "background"):
+                # User constraint: readable / text-dense graphics MUST stay in front
+                UNSUITABLE_FOR_BEHIND = {
+                    "cooked_terminal", "cooked_chat", "cooked_notes",
+                    "code_reveal", "vscode_code_typing", "quote_reveal",
+                    "step_sequence", "kinetic_text", "browser_walkthrough"
+                }
+                if edit.get("motion_graphics_type") in UNSUITABLE_FOR_BEHIND:
+                    norm_layer = "front"
+                    report.issues.append(ValidationIssue(
+                        trigger_id=trigger_id,
+                        action=action,
+                        issue=f"Template '{edit.get('motion_graphics_type')}' has readable text; forced layer from 'behind' to 'front' to prevent obscuring speaker",
+                        severity="modified",
+                    ))
+                    report.modified_count += 1
+                else:
+                    norm_layer = "behind"
+            edit["layer"] = norm_layer
+
             validated.append(edit)
             report.accepted_count += 1
             continue
@@ -291,6 +406,30 @@ def validate_blueprint(
             issue=f"Unknown action type: '{action}'",
         ))
         report.rejected_count += 1
+
+    # ── Phase 3: Anti-AI Quality Guardian & Pacing Linter ──────────────
+    try:
+        from services.ai_tells_linter import lint_and_guard_blueprint
+        linted, linter_summary = lint_and_guard_blueprint(
+            edits=validated,
+            timestamp_map=timestamp_map,
+            video_duration=video_duration,
+        )
+        for l_issue in linter_summary.get("issues", []):
+            report.issues.append(ValidationIssue(
+                trigger_id=l_issue["trigger_id"],
+                action=l_issue["action"],
+                issue=f"[{l_issue['rule']}] {l_issue['details']}",
+                severity=l_issue["severity"],
+            ))
+            if l_issue["severity"] == "rejected":
+                report.rejected_count += 1
+                report.accepted_count = max(0, report.accepted_count - 1)
+            elif l_issue["severity"] == "modified":
+                report.modified_count += 1
+        validated = linted
+    except Exception as e:
+        print(f"[Blueprint Validator] Linter pass skipped: {e}")
 
     report.broll_budget_used = round(total_broll_duration, 2)
     return validated, report

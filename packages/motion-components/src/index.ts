@@ -43,3 +43,10 @@ export * from './character/SvgCharacter';
 export * from './editor';
 export * from './project';
 export * from './motion';
+
+// Synthetic UI, Device Frames & Screencast Mockups
+export * from './themes/brandTokens';
+export * from './ui/MotionKit';
+export * from './devices/WebBrowserFrame';
+export * from './devices/VSCodeFrame';
+export * from './animations/Screencast';
