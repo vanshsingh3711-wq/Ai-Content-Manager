@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import { GraphicElement } from "@/lib/timeline-types";
+import { cn } from "@/lib/utils";
 
 interface GraphicCanvasRendererProps {
   graphic: GraphicElement;
@@ -503,6 +504,354 @@ export function GraphicCanvasRenderer({ graphic, playheadTime }: GraphicCanvasRe
         >
           <path d="M12 2L4 14h6v8h4v-8h6L12 2z" />
         </svg>
+      </div>
+    );
+  }
+
+  // RENDERER 10: APP SCREEN UPLOAD
+  if (
+    compKey === "app-screen-upload" ||
+    compKey === "screen-upload" ||
+    compKey === "video-upload" ||
+    compKey === "app-upload"
+  ) {
+    const title = props.title || "VIDEO UPLOAD";
+    const appName = props.appName || "Video Studio App";
+    const fileName = props.fileName || "upload_video.mp4";
+    const fileSize = props.fileSize || "48.2 MB";
+    const fileType = props.fileType || "MP4 Video";
+    const uploadDuration = Math.max(1.0, totalDuration * 0.7);
+    const targetProgress = typeof props.progress === "number" ? Math.min(100, Math.max(0, props.progress)) : 100;
+    const uploadProgress = Math.min(targetProgress, Math.round((localTime / uploadDuration) * targetProgress));
+    const isComplete = uploadProgress >= 100;
+    const statusText = isComplete ? (props.status || "Upload Complete") : "Uploading to cloud...";
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border border-sky-500/40 p-5 shadow-[0_0_35px_rgba(14,165,233,0.25),inset_0_1px_1px_rgba(255,255,255,0.15)] min-w-[340px] max-w-[420px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        {/* Ambient Top Glow Line */}
+        <div className={`absolute -top-px left-8 right-8 h-[2px] bg-gradient-to-r from-transparent ${isComplete ? "via-emerald-400 shadow-[0_0_10px_#10b981]" : "via-sky-400 shadow-[0_0_10px_#38bdf8]"} to-transparent`} />
+
+        {/* macOS / App Titlebar */}
+        <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-white/10">
+          <div className="flex items-center space-x-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+            <span className="text-[11px] font-mono text-neutral-300 font-bold ml-1.5">{appName}</span>
+          </div>
+          <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-sky-400 bg-sky-500/10 border border-sky-400/30 px-2 py-0.5 rounded-full">
+            {title}
+          </span>
+        </div>
+
+        {/* Upload File Dropzone & Card */}
+        <div className={`border border-dashed ${isComplete ? "border-emerald-500/40 bg-emerald-950/20" : "border-sky-500/30 bg-neutral-900/80"} rounded-xl p-3.5 space-y-3 transition-colors`}>
+          <div className="flex items-center space-x-3">
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                isComplete
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-400/40"
+                  : "bg-sky-500/20 text-sky-400 border border-sky-400/40 animate-pulse"
+              }`}
+            >
+              {isComplete ? (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-white truncate font-mono">{fileName}</div>
+              <div className="flex items-center space-x-2 text-[10px] text-neutral-400 font-mono mt-0.5">
+                <span>{fileType}</span>
+                <span>•</span>
+                <span>{fileSize}</span>
+                <span>•</span>
+                <span className="text-sky-400">4K / 60fps</span>
+              </div>
+            </div>
+            <span className={`text-xs font-mono font-bold ${isComplete ? "text-emerald-400" : "text-sky-400"}`}>
+              {uploadProgress}%
+            </span>
+          </div>
+
+          {/* Progress Track */}
+          <div className="w-full bg-neutral-950 rounded-full h-2 overflow-hidden border border-white/5 relative">
+            <div
+              className={`h-full transition-all duration-75 rounded-full shadow-sm ${
+                isComplete
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_10px_#10b981]"
+                  : "bg-gradient-to-r from-sky-500 via-indigo-400 to-cyan-400 shadow-[0_0_10px_#38bdf8]"
+              }`}
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+
+          {/* Status Label */}
+          <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+            <span className={isComplete ? "text-emerald-400 font-semibold" : "text-neutral-400"}>
+              {statusText}
+            </span>
+            {isComplete && (
+              <span className="text-[10px] text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 px-2 py-0.5 rounded font-bold">
+                READY
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER 11: BROWSER WALKTHROUGH / LIVE WEB EVIDENCE
+  if (
+    compKey === "browser-walkthrough" ||
+    compKey === "browser" ||
+    compKey === "web-capture" ||
+    compKey === "web-evidence"
+  ) {
+    const url = props.url || "https://example.com";
+    const tabTitle = props.tabTitle || "Web Evidence";
+    const highlightText =
+      props.highlightText && props.highlightText !== "Featured Source" ? props.highlightText : null;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const rawScreenshotUrl = props.screenshotUrl || props.preview_url;
+    const screenshotUrl = rawScreenshotUrl
+      ? rawScreenshotUrl.startsWith("http") || rawScreenshotUrl.startsWith("data:")
+        ? rawScreenshotUrl
+        : `${apiBase}${rawScreenshotUrl.startsWith("/") ? "" : "/"}${rawScreenshotUrl}`
+      : null;
+
+    const rawVideoUrl = props.videoUrl;
+    const videoUrl = rawVideoUrl
+      ? rawVideoUrl.startsWith("http") || rawVideoUrl.startsWith("data:")
+        ? rawVideoUrl
+        : `${apiBase}${rawVideoUrl.startsWith("/") ? "" : "/"}${rawVideoUrl}`
+      : null;
+
+    const format = props.format || props.aspectRatio || "16:9";
+    const isMobile = format === "9:16";
+    const isSquare = format === "1:1";
+
+    // Live vertical scroll computation as playhead advances
+    const scrollProgress = Math.min(1, Math.max(0, localTime / totalDuration));
+    const scrollY = Math.round(scrollProgress * (isMobile ? 260 : 180));
+
+    // VARIANT A: 9:16 MOBILE PHONE BROWSER
+    if (isMobile) {
+      return (
+        <div
+          className="relative select-none pointer-events-none rounded-[36px] bg-neutral-950/95 backdrop-blur-2xl border-2 border-neutral-700/80 shadow-[0_0_50px_rgba(14,165,233,0.35),0_25px_60px_rgba(0,0,0,0.85)] w-[260px] sm:w-[280px] text-white font-sans transition-all overflow-hidden p-2.5"
+          style={{
+            opacity,
+            transform: `scale(${scaleEntrance})`,
+          }}
+        >
+          {/* Dynamic Island Notch */}
+          <div className="w-20 h-4 bg-black rounded-full mx-auto mb-1.5 flex items-center justify-end px-2 shadow-inner">
+            <div className="w-1.5 h-1.5 rounded-full bg-sky-950 border border-sky-800" />
+          </div>
+
+          {/* Mobile Status Bar */}
+          <div className="flex items-center justify-between px-2 text-[10px] text-neutral-400 font-mono mb-1.5">
+            <span className="font-semibold text-white">9:41</span>
+            <div className="flex items-center space-x-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[9px] font-bold text-sky-400 tracking-wider">LIVE WEB</span>
+            </div>
+          </div>
+
+          {/* Compact Mobile URL Bar */}
+          <div className="mb-2 bg-neutral-900/95 border border-white/10 rounded-xl px-2.5 py-1.5 flex items-center space-x-2 shadow-sm">
+            <span className="text-[11px] text-emerald-400 shrink-0">🔒</span>
+            <span className="text-[10px] font-mono text-neutral-300 truncate font-medium">{url}</span>
+          </div>
+
+          {/* Mobile Screen Viewport */}
+          <div className="relative bg-neutral-950 h-[380px] sm:h-[420px] rounded-2xl overflow-hidden flex flex-col items-center justify-start border border-white/5">
+            {videoUrl ? (
+              <div className="w-full h-full overflow-hidden relative">
+                <video
+                  src={videoUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover select-none"
+                />
+              </div>
+            ) : screenshotUrl ? (
+              <div className="w-full h-full overflow-hidden relative">
+                <img
+                  src={screenshotUrl}
+                  alt={tabTitle}
+                  style={{
+                    transform: `translateY(-${scrollY}px)`,
+                    transition: "transform 0.1s linear",
+                  }}
+                  className="w-full min-h-full object-cover object-top select-none"
+                />
+
+                {/* Simulated Mobile Tap Indicator (Only if explicitly enabled) */}
+                {props.showTapIndicator && (
+                  <div
+                    className="absolute pointer-events-none transition-all duration-300 z-10"
+                    style={{
+                      top: `${Math.min(78, 20 + scrollProgress * 54)}%`,
+                      left: `${Math.min(80, 24 + Math.sin(scrollProgress * Math.PI) * 40)}%`,
+                    }}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-sky-400/30 border-2 border-sky-300 flex items-center justify-center animate-ping" />
+                    <div className="w-3 h-3 rounded-full bg-sky-400 shadow-[0_0_12px_#38bdf8] -mt-4.5 ml-1.5" />
+                  </div>
+                )}
+
+                {/* Subtle vignette */}
+                <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/15 via-transparent to-black/35" />
+              </div>
+            ) : (
+              <div className="w-full p-4 space-y-2.5">
+                <div className="h-4 bg-white/10 rounded w-3/4 animate-pulse" />
+                <div className="h-3 bg-white/5 rounded w-full" />
+                <div className="h-3 bg-white/5 rounded w-5/6" />
+                <div className="h-3 bg-white/5 rounded w-2/3" />
+              </div>
+            )}
+
+            {/* Mobile Bottom Highlight Pill (Only if explicitly custom) */}
+            {highlightText && (
+              <div className="absolute bottom-2.5 left-2.5 right-2.5 bg-neutral-900/95 backdrop-blur-md border border-purple-500/50 rounded-lg px-2.5 py-1.5 shadow-xl flex items-center space-x-1.5 z-20">
+                <span className="text-xs">👆</span>
+                <span className="text-[10px] font-mono font-bold text-purple-300 truncate">{highlightText}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Home Indicator */}
+          <div className="w-24 h-1 bg-white/30 rounded-full mx-auto mt-2" />
+        </div>
+      );
+    }
+
+    // VARIANT B: 16:9 DESKTOP & 1:1 SQUARE BROWSER WINDOW
+    return (
+      <div
+        className={cn(
+          "relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border border-sky-500/40 shadow-[0_0_40px_rgba(14,165,233,0.3),inset_0_1px_1px_rgba(255,255,255,0.15)] text-white font-sans transition-all overflow-hidden",
+          isSquare ? "w-[320px] max-w-[340px]" : "min-w-[340px] max-w-[480px]"
+        )}
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        {/* Ambient Top Glow Line */}
+        <div className="absolute -top-px left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-[0_0_10px_#38bdf8]" />
+
+        {/* Browser Chrome Header */}
+        <div className="bg-neutral-900/90 px-4 py-2.5 border-b border-white/10 flex flex-col space-y-2">
+          {/* Traffic lights & tab title */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+              <span className="text-[11px] font-mono text-neutral-300 font-bold ml-2 truncate max-w-[200px]">
+                {tabTitle}
+              </span>
+            </div>
+            <div className="flex items-center space-x-1.5 bg-sky-500/10 border border-sky-400/30 px-2 py-0.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-sky-400">
+                LIVE WEB
+              </span>
+            </div>
+          </div>
+
+          {/* URL address bar */}
+          <div className="bg-neutral-950/80 border border-white/10 rounded-lg px-2.5 py-1 flex items-center space-x-2">
+            <span className="text-emerald-400 text-xs">🔒</span>
+            <span className="text-[11px] font-mono text-neutral-300 truncate">{url}</span>
+          </div>
+        </div>
+
+        {/* Viewport Content */}
+        <div
+          className={cn(
+            "relative bg-neutral-950 overflow-hidden flex flex-col items-center justify-start",
+            isSquare ? "h-[250px]" : "h-[220px]"
+          )}
+        >
+          {videoUrl ? (
+            <div className="w-full h-full overflow-hidden relative">
+              <video
+                src={videoUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover select-none"
+              />
+            </div>
+          ) : screenshotUrl ? (
+            <div className="w-full h-full overflow-hidden relative">
+              <img
+                src={screenshotUrl}
+                alt={tabTitle}
+                style={{
+                  transform: `translateY(-${scrollY}px)`,
+                  transition: "transform 0.1s linear",
+                }}
+                className="w-full min-h-full object-cover object-top select-none"
+              />
+
+              {/* Simulated active cursor browsing the live page */}
+              <div
+                className="absolute pointer-events-none transition-all duration-300 z-10"
+                style={{
+                  top: `${Math.min(76, 20 + scrollProgress * 52)}%`,
+                  left: `${Math.min(80, 24 + Math.sin(scrollProgress * Math.PI) * 38)}%`,
+                }}
+              >
+                <svg
+                  className="w-4 h-4 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] filter"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M3 3l7 18 3-7 7-3L3 3z" />
+                </svg>
+              </div>
+
+              {/* Subtle top/bottom viewport vignette */}
+              <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/15 via-transparent to-black/35" />
+            </div>
+          ) : (
+            <div className="w-full p-4 space-y-2.5">
+              <div className="h-4 bg-white/10 rounded w-3/4 animate-pulse" />
+              <div className="h-3 bg-white/5 rounded w-full" />
+              <div className="h-3 bg-white/5 rounded w-5/6" />
+              <div className="h-3 bg-white/5 rounded w-2/3" />
+            </div>
+          )}
+
+          {/* Floating Highlight Pill */}
+          {highlightText && (
+            <div className="absolute bottom-3 left-4 right-4 bg-neutral-900/95 backdrop-blur-md border border-purple-500/50 rounded-lg px-3 py-1.5 shadow-xl flex items-center space-x-2 z-20">
+              <span className="text-xs">👆</span>
+              <span className="text-xs font-mono font-bold text-purple-300 truncate">{highlightText}</span>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

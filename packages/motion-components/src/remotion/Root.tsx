@@ -13,6 +13,7 @@ import { BrowserWalkthrough } from './compositions/BrowserWalkthrough';
 import { VSCodeTyping } from './compositions/VSCodeTyping';
 import { KineticText } from './compositions/KineticText';
 import { CookedMotionCard } from './compositions/CookedMotionCard';
+import { AppScreenUpload } from './compositions/AppScreenUpload';
 
 // Remotion Root — all compositions registered here
 // Python calls: npx remotion render src/remotion/Root.tsx <ID> --props='{}' out.mov
@@ -66,6 +67,12 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="kinetic-text" component={KineticText} durationInFrames={150} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}
       defaultProps={{ text: 'THIS IS THE HOOK', personality: 'energetic' }} />
+    <Composition id="app-screen-upload" component={AppScreenUpload} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'VIDEO UPLOAD', appName: 'Video Studio Pro', fileName: 'upload_video.mp4', fileSize: '48.2 MB', fileType: 'MP4 Video', progress: 100, status: 'Upload Complete', personality: 'technical' }} />
+    <Composition id="app_screen_upload" component={AppScreenUpload} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'VIDEO UPLOAD', appName: 'Video Studio Pro', fileName: 'upload_video.mp4', fileSize: '48.2 MB', fileType: 'MP4 Video', progress: 100, status: 'Upload Complete', personality: 'technical' }} />
 
     {/* Cooked Motion Templates */}
     <Composition id="cooked-card" component={CookedMotionCard} durationInFrames={150} fps={FPS} width={W} height={H}

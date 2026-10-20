@@ -90,4 +90,112 @@ describe("GraphicCanvasRenderer Component", () => {
     expect(screen.getByText("ESSENTIAL INSIGHT")).toBeDefined();
     expect(screen.getByText("KEY TAKEAWAY")).toBeDefined();
   });
+
+  it("renders app-screen-upload with app title, filename, and progress bar", () => {
+    const mockGraphic: GraphicElement = {
+      id: "g-5",
+      name: "APP SCREEN UPLOAD",
+      compositionId: "app-screen-upload",
+      props: {
+        title: "VIDEO UPLOAD",
+        appName: "Video Studio App",
+        fileName: "production_reel.mp4",
+        progress: 100,
+        status: "Upload Complete",
+      },
+      start: 10.0,
+      end: 14.0,
+    };
+
+    // At playhead 13.5 (near end of clip), progress is complete
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={13.5} />);
+
+    expect(screen.getByText("VIDEO UPLOAD")).toBeDefined();
+    expect(screen.getByText("Video Studio App")).toBeDefined();
+    expect(screen.getByText("production_reel.mp4")).toBeDefined();
+    expect(screen.getByText("100%")).toBeDefined();
+    expect(screen.getByText("Upload Complete")).toBeDefined();
+    expect(screen.getByText("READY")).toBeDefined();
+  });
+
+  it("renders browser-walkthrough with url bar, tab title, and highlight pill", () => {
+    const mockGraphic: GraphicElement = {
+      id: "g-6",
+      name: "BROWSER WALKTHROUGH",
+      compositionId: "browser-walkthrough",
+      props: {
+        url: "https://github.com/facebook/react",
+        tabTitle: "facebook/react",
+        highlightText: "Key Documentation Evidence",
+        screenshotUrl: "/api/v1/editor/captures/capture_123.png",
+      },
+      start: 5.0,
+      end: 9.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={6.0} />);
+
+    expect(screen.getByText("facebook/react")).toBeDefined();
+    expect(screen.getByText("https://github.com/facebook/react")).toBeDefined();
+    expect(screen.getByText("LIVE WEB")).toBeDefined();
+    expect(screen.getByText("Key Documentation Evidence")).toBeDefined();
+
+    const img = screen.getByAltText("facebook/react") as HTMLImageElement;
+    expect(img).toBeDefined();
+    expect(img.src).toContain("/api/v1/editor/captures/capture_123.png");
+  });
+
+  it("renders browser-walkthrough in 9:16 mobile phone format with status bar and dynamic island", () => {
+    const mockGraphic: GraphicElement = {
+      id: "g-mobile",
+      name: "BROWSER WALKTHROUGH MOBILE",
+      compositionId: "browser-walkthrough",
+      props: {
+        url: "https://techcrunch.com",
+        tabTitle: "techcrunch.com",
+        format: "9:16",
+        highlightText: "Breaking Tech News",
+        screenshotUrl: "/api/v1/editor/captures/capture_techcrunch.png",
+      },
+      start: 0.0,
+      end: 6.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={1.5} />);
+
+    // Mobile status bar elements
+    expect(screen.getByText("9:41")).toBeDefined();
+    expect(screen.getByText("LIVE WEB")).toBeDefined();
+    expect(screen.getByText("https://techcrunch.com")).toBeDefined();
+    expect(screen.getByText("Breaking Tech News")).toBeDefined();
+
+    const img = screen.getByAltText("techcrunch.com") as HTMLImageElement;
+    expect(img).toBeDefined();
+    expect(img.src).toContain("/api/v1/editor/captures/capture_techcrunch.png");
+  });
+
+  it("renders browser-walkthrough in 1:1 square format", () => {
+    const mockGraphic: GraphicElement = {
+      id: "g-square",
+      name: "BROWSER WALKTHROUGH SQUARE",
+      compositionId: "browser-walkthrough",
+      props: {
+        url: "https://news.ycombinator.com",
+        tabTitle: "Hacker News",
+        format: "1:1",
+        highlightText: "Top Post",
+        screenshotUrl: "/api/v1/editor/captures/capture_hn.png",
+      },
+      start: 2.0,
+      end: 7.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={3.0} />);
+
+    expect(screen.getByText("Hacker News")).toBeDefined();
+    expect(screen.getByText("https://news.ycombinator.com")).toBeDefined();
+    expect(screen.getByText("Top Post")).toBeDefined();
+    expect(screen.getByText("LIVE WEB")).toBeDefined();
+  });
 });
+

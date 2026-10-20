@@ -247,6 +247,279 @@ describe("Phase 3: Staged Edit Proposal & Approval Drawer", () => {
       expect(handleRejectSingle).toHaveBeenCalledWith("edit-2");
       expect(screen.getByText("Skipped")).toBeInTheDocument();
     });
+
+    describe("Phase 5: Interactive Parameter Customizer", () => {
+      it("expands and collapses the parameter customizer on clicking Customize / Hide Controls", () => {
+        render(
+          <StagedEditReviewDrawer
+            isOpen={true}
+            onClose={vi.fn()}
+            proposal={sampleProposal}
+            onApplySelected={vi.fn()}
+          />
+        );
+
+        expect(screen.queryByTestId("customizer-panel-edit-1")).toBeNull();
+
+        const customizeBtn = screen.getByTestId("customize-edit-btn-edit-1");
+        expect(customizeBtn).toHaveTextContent("Customize");
+
+        // Expand
+        fireEvent.click(customizeBtn);
+        expect(screen.getByTestId("customizer-panel-edit-1")).toBeInTheDocument();
+        expect(customizeBtn).toHaveTextContent("Hide Controls");
+
+        // Collapse
+        fireEvent.click(customizeBtn);
+        expect(screen.queryByTestId("customizer-panel-edit-1")).toBeNull();
+        expect(customizeBtn).toHaveTextContent("Customize");
+      });
+
+      it("allows adjusting timing range (start/end) and propagates timestamps on accept", () => {
+        const handleApplySingle = vi.fn();
+        render(
+          <StagedEditReviewDrawer
+            isOpen={true}
+            onClose={vi.fn()}
+            proposal={sampleProposal}
+            onApplySelected={vi.fn()}
+            onApplySingle={handleApplySingle}
+          />
+        );
+
+        fireEvent.click(screen.getByTestId("customize-edit-btn-edit-1"));
+
+        const startInput = screen.getByTestId("timing-start-input-edit-1");
+        const endInput = screen.getByTestId("timing-end-input-edit-1");
+
+        // Modify start to 3.0 and end to 7.5
+        fireEvent.change(startInput, { target: { value: "3.0" } });
+        fireEvent.change(endInput, { target: { value: "7.5" } });
+
+        // Check updated display text in the card
+        expect(screen.getByText(/3.0s – 7.5s \(4.5s\)/)).toBeInTheDocument();
+
+        // Accept single
+        const edit1Card = screen.getByTestId("proposed-edit-card-edit-1");
+        const acceptBtn = edit1Card.querySelector("button:has(svg.lucide-check)")!;
+        fireEvent.click(acceptBtn);
+
+        expect(handleApplySingle).toHaveBeenCalledTimes(1);
+        const applied = handleApplySingle.mock.calls[0][0];
+        expect(applied.start).toBe(3.0);
+        expect(applied.end).toBe(7.5);
+        expect(applied.operation.element.start).toBe(3.0);
+        expect(applied.operation.element.end).toBe(7.5);
+      });
+
+      it("switches template between Stock B-Roll and App Screen Upload", () => {
+        const handleApplySingle = vi.fn();
+        render(
+          <StagedEditReviewDrawer
+            isOpen={true}
+            onClose={vi.fn()}
+            proposal={sampleProposal}
+            onApplySelected={vi.fn()}
+            onApplySingle={handleApplySingle}
+          />
+        );
+
+        // edit-1 is initially a B-Roll edit
+        fireEvent.click(screen.getByTestId("customize-edit-btn-edit-1"));
+        expect(screen.getByTestId("customizer-panel-edit-1")).toBeInTheDocument();
+
+        // Click App Upload template button
+        const appUploadBtn = screen.getByTestId("template-btn-app-upload-edit-1");
+        fireEvent.click(appUploadBtn);
+
+        // Prop editor for App Screen Upload should now appear
+        expect(screen.getByTestId("prop-app-name-edit-1")).toBeInTheDocument();
+        expect(screen.getByTestId("prop-file-name-edit-1")).toBeInTheDocument();
+
+        // Accept and verify applied item structure
+        const edit1Card = screen.getByTestId("proposed-edit-card-edit-1");
+        const acceptBtn = edit1Card.querySelector("button:has(svg.lucide-check)")!;
+        fireEvent.click(acceptBtn);
+
+        expect(handleApplySingle).toHaveBeenCalledTimes(1);
+        const applied = handleApplySingle.mock.calls[0][0];
+        expect(applied.action_type).toBe("graphic");
+        expect(applied.track).toBe("graphic");
+        expect(applied.operation.element.compositionId).toBe("app-screen-upload");
+        expect(applied.operation.element.props.appName).toBe("Video Studio App");
+      });
+
+      it("allows inline prop editing of App Screen Upload and dispatches custom values", () => {
+        const handleApplySingle = vi.fn();
+        const appUploadProposal: EditPlanProposal = {
+          ...sampleProposal,
+          edits: [
+            {
+              id: "edit-app-1",
+              action_type: "graphic",
+              title: "App Screen Upload",
+              track: "graphic",
+              start: 1.0,
+              end: 5.0,
+              description: "Shows user uploading file",
+              operation: {
+                type: "add_element",
+                track: "graphic",
+                element: {
+                  id: "elem-app-1",
+                  name: "App Screen Upload",
+                  compositionId: "app-screen-upload",
+                  props: {
+                    appName: "Default App",
+                    fileName: "test.mp4",
+                    progress: 50,
+                    status: "Uploading...",
+                  },
+                  start: 1.0,
+                  end: 5.0,
+                },
+              },
+            },
+          ],
+        };
+
+        render(
+          <StagedEditReviewDrawer
+            isOpen={true}
+            onClose={vi.fn()}
+            proposal={appUploadProposal}
+            onApplySelected={vi.fn()}
+            onApplySingle={handleApplySingle}
+          />
+        );
+
+        fireEvent.click(screen.getByTestId("customize-edit-btn-edit-app-1"));
+
+        // Edit appName
+        const appNameInput = screen.getByTestId("prop-app-name-edit-app-1");
+        fireEvent.change(appNameInput, { target: { value: "Super Studio Pro" } });
+
+        // Edit fileName
+        const fileNameInput = screen.getByTestId("prop-file-name-edit-app-1");
+        fireEvent.change(fileNameInput, { target: { value: "final_presentation.mov" } });
+
+        // Edit progress
+        const progressSlider = screen.getByTestId("prop-progress-slider-edit-app-1");
+        fireEvent.change(progressSlider, { target: { value: "95" } });
+
+        // Edit status
+        const statusInput = screen.getByTestId("prop-status-edit-app-1");
+        fireEvent.change(statusInput, { target: { value: "Almost Ready!" } });
+
+        // Accept
+        const card = screen.getByTestId("proposed-edit-card-edit-app-1");
+        const acceptBtn = card.querySelector("button:has(svg.lucide-check)")!;
+        fireEvent.click(acceptBtn);
+
+        expect(handleApplySingle).toHaveBeenCalledTimes(1);
+        const applied = handleApplySingle.mock.calls[0][0];
+        expect(applied.operation.element.props.appName).toBe("Super Studio Pro");
+        expect(applied.operation.element.props.fileName).toBe("final_presentation.mov");
+        expect(applied.operation.element.props.progress).toBe(95);
+        expect(applied.operation.element.props.status).toBe("Almost Ready!");
+      });
+
+      it("switches to Web Capture and edits web evidence parameters", () => {
+        const handleApplySingle = vi.fn();
+        render(
+          <StagedEditReviewDrawer
+            isOpen={true}
+            onClose={vi.fn()}
+            proposal={sampleProposal}
+            onApplySelected={vi.fn()}
+            onApplySingle={handleApplySingle}
+          />
+        );
+
+        fireEvent.click(screen.getByTestId("customize-edit-btn-edit-1"));
+
+        // Switch to Web Capture
+        fireEvent.click(screen.getByTestId("template-btn-browser-edit-1"));
+
+        // Edit web inputs
+        const urlInput = screen.getByTestId("prop-web-url-edit-1");
+        fireEvent.change(urlInput, { target: { value: "https://github.com/trending" } });
+
+        const tabInput = screen.getByTestId("prop-web-tab-edit-1");
+        fireEvent.change(tabInput, { target: { value: "GitHub Trending" } });
+
+        const highlightInput = screen.getByTestId("prop-web-highlight-edit-1");
+        fireEvent.change(highlightInput, { target: { value: "Top Repository" } });
+
+        // Select Phone (9:16) format
+        const phoneFormatBtn = screen.getByTestId("prop-web-format-9-16-edit-1");
+        fireEvent.click(phoneFormatBtn);
+
+        // Accept
+        const card = screen.getByTestId("proposed-edit-card-edit-1");
+        const acceptBtn = card.querySelector("button:has(svg.lucide-check)")!;
+        fireEvent.click(acceptBtn);
+
+        expect(handleApplySingle).toHaveBeenCalledTimes(1);
+        const applied = handleApplySingle.mock.calls[0][0];
+        expect(applied.operation.element.compositionId).toBe("browser-walkthrough");
+        expect(applied.operation.element.props.url).toBe("https://github.com/trending");
+        expect(applied.operation.element.props.tabTitle).toBe("GitHub Trending");
+        expect(applied.operation.element.props.highlightText).toBe("Top Repository");
+        expect(applied.operation.element.props.format).toBe("9:16");
+        expect(applied.operation.element.props.aspectRatio).toBe("9:16");
+      });
+
+      it("preserves customized parameters across batch Apply Selected", () => {
+        const handleApplySelected = vi.fn();
+        render(
+          <StagedEditReviewDrawer
+            isOpen={true}
+            onClose={vi.fn()}
+            proposal={sampleProposal}
+            onApplySelected={handleApplySelected}
+          />
+        );
+
+        // Customize edit-1: change start to 3.5, switch to app-screen-upload
+        fireEvent.click(screen.getByTestId("customize-edit-btn-edit-1"));
+        fireEvent.change(screen.getByTestId("timing-start-input-edit-1"), {
+          target: { value: "3.5" },
+        });
+        fireEvent.click(screen.getByTestId("template-btn-app-upload-edit-1"));
+        fireEvent.change(screen.getByTestId("prop-app-name-edit-1"), {
+          target: { value: "Batch App" },
+        });
+
+        // Customize edit-2: change end to 8.0
+        fireEvent.click(screen.getByTestId("customize-edit-btn-edit-2"));
+        fireEvent.change(screen.getByTestId("timing-end-input-edit-2"), {
+          target: { value: "8.0" },
+        });
+
+        // Deselect edit-3 so only edit-1 and edit-2 are applied
+        const edit3Card = screen.getByTestId("proposed-edit-card-edit-3");
+        fireEvent.click(edit3Card.querySelector("button[title='Deselect edit']")!);
+
+        // Click Apply Selected (2)
+        fireEvent.click(screen.getByText("Apply Selected (2)"));
+
+        expect(handleApplySelected).toHaveBeenCalledTimes(1);
+        const appliedBatch: ProposedEditItem[] = handleApplySelected.mock.calls[0][0];
+        expect(appliedBatch).toHaveLength(2);
+
+        // Verify edit-1 customized values
+        const batchEdit1 = appliedBatch.find((e) => e.id === "edit-1")!;
+        expect(batchEdit1.start).toBe(3.5);
+        expect(batchEdit1.operation.element.compositionId).toBe("app-screen-upload");
+        expect(batchEdit1.operation.element.props.appName).toBe("Batch App");
+
+        // Verify edit-2 customized values
+        const batchEdit2 = appliedBatch.find((e) => e.id === "edit-2")!;
+        expect(batchEdit2.end).toBe(8.0);
+        expect(batchEdit2.operation.element.end).toBe(8.0);
+      });
+    });
   });
 
   describe("ChatAssistantDrawer Multi-Edit & Review Integration", () => {
@@ -353,6 +626,49 @@ describe("Phase 3: Staged Edit Proposal & Approval Drawer", () => {
       expect(brollClips[0].name).toBe("City Drone Shot");
 
       expect(screen.getByText("Applied to Timeline")).toBeInTheDocument();
+
+      global.fetch = originalFetch;
+    });
+
+    it("renders suggested_actions quick-action chips on conversational fallback and allows user selection", async () => {
+      window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
+      const fallbackProposal: EditPlanProposal = {
+        id: "prop-fallback-1",
+        user_prompt: "can you make this look much more aesthetic and vibrant",
+        summary: "Could not determine exact edit type for 'can you make this look much more aesthetic and vibrant'. Please select a visual action below.",
+        scope: "time_range",
+        total_duration_seconds: 60.0,
+        edits: [],
+        suggested_actions: ["Add stock video footage", "Add animated motion card", "Add subtitle caption"],
+      };
+
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => fallbackProposal,
+      } as any);
+
+      render(<ChatAssistantDrawer isOpen={true} onClose={vi.fn()} />);
+
+      const input = screen.getByPlaceholderText("Type an editing command...");
+      fireEvent.change(input, {
+        target: { value: "can you make this look much more aesthetic and vibrant" },
+      });
+      const form = input.closest("form")!;
+      fireEvent.submit(form);
+
+      const actionGroup = await screen.findByTestId("copilot-suggested-actions");
+      expect(actionGroup).toBeInTheDocument();
+      expect(screen.getByText("Add stock video footage")).toBeInTheDocument();
+      expect(screen.getByText("Add animated motion card")).toBeInTheDocument();
+      expect(screen.getByText("Add subtitle caption")).toBeInTheDocument();
+
+      // Click one of the suggested action chips
+      fireEvent.click(screen.getByText("Add stock video footage"));
+
+      // Verify fetch was dispatched again with the clicked action
+      expect(global.fetch).toHaveBeenCalledTimes(2);
 
       global.fetch = originalFetch;
     });

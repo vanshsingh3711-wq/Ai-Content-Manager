@@ -459,6 +459,28 @@ export function ChatAssistantDrawer({ isOpen, onClose }: ChatAssistantDrawerProp
                 </div>
               )}
 
+              {/* Conversational Quick-Action Buttons (e.g. from Fallback or Alternatives) */}
+              {msg.proposal?.suggested_actions && msg.proposal.suggested_actions.length > 0 && !msg.isApplied && !msg.isRejected && (
+                <div data-testid="copilot-suggested-actions" className="mt-2.5 pt-2 border-t border-neutral-800/80 space-y-1.5">
+                  <div className="flex items-center gap-1 text-[10px] text-neutral-400 font-medium">
+                    <Sparkles className="w-3 h-3 text-yellow-400" />
+                    <span>Suggested actions:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {msg.proposal.suggested_actions.map((action, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSubmit(action)}
+                        className="px-2.5 py-1 rounded-full bg-neutral-900 hover:bg-neutral-800 text-yellow-400 hover:text-yellow-300 text-[11px] font-medium border border-neutral-800 hover:border-yellow-400/40 transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                      >
+                        <Wand2 className="w-3 h-3 text-yellow-400" />
+                        <span>{action}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {msg.operation && !msg.proposal && (
                 <div className="mt-2.5 pt-2 border-t border-neutral-800/80 flex items-center justify-between">
                   <span className="text-[10px] text-neutral-500">Atomic inverse logged</span>

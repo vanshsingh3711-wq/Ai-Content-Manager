@@ -47,6 +47,8 @@ ALLOWED_COMPOSITIONS = {
     "browser_walkthrough",
     "vscode_code_typing",
     "kinetic_text",
+    "app_screen_upload",
+    "app-screen-upload",
     # Cooked Motion Templates
     "cooked_card",
     "cooked_likes",

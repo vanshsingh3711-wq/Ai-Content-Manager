@@ -25,4 +25,5 @@ export interface EditPlanProposal {
   edits: ProposedEditItem[];
   created_at: string;
   total_duration_seconds: number;
+  suggested_actions?: string[];
 }
