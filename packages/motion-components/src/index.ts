@@ -50,3 +50,13 @@ export * from './ui/MotionKit';
 export * from './devices/WebBrowserFrame';
 export * from './devices/VSCodeFrame';
 export * from './animations/Screencast';
+
+// Explainer & Educational Motion Graphics
+export * from './remotion/compositions/VennDiagram';
+export * from './remotion/compositions/FunnelAnalysis';
+export * from './remotion/compositions/HorizontalProcessFlow';
+export * from './remotion/compositions/FeatureCalloutPointer';
+export * from './remotion/compositions/QuadrantMatrix';
+export * from './remotion/compositions/SpectrumContinuum';
+export * from './remotion/compositions/IcebergModel';
+export * from './remotion/compositions/ProsConsComparison';

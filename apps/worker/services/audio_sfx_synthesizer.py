@@ -149,6 +149,17 @@ ALIAS_MAP = {
     "clink": "tick",
     "riser": "whoosh-in",
     "sweep": "whoosh-in",
+    "sweet_spot": "ding",
+    "ikigai": "ding",
+    "funnel": "whoosh-in",
+    "blueprint": "tick",
+    "reticle": "tick",
+    "matrix": "impact",
+    "quadrant": "impact",
+    "continuum": "whoosh-in",
+    "iceberg": "impact",
+    "underwater": "impact",
+    "tradeoffs": "ding",
 }
 
 # Template defaults when no specific sound_effect keyword is given
@@ -193,6 +204,23 @@ TEMPLATE_SFX_MAP = {
     "wealth-flywheel": "whoosh-in",
     "battle_chart": "impact",
     "battle-chart": "impact",
+    # 8 Explainer & Educational Motion Graphics
+    "venn_diagram": "ding",
+    "venn-diagram": "ding",
+    "funnel_analysis": "whoosh-in",
+    "funnel-analysis": "whoosh-in",
+    "horizontal_process_flow": "tick",
+    "horizontal-process-flow": "tick",
+    "feature_callout_pointer": "tick",
+    "feature-callout-pointer": "tick",
+    "quadrant_matrix": "impact",
+    "quadrant-matrix": "impact",
+    "spectrum_continuum": "whoosh-in",
+    "spectrum-continuum": "whoosh-in",
+    "iceberg_model": "impact",
+    "iceberg-model": "impact",
+    "pros_cons_comparison": "ding",
+    "pros-cons-comparison": "ding",
 }
 
 

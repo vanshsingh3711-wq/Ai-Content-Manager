@@ -41,6 +41,14 @@ import { BudgetWaterfall } from './compositions/BudgetWaterfall';
 import { DebtPayoffTracker } from './compositions/DebtPayoffTracker';
 import { ROIBalanceScale } from './compositions/ROIBalanceScale';
 import { WealthFlywheel } from './compositions/WealthFlywheel';
+import { VennDiagram } from './compositions/VennDiagram';
+import { FunnelAnalysis } from './compositions/FunnelAnalysis';
+import { HorizontalProcessFlow } from './compositions/HorizontalProcessFlow';
+import { FeatureCalloutPointer } from './compositions/FeatureCalloutPointer';
+import { QuadrantMatrix } from './compositions/QuadrantMatrix';
+import { SpectrumContinuum } from './compositions/SpectrumContinuum';
+import { IcebergModel } from './compositions/IcebergModel';
+import { ProsConsComparison } from './compositions/ProsConsComparison';
 
 // Remotion Root — all compositions registered here
 // Python calls: npx remotion render src/remotion/Root.tsx <ID> --props='{}' out.mov
@@ -122,6 +130,32 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="wealth-flywheel" component={WealthFlywheel as any} durationInFrames={150} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}
       defaultProps={{ mode: 'wealth', title: 'THE EXPONENTIAL WEALTH FLYWHEEL' }} />
+    {/* Universal Explainer & Educational Motion Graphics Pack */}
+    <Composition id="venn-diagram" component={VennDiagram as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'THE SWEET SPOT', subtitle: 'WHERE PASSION MEETS PROFIT & MASTERY', centerLabel: 'IKIGAI' }} />
+    <Composition id="funnel-analysis" component={FunnelAnalysis as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'CONVERSION DROP-OFF', subtitle: 'HIGH-TICKET CLIENT PIPELINE' }} />
+    <Composition id="horizontal-process-flow" component={HorizontalProcessFlow as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'HOW IT WORKS: 4-STEP BLUEPRINT', subtitle: 'FROM ZERO TO SCALED AUTOMATION', activeStep: 3 }} />
+    <Composition id="feature-callout-pointer" component={FeatureCalloutPointer as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ headline: 'RETINAL HUD DISPLAY', category: 'HARDWARE ARCHITECTURE' }} />
+    <Composition id="quadrant-matrix" component={QuadrantMatrix as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'EISENHOWER DECISION MATRIX', subtitle: 'URGENCY VS IMPORTANCE FRAMEWORK', activeQuadrant: 2 }} />
+    <Composition id="spectrum-continuum" component={SpectrumContinuum as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'THE ARCHITECTURE SPECTRUM', subtitle: 'FINDING THE PRAGMATIC ENGINEERING BALANCE', currentValue: 68 }} />
+    <Composition id="iceberg-model" component={IcebergModel as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'THE ICEBERG ILLUSION', subtitle: 'WHAT SUCCESS ACTUALLY DEMANDS' }} />
+    <Composition id="pros-cons-comparison" component={ProsConsComparison as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'FRAMEWORK DUEL: NEXT.JS VS VITE', subtitle: 'MAKING THE PRODUCTION ARCHITECTURE DECISION' }} />
+
     {/* Universal Educational & Cognitive Motion Graphics Pack */}
     <Composition id="spotlight-cone" component={SpotlightCone as any} durationInFrames={75} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}

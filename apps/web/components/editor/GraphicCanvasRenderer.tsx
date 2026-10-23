@@ -3093,6 +3093,492 @@ export function GraphicCanvasRenderer({ graphic, playheadTime }: GraphicCanvasRe
     );
   }
 
+  // =========================================================================
+  // EXPLAINER & EDUCATIONAL MOTION GRAPHICS PACK (PHASE 2 WYSIWYG RENDERERS)
+  // =========================================================================
+
+  // 1. 3-WAY VENN DIAGRAM (THE SWEET SPOT / IKIGAI)
+  if (compKey === "venn-diagram" || compKey === "venn_diagram") {
+    const title = props.title || "THE SWEET SPOT";
+    const subtitle = props.subtitle || "WHERE PASSION MEETS PROFIT & MASTERY";
+    const circle1Label = props.circle1Label || "PASSION";
+    const circle2Label = props.circle2Label || "MASTERY";
+    const circle3Label = props.circle3Label || "MARKET";
+    const centerLabel = props.centerLabel || "IKIGAI";
+
+    return (
+      <div
+        data-testid="graphic-venn-diagram"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-sky-500/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-3 text-center">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            SYNTHESIS ARCHITECTURE
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+          <p className="text-[9px] text-neutral-400 truncate">{subtitle}</p>
+        </div>
+
+        <div className="relative h-32 w-full flex items-center justify-center">
+          <svg className="w-full h-full overflow-visible" viewBox="0 0 240 120">
+            {/* Top Circle - Passion (Cyan) */}
+            <circle cx="120" cy="45" r="38" fill="#0284C7" fillOpacity="0.25" stroke="#38BDF8" strokeWidth="1.5" strokeDasharray="3 2" />
+            {/* Left Circle - Mastery (Purple) */}
+            <circle cx="95" cy="78" r="38" fill="#7C3AED" fillOpacity="0.25" stroke="#C084FC" strokeWidth="1.5" strokeDasharray="3 2" />
+            {/* Right Circle - Market (Emerald) */}
+            <circle cx="145" cy="78" r="38" fill="#059669" fillOpacity="0.25" stroke="#34D399" strokeWidth="1.5" strokeDasharray="3 2" />
+            {/* Center Sweet Spot Glow */}
+            <circle cx="120" cy="68" r="16" fill="#F59E0B" fillOpacity="0.4" stroke="#FBBF24" strokeWidth="2" />
+            <text x="120" y="72" textAnchor="middle" fill="#FFFFFF" fontSize="8" fontWeight="900" letterSpacing="0.5">
+              {centerLabel}
+            </text>
+            {/* Circle Labels */}
+            <text x="120" y="24" textAnchor="middle" fill="#38BDF8" fontSize="8" fontWeight="800">
+              {circle1Label}
+            </text>
+            <text x="60" y="98" textAnchor="middle" fill="#C084FC" fontSize="8" fontWeight="800">
+              {circle2Label}
+            </text>
+            <text x="180" y="98" textAnchor="middle" fill="#34D399" fontSize="8" fontWeight="800">
+              {circle3Label}
+            </text>
+          </svg>
+        </div>
+
+        <div className="mt-2 text-center bg-amber-500/15 border border-amber-500/35 py-1 rounded-lg text-amber-300 font-mono font-bold text-[10px]">
+          ★ {centerLabel}: THE UNFAIR ADVANTAGE ★
+        </div>
+      </div>
+    );
+  }
+
+  // 2. CONVERSION & DROP-OFF FUNNEL
+  if (compKey === "funnel-analysis" || compKey === "funnel_analysis") {
+    const title = props.title || "CONVERSION DROP-OFF";
+    const subtitle = props.subtitle || "HIGH-TICKET CLIENT PIPELINE";
+    const dropoffNote = props.dropoffNote || "99.9% ELIMINATED AT TOP OF FUNNEL";
+    const stages = props.stages || [
+      { name: "Impressions", count: "1,000,000", pct: "100%", color: "#38BDF8" },
+      { name: "Visitors", count: "125,000", pct: "12.5%", color: "#818CF8" },
+      { name: "Booked Calls", count: "8,400", pct: "0.84%", color: "#C084FC" },
+      { name: "Revenue Yield", count: "940", pct: "$2.8M", color: "#10B981" },
+    ];
+
+    return (
+      <div
+        data-testid="graphic-funnel-analysis"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-sky-500/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-3 text-center">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            PIPELINE ATTRITION
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+          <p className="text-[9px] text-neutral-400 truncate">{subtitle}</p>
+        </div>
+
+        <div className="space-y-1.5 flex flex-col items-center">
+          {stages.map((stg: any, i: number) => {
+            const widthPct = 100 - i * 18;
+            return (
+              <div
+                key={i}
+                className="rounded-lg p-1.5 flex items-center justify-between text-[10px] border border-neutral-800 transition-all"
+                style={{
+                  width: `${widthPct}%`,
+                  background: `linear-gradient(135deg, ${stg.color || "#38BDF8"}25 0%, rgba(15,15,22,0.95) 100%)`,
+                  borderColor: `${stg.color || "#38BDF8"}50`,
+                }}
+              >
+                <span className="font-bold text-white truncate max-w-[100px]">{stg.name}</span>
+                <div className="flex items-center gap-1 font-mono font-black">
+                  <span>{stg.count}</span>
+                  <span
+                    className="px-1 py-0.2 rounded text-[8px]"
+                    style={{ backgroundColor: `${stg.color || "#38BDF8"}30`, color: stg.color || "#38BDF8" }}
+                  >
+                    {stg.pct}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-2.5 text-center bg-rose-500/15 border border-rose-500/35 py-1 rounded-lg text-rose-300 font-mono font-bold text-[9px]">
+          {dropoffNote}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. HORIZONTAL PROCESS FLOW / PIPELINE
+  if (compKey === "horizontal-process-flow" || compKey === "horizontal_process_flow") {
+    const title = props.title || "HOW IT WORKS: 4-STEP BLUEPRINT";
+    const subtitle = props.subtitle || "FROM ZERO TO SCALED AUTOMATION";
+    const activeStep = typeof props.activeStep === "number" ? props.activeStep : 3;
+    const steps = props.steps || [
+      { num: 1, title: "Audit", desc: "Identify bottlenecks" },
+      { num: 2, title: "Architect", desc: "Build AI pipelines" },
+      { num: 3, title: "Deploy", desc: "Go live in 24 hours" },
+      { num: 4, title: "Scale", desc: "10x capacity" },
+    ];
+
+    return (
+      <div
+        data-testid="graphic-horizontal-process-flow"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-sky-500/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-2 text-center">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            EXECUTION PIPELINE
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+          <p className="text-[9px] text-neutral-400 truncate">{subtitle}</p>
+        </div>
+
+        <div className="space-y-1.5 relative">
+          {steps.map((st: any, i: number) => {
+            const isActive = st.num === activeStep;
+            const isDone = st.num < activeStep;
+            return (
+              <div
+                key={i}
+                className={cn(
+                  "p-2 rounded-xl flex items-center justify-between border transition-all text-[10px]",
+                  isActive
+                    ? "bg-sky-500/20 border-sky-400/60 shadow-[0_0_15px_rgba(56,189,248,0.25)]"
+                    : isDone
+                    ? "bg-emerald-500/10 border-emerald-500/30"
+                    : "bg-neutral-900/60 border-neutral-800"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black",
+                      isActive
+                        ? "bg-sky-500 text-white"
+                        : isDone
+                        ? "bg-emerald-500/30 text-emerald-400"
+                        : "bg-neutral-800 text-neutral-400"
+                    )}
+                  >
+                    {isDone ? "✓" : st.num}
+                  </div>
+                  <div>
+                    <div className="font-bold text-white leading-tight">{st.title}</div>
+                    <div className="text-[8px] text-neutral-400">{st.desc}</div>
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    "text-[8px] font-mono font-bold uppercase",
+                    isActive ? "text-sky-400" : isDone ? "text-emerald-400" : "text-neutral-500"
+                  )}
+                >
+                  {isActive ? "ACTIVE" : isDone ? "DONE" : "NEXT"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // 4. FEATURE CALLOUT POINTER (HUD LEADER LINE)
+  if (compKey === "feature-callout-pointer" || compKey === "feature_callout_pointer") {
+    const headline = props.headline || "RETINAL HUD DISPLAY";
+    const category = props.category || "HARDWARE BREAKDOWN";
+    const detailText = props.detailText || "Micro-OLED 4K waveguides with real-time 120Hz spatial eye tracking.";
+    const specTag = props.specTag || "LATENCY < 12ms";
+
+    return (
+      <div
+        data-testid="graphic-feature-callout-pointer"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-cyan-500/40 shadow-[0_0_30px_rgba(34,211,238,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-[9px] font-mono font-bold text-cyan-400 uppercase tracking-widest">
+              {category}
+            </span>
+          </div>
+          <span className="text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.5 rounded">
+            {specTag}
+          </span>
+        </div>
+
+        <div className="flex items-start gap-2.5 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center text-cyan-300 text-xs font-bold shrink-0">
+            ◎
+          </div>
+          <div>
+            <h4 className="font-black text-xs text-white leading-tight">{headline}</h4>
+            <p className="text-[9px] text-neutral-300 mt-1 leading-snug">{detailText}</p>
+          </div>
+        </div>
+
+        <div className="text-[8px] font-mono text-neutral-400 border-t border-neutral-800/80 pt-1.5 flex justify-between">
+          <span>TARGET: [540, 720] LOCKED</span>
+          <span>STATUS: ONLINE</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. 2x2 DECISION MATRIX (EISENHOWER / STRATEGIC QUADRANT)
+  if (compKey === "quadrant-matrix" || compKey === "quadrant_matrix") {
+    const title = props.title || "EISENHOWER DECISION MATRIX";
+    const subtitle = props.subtitle || "URGENCY VS IMPORTANCE FRAMEWORK";
+    const q1Title = props.q1Title || "DO FIRST";
+    const q2Title = props.q2Title || "SCHEDULE";
+    const q3Title = props.q3Title || "DELEGATE";
+    const q4Title = props.q4Title || "ELIMINATE";
+    const activeQuadrant = typeof props.activeQuadrant === "number" ? props.activeQuadrant : 2;
+
+    return (
+      <div
+        data-testid="graphic-quadrant-matrix"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-sky-500/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-2 text-center">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            2×2 DECISION MATRIX
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+          <p className="text-[9px] text-neutral-400 truncate">{subtitle}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5 text-[9px] font-bold">
+          {/* Q1: Do First */}
+          <div
+            className={cn(
+              "p-2 rounded-xl border transition-all",
+              activeQuadrant === 1
+                ? "bg-rose-500/25 border-rose-500 text-rose-300 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                : "bg-neutral-900 border-neutral-800 text-neutral-300"
+            )}
+          >
+            <div className="text-[8px] text-neutral-400">URGENT & IMPORTANT</div>
+            <div className="font-black text-[11px] text-white mt-0.5">{q1Title}</div>
+          </div>
+
+          {/* Q2: Schedule (Target) */}
+          <div
+            className={cn(
+              "p-2 rounded-xl border transition-all",
+              activeQuadrant === 2
+                ? "bg-sky-500/25 border-sky-400 text-sky-300 shadow-[0_0_15px_rgba(56,189,248,0.3)]"
+                : "bg-neutral-900 border-neutral-800 text-neutral-300"
+            )}
+          >
+            <div className="text-[8px] text-sky-300">★ HIGH VALUE</div>
+            <div className="font-black text-[11px] text-white mt-0.5">{q2Title}</div>
+          </div>
+
+          {/* Q3: Delegate */}
+          <div
+            className={cn(
+              "p-2 rounded-xl border transition-all",
+              activeQuadrant === 3
+                ? "bg-amber-500/25 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                : "bg-neutral-900 border-neutral-800 text-neutral-300"
+            )}
+          >
+            <div className="text-[8px] text-neutral-400">URGENT BUSYWORK</div>
+            <div className="font-black text-[11px] text-white mt-0.5">{q3Title}</div>
+          </div>
+
+          {/* Q4: Eliminate */}
+          <div
+            className={cn(
+              "p-2 rounded-xl border transition-all",
+              activeQuadrant === 4
+                ? "bg-neutral-800 border-neutral-600 text-neutral-200"
+                : "bg-neutral-900 border-neutral-800 text-neutral-400"
+            )}
+          >
+            <div className="text-[8px] text-neutral-500">TIME WASTERS</div>
+            <div className="font-black text-[11px] text-neutral-300 mt-0.5">{q4Title}</div>
+          </div>
+        </div>
+
+        <div className="mt-2 text-center bg-sky-500/15 border border-sky-500/35 py-1 rounded-lg text-sky-300 font-mono font-bold text-[9px]">
+          🎯 OPTIMIZE 70%+ ENERGY IN QUADRANT 2
+        </div>
+      </div>
+    );
+  }
+
+  // 6. CONTINUOUS SPECTRUM & NUANCE SLIDER
+  if (compKey === "spectrum-continuum" || compKey === "spectrum_continuum") {
+    const title = props.title || "THE ARCHITECTURE SPECTRUM";
+    const subtitle = props.subtitle || "FINDING THE PRAGMATIC ENGINEERING BALANCE";
+    const leftLabel = props.leftLabel || "100% MONOLITH";
+    const rightLabel = props.rightLabel || "100% MICROSERVICES";
+    const currentValue = typeof props.currentValue === "number" ? props.currentValue : 68;
+    const markerTitle = props.markerTitle || "MODULAR MONOLITH";
+
+    return (
+      <div
+        data-testid="graphic-spectrum-continuum"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-sky-500/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-3 text-center">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            CONTINUOUS SPECTRUM
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+          <p className="text-[9px] text-neutral-400 truncate">{subtitle}</p>
+        </div>
+
+        <div className="flex justify-between text-[8px] font-bold text-neutral-400 mb-1 font-mono">
+          <span>{leftLabel}</span>
+          <span>{rightLabel}</span>
+        </div>
+
+        {/* Gradient Spectrum Track */}
+        <div className="relative h-3 w-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500 my-2">
+          {/* Slider Cursor */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-sky-400 shadow-[0_0_10px_#38bdf8]"
+            style={{ left: `calc(${currentValue}% - 8px)` }}
+          />
+        </div>
+
+        <div className="mt-2 text-center bg-sky-500/20 border border-sky-500/40 p-1.5 rounded-xl">
+          <div className="text-[8px] font-mono font-bold text-sky-300">INDEX: {currentValue}%</div>
+          <div className="font-black text-[11px] text-white mt-0.5">{markerTitle}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // 7. THE ICEBERG ILLUSION (VISIBLE VS HIDDEN REALITY)
+  if (compKey === "iceberg-model" || compKey === "iceberg_model") {
+    const title = props.title || "THE ICEBERG ILLUSION";
+    const subtitle = props.subtitle || "WHAT SUCCESS ACTUALLY DEMANDS";
+    const surfaceTitle = props.surfaceTitle || "WHAT PEOPLE SEE (10%)";
+    const underwaterTitle = props.underwaterTitle || "WHAT LIES BENEATH (90%)";
+
+    return (
+      <div
+        data-testid="graphic-iceberg-model"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-sky-500/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-2 text-center">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            DEPTH ARCHITECTURE
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+          <p className="text-[9px] text-neutral-400 truncate">{subtitle}</p>
+        </div>
+
+        {/* Surface 10% */}
+        <div className="bg-sky-500/15 border border-sky-400/40 p-2 rounded-xl mb-1.5">
+          <div className="text-[8px] font-mono font-bold text-sky-300">▲ {surfaceTitle}</div>
+          <div className="font-black text-[10px] text-white mt-0.5">Viral Output • Public Praise</div>
+        </div>
+
+        {/* Waterline Wave */}
+        <div className="h-2 w-full flex items-center justify-center my-0.5">
+          <div className="h-0.5 w-full bg-gradient-to-r from-sky-400 via-cyan-300 to-sky-400 shadow-[0_0_8px_#38bdf8]" />
+        </div>
+
+        {/* Underwater 90% */}
+        <div className="bg-gradient-to-b from-sky-950/40 to-neutral-950 p-2.5 rounded-xl border border-sky-600/30 space-y-1">
+          <div className="text-[8px] font-mono font-bold text-sky-400">▼ {underwaterTitle}</div>
+          <div className="text-[9px] font-bold text-neutral-200">
+            • 5 Years of Zero Recognition<br />
+            • Hundreds of Unanswered Pitches<br />
+            • Relentless Unseen Discipline
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 8. PROS & CONS DECISION MATRIX
+  if (compKey === "pros-cons-comparison" || compKey === "pros_cons_comparison") {
+    const title = props.title || "FRAMEWORK DUEL: NEXT.JS VS VITE";
+    const prosTitle = props.prosTitle || "ADVANTAGES";
+    const consTitle = props.consTitle || "TRADE-OFFS";
+    const verdictBadge = props.verdictBadge || "VERDICT: SSR HYBRID WINS FOR SCALE";
+
+    return (
+      <div
+        data-testid="graphic-pros-cons-comparison"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-neutral-700 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-2 text-center">
+          <span className="text-[9px] font-mono font-bold text-neutral-400 bg-neutral-800 px-2 py-0.5 rounded">
+            TRADE-OFF EVALUATION
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-[9px]">
+          {/* Pros */}
+          <div className="bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl">
+            <div className="font-black text-emerald-400 mb-1">✓ {prosTitle}</div>
+            <div className="text-[8px] text-neutral-300 space-y-0.5">
+              <div>• Built-in SSR & SEO</div>
+              <div>• Edge Network Caching</div>
+            </div>
+          </div>
+
+          {/* Cons */}
+          <div className="bg-rose-500/10 border border-rose-500/30 p-2 rounded-xl">
+            <div className="font-black text-rose-400 mb-1">✕ {consTitle}</div>
+            <div className="text-[8px] text-neutral-300 space-y-0.5">
+              <div>• Serverless Cold Starts</div>
+              <div>• Complex Caching Model</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-2 text-center bg-amber-500/15 border border-amber-500/40 py-1 rounded-lg text-amber-300 font-mono font-bold text-[8px] uppercase">
+          ★ {verdictBadge} ★
+        </div>
+      </div>
+    );
+  }
+
   // DEFAULT FALLBACK: HERO REVEAL / COOKED CARD / STAT CARD
   const headline = props.headline || props.title || graphic.name || "ESSENTIAL INSIGHT";
   const supporting = props.supporting || props.label || "KEY TAKEAWAY";

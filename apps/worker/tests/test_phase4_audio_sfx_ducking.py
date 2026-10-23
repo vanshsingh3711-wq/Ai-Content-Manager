@@ -294,3 +294,33 @@ class TestPhase4AudioSFXAndDucking:
         assert resolve_cue_name("fire") == "whoosh-in"
         assert resolve_cue_name("clink") == "tick"
 
+    def test_explainer_motion_graphics_sfx_pairing(self):
+        """
+        Phase 5: Verifies the 8 Explainer & Educational Motion Graphics templates
+        are mapped to appropriate acoustic sound cues in audio_sfx_synthesizer.
+        """
+        from services.audio_sfx_synthesizer import recommend_sfx_for_action, resolve_cue_name
+
+        # 1. Explainer Template SFX recommendations
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "venn-diagram"}) == "ding"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "funnel-analysis"}) == "whoosh-in"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "horizontal-process-flow"}) == "tick"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "feature-callout-pointer"}) == "tick"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "quadrant-matrix"}) == "impact"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "spectrum-continuum"}) == "whoosh-in"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "iceberg-model"}) == "impact"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "pros-cons-comparison"}) == "ding"
+
+        # 2. Explainer keyword aliases
+        assert resolve_cue_name("sweet_spot") == "ding"
+        assert resolve_cue_name("ikigai") == "ding"
+        assert resolve_cue_name("funnel") == "whoosh-in"
+        assert resolve_cue_name("blueprint") == "tick"
+        assert resolve_cue_name("reticle") == "tick"
+        assert resolve_cue_name("quadrant") == "impact"
+        assert resolve_cue_name("continuum") == "whoosh-in"
+        assert resolve_cue_name("iceberg") == "impact"
+        assert resolve_cue_name("underwater") == "impact"
+        assert resolve_cue_name("tradeoffs") == "ding"
+
+

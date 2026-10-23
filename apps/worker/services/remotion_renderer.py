@@ -111,6 +111,23 @@ ALLOWED_COMPOSITIONS = {
     # Universal Phase 8: Split Slider Comparison & Transformation Wipe
     "split_slider_comparison",
     "split-slider-comparison",
+    # 8 Explainer & Educational Motion Graphics Pack
+    "venn_diagram",
+    "venn-diagram",
+    "funnel_analysis",
+    "funnel-analysis",
+    "horizontal_process_flow",
+    "horizontal-process-flow",
+    "feature_callout_pointer",
+    "feature-callout-pointer",
+    "quadrant_matrix",
+    "quadrant-matrix",
+    "spectrum_continuum",
+    "spectrum-continuum",
+    "iceberg_model",
+    "iceberg-model",
+    "pros_cons_comparison",
+    "pros-cons-comparison",
     # Cooked Motion Templates
     "cooked_card",
     "cooked_likes",
@@ -359,6 +376,23 @@ def build_props_from_edit(edit: Dict[str, Any]) -> Dict[str, Any]:
         "roi-balance-scale": {"cost": "cost", "returns": "returns", "costLabel": "costLabel", "returnLabel": "returnLabel", "roiMultiple": "roiMultiple", "title": "title"},
         "wealth_flywheel": {"stages": "stages", "activeStage": "activeStage", "title": "title", "centerLabel": "centerLabel"},
         "wealth-flywheel": {"stages": "stages", "activeStage": "activeStage", "title": "title", "centerLabel": "centerLabel"},
+        # 8 Explainer & Educational Motion Graphics Pack
+        "venn_diagram": {"title": "title", "subtitle": "subtitle", "circle1Label": "circle1Label", "circle1Sub": "circle1Sub", "circle2Label": "circle2Label", "circle2Sub": "circle2Sub", "circle3Label": "circle3Label", "circle3Sub": "circle3Sub", "centerLabel": "centerLabel", "centerSub": "centerSub", "accentColor": "accentColor"},
+        "venn-diagram": {"title": "title", "subtitle": "subtitle", "circle1Label": "circle1Label", "circle1Sub": "circle1Sub", "circle2Label": "circle2Label", "circle2Sub": "circle2Sub", "circle3Label": "circle3Label", "circle3Sub": "circle3Sub", "centerLabel": "centerLabel", "centerSub": "centerSub", "accentColor": "accentColor"},
+        "funnel_analysis": {"title": "title", "subtitle": "subtitle", "dropoffNote": "dropoffNote", "stages": "stages"},
+        "funnel-analysis": {"title": "title", "subtitle": "subtitle", "dropoffNote": "dropoffNote", "stages": "stages"},
+        "horizontal_process_flow": {"title": "title", "subtitle": "subtitle", "activeStep": "activeStep", "steps": "steps"},
+        "horizontal-process-flow": {"title": "title", "subtitle": "subtitle", "activeStep": "activeStep", "steps": "steps"},
+        "feature_callout_pointer": {"headline": "headline", "category": "category", "detailText": "detailText", "specTag": "specTag", "pointerX": "pointerX", "pointerY": "pointerY", "cardX": "cardX", "cardY": "cardY", "accentColor": "accentColor"},
+        "feature-callout-pointer": {"headline": "headline", "category": "category", "detailText": "detailText", "specTag": "specTag", "pointerX": "pointerX", "pointerY": "pointerY", "cardX": "cardX", "cardY": "cardY", "accentColor": "accentColor"},
+        "quadrant_matrix": {"title": "title", "subtitle": "subtitle", "xAxisLabel": "xAxisLabel", "yAxisLabel": "yAxisLabel", "q1Title": "q1Title", "q1Desc": "q1Desc", "q2Title": "q2Title", "q2Desc": "q2Desc", "q3Title": "q3Title", "q3Desc": "q3Desc", "q4Title": "q4Title", "q4Desc": "q4Desc", "activeQuadrant": "activeQuadrant"},
+        "quadrant-matrix": {"title": "title", "subtitle": "subtitle", "xAxisLabel": "xAxisLabel", "yAxisLabel": "yAxisLabel", "q1Title": "q1Title", "q1Desc": "q1Desc", "q2Title": "q2Title", "q2Desc": "q2Desc", "q3Title": "q3Title", "q3Desc": "q3Desc", "q4Title": "q4Title", "q4Desc": "q4Desc", "activeQuadrant": "activeQuadrant"},
+        "spectrum_continuum": {"title": "title", "subtitle": "subtitle", "leftLabel": "leftLabel", "leftSub": "leftSub", "rightLabel": "rightLabel", "rightSub": "rightSub", "currentValue": "currentValue", "markerTitle": "markerTitle", "markerDesc": "markerDesc", "accentColor": "accentColor"},
+        "spectrum-continuum": {"title": "title", "subtitle": "subtitle", "leftLabel": "leftLabel", "leftSub": "leftSub", "rightLabel": "rightLabel", "rightSub": "rightSub", "currentValue": "currentValue", "markerTitle": "markerTitle", "markerDesc": "markerDesc", "accentColor": "accentColor"},
+        "iceberg_model": {"title": "title", "subtitle": "subtitle", "surfaceTitle": "surfaceTitle", "surfaceItems": "surfaceItems", "underwaterTitle": "underwaterTitle", "underwaterItems": "underwaterItems"},
+        "iceberg-model": {"title": "title", "subtitle": "subtitle", "surfaceTitle": "surfaceTitle", "surfaceItems": "surfaceItems", "underwaterTitle": "underwaterTitle", "underwaterItems": "underwaterItems"},
+        "pros_cons_comparison": {"title": "title", "subtitle": "subtitle", "prosTitle": "prosTitle", "prosList": "prosList", "consTitle": "consTitle", "consList": "consList", "verdictBadge": "verdictBadge"},
+        "pros-cons-comparison": {"title": "title", "subtitle": "subtitle", "prosTitle": "prosTitle", "prosList": "prosList", "consTitle": "consTitle", "consList": "consList", "verdictBadge": "verdictBadge"},
     }
 
     prop_map = PROP_MAPS.get(comp_id, {})

@@ -71,6 +71,30 @@ export class DeterministicSFXPlanner {
           } else if (/battle|versus|duel/i.test(desc)) {
             soundSrc = '/sfx/impact.mp3';
             soundDesc = 'Battle chart clash impact SFX';
+          } else if (/venn|sweet\s*spot|ikigai/i.test(desc)) {
+            soundSrc = '/sfx/chime.mp3';
+            soundDesc = '3-Way Venn Sweet Spot Chime SFX';
+          } else if (/funnel|dropoff|conversion/i.test(desc)) {
+            soundSrc = '/sfx/whoosh.mp3';
+            soundDesc = 'Conversion Funnel Slide Whoosh SFX';
+          } else if (/process|workflow|horizontal|pipeline|blueprint/i.test(desc)) {
+            soundSrc = '/sfx/click.mp3';
+            soundDesc = 'Process Flow Node Tick SFX';
+          } else if (/callout|pointer|reticle|hud/i.test(desc)) {
+            soundSrc = '/sfx/click.mp3';
+            soundDesc = 'HUD Reticle Target Lock Click SFX';
+          } else if (/matrix|quadrant|eisenhower/i.test(desc)) {
+            soundSrc = '/sfx/impact.mp3';
+            soundDesc = 'Quadrant Matrix Grid Lock Impact SFX';
+          } else if (/spectrum|continuum|slider|nuance/i.test(desc)) {
+            soundSrc = '/sfx/whoosh.mp3';
+            soundDesc = 'Spectrum Continuum Glide Whoosh SFX';
+          } else if (/iceberg|underwater|illusion/i.test(desc)) {
+            soundSrc = '/sfx/impact.mp3';
+            soundDesc = 'Iceberg Underwater Plunge Impact SFX';
+          } else if (/pros|cons|tradeoffs|comparison/i.test(desc)) {
+            soundSrc = '/sfx/chime.mp3';
+            soundDesc = 'Pros & Cons Verdict Chime SFX';
           }
 
           sfxElements.push({

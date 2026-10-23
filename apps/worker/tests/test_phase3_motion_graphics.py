@@ -275,3 +275,78 @@ def test_remotion_renderer_finance_pack_compositions():
     assert props["paidAmount"] == 25000
     assert props["debtName"] == "Visa Card"
 
+
+def test_explainer_motion_graphics_remotion_integration():
+    """
+    Phase 6: Verifies all 8 Explainer & Educational Motion Graphics templates
+    are recognized by RemotionRenderer and properly dispatched to npx remotion render.
+    """
+    from services.remotion_renderer import build_props_from_edit
+
+    explainer_templates = [
+        "venn-diagram",
+        "funnel-analysis",
+        "horizontal-process-flow",
+        "feature-callout-pointer",
+        "quadrant-matrix",
+        "spectrum-continuum",
+        "iceberg-model",
+        "pros-cons-comparison",
+    ]
+
+    for comp in explainer_templates:
+        assert comp in ALLOWED_COMPOSITIONS
+        assert comp.replace("-", "_") in ALLOWED_COMPOSITIONS
+
+    with patch("subprocess.run") as mock_run, \
+         patch("os.path.isdir", return_value=True), \
+         patch("os.path.exists", return_value=True), \
+         patch("os.path.getsize", return_value=1024 * 1024 * 2):
+
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        # 1. Test Venn Diagram render
+        res_venn = render_motion_graphic(
+            composition_id="venn-diagram",
+            props={"title": "THE SWEET SPOT", "centerLabel": "IKIGAI"},
+            duration_frames=150,
+            fps=30,
+            width=1080,
+            height=1920,
+            output_path="/tmp/test_venn.mov",
+        )
+        assert res_venn == "/tmp/test_venn.mov"
+        cmd = mock_run.call_args[0][0]
+        assert "venn-diagram" in cmd
+        assert "--codec=prores" in cmd
+        assert "--pixel-format=yuva444p10le" in cmd
+
+        # 2. Test Iceberg Model render
+        res_iceberg = render_motion_graphic(
+            composition_id="iceberg_model",
+            props={"title": "THE ICEBERG ILLUSION"},
+            duration_frames=150,
+            fps=30,
+            width=1080,
+            height=1920,
+            output_path="/tmp/test_iceberg.mov",
+        )
+        assert res_iceberg == "/tmp/test_iceberg.mov"
+        cmd_iceberg = mock_run.call_args[0][0]
+        assert "iceberg-model" in cmd_iceberg
+
+    # 3. Verify build_props_from_edit for explainer templates
+    edit_decision = {
+        "motion_graphics_type": "quadrant-matrix",
+        "motion_graphics_targets": {
+            "title": "STRATEGIC PRIORITY",
+            "activeQuadrant": 3,
+            "q3Title": "DELEGATE FAST",
+        },
+    }
+    props = build_props_from_edit(edit_decision)
+    assert props["title"] == "STRATEGIC PRIORITY"
+    assert props["activeQuadrant"] == 3
+    assert props["q3Title"] == "DELEGATE FAST"
+
+

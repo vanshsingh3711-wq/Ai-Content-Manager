@@ -519,6 +519,237 @@ export const GRAPHIC_CONFIGS: GraphicConfig[] = [
       durationYears: "10-YEAR CHALLENGE",
     },
   },
+  {
+    triggers: [
+      "3-way venn diagram",
+      "venn diagram",
+      "sweet spot diagram",
+      "ikigai diagram",
+      "intersection diagram",
+      "overlap diagram",
+      "venn",
+      "sweet spot",
+      "ikigai",
+    ],
+    compositionId: "venn-diagram",
+    name: "3-WAY VENN DIAGRAM",
+    props: {
+      title: "THE SWEET SPOT",
+      subtitle: "WHERE PASSION MEETS PROFIT & MASTERY",
+      circle1Label: "PASSION",
+      circle1Sub: "What You Love",
+      circle2Label: "MASTERY",
+      circle2Sub: "What You Excel At",
+      circle3Label: "MARKET",
+      circle3Sub: "What They Pay For",
+      centerLabel: "IKIGAI",
+      centerSub: "The Unfair Advantage",
+      accentColor: "#38bdf8",
+    },
+  },
+  {
+    triggers: [
+      "conversion drop-off funnel",
+      "funnel analysis",
+      "conversion funnel",
+      "pipeline attrition",
+      "marketing funnel",
+      "funnel dropoff",
+      "sales funnel",
+      "drop off funnel",
+      "drop off",
+      "funnel",
+    ],
+    compositionId: "funnel-analysis",
+    name: "CONVERSION & DROP-OFF FUNNEL",
+    props: {
+      title: "CONVERSION DROP-OFF",
+      subtitle: "HIGH-TICKET CLIENT PIPELINE",
+      dropoffNote: "99.9% ELIMINATED AT TOP OF FUNNEL",
+      stages: [
+        { name: "Impressions", count: "1,000,000", pct: "100%", color: "#38BDF8" },
+        { name: "Visitors", count: "125,000", pct: "12.5%", color: "#818CF8" },
+        { name: "Booked Calls", count: "8,400", pct: "0.84%", color: "#C084FC" },
+        { name: "Revenue Yield", count: "940", pct: "$2.8M", color: "#10B981" },
+      ],
+    },
+  },
+  {
+    triggers: [
+      "horizontal process flow",
+      "horizontal process pipeline",
+      "process flow",
+      "horizontal pipeline",
+      "step by step blueprint",
+      "step by step flow",
+      "how it works flow",
+      "execution pipeline",
+      "process pipeline",
+      "phased roadmap",
+      "4-step blueprint",
+      "step by step",
+      "how it works",
+    ],
+    compositionId: "horizontal-process-flow",
+    name: "HORIZONTAL PROCESS PIPELINE",
+    props: {
+      title: "HOW IT WORKS: 4-STEP BLUEPRINT",
+      subtitle: "FROM ZERO TO SCALED AUTOMATION",
+      activeStep: 3,
+      steps: [
+        { num: 1, title: "Audit & Diagnose", desc: "Identify critical workflow bottlenecks", tag: "PHASE 01" },
+        { num: 2, title: "Architect System", desc: "Engineer custom AI automations", tag: "PHASE 02" },
+        { num: 3, title: "Deploy Live", desc: "Zero downtime rollout with automated regression", tag: "ACTIVE NOW" },
+        { num: 4, title: "Scale & Compound", desc: "10x client capacity without adding overhead", tag: "PHASE 04" },
+      ],
+    },
+  },
+  {
+    triggers: [
+      "feature callout pointer",
+      "hud leader line callout",
+      "feature callout",
+      "hud callout",
+      "reticle pointer",
+      "hardware callout",
+      "leader line callout",
+      "pointer callout",
+      "feature highlight",
+      "leader line",
+    ],
+    compositionId: "feature-callout-pointer",
+    name: "HUD LEADER LINE CALLOUT",
+    props: {
+      headline: "RETINAL HUD DISPLAY",
+      category: "HARDWARE BREAKDOWN",
+      detailText: "Micro-OLED 4K waveguides with real-time 120Hz spatial eye tracking.",
+      specTag: "LATENCY < 12ms",
+      pointerX: 540,
+      pointerY: 720,
+      cardX: 540,
+      cardY: 1240,
+      accentColor: "#22d3ee",
+    },
+  },
+  {
+    triggers: [
+      "2x2 strategic decision matrix",
+      "2x2 decision matrix",
+      "eisenhower matrix",
+      "quadrant matrix",
+      "strategy quadrant",
+      "decision matrix",
+      "urgency importance matrix",
+      "2x2 matrix",
+      "urgency importance",
+      "quadrant",
+    ],
+    compositionId: "quadrant-matrix",
+    name: "2X2 STRATEGIC DECISION MATRIX",
+    props: {
+      title: "EISENHOWER DECISION MATRIX",
+      subtitle: "URGENCY VS IMPORTANCE FRAMEWORK",
+      xAxisLabel: "IMPORTANCE ➔",
+      yAxisLabel: "URGENCY ➔",
+      q1Title: "DO FIRST",
+      q1Desc: "Critical Crises & Deadlines",
+      q2Title: "SCHEDULE",
+      q2Desc: "High-Value Strategic Growth",
+      q3Title: "DELEGATE",
+      q3Desc: "Interruptions & Busywork",
+      q4Title: "ELIMINATE",
+      q4Desc: "Mindless Time Wasters",
+      activeQuadrant: 2,
+    },
+  },
+  {
+    triggers: [
+      "spectrum continuum",
+      "spectrum and nuance continuum",
+      "nuance continuum",
+      "continuous spectrum",
+      "architecture spectrum",
+      "monolith microservices spectrum",
+      "spectrum scale",
+      "nuance slider",
+      "spectrum slider",
+      "spectrum",
+    ],
+    compositionId: "spectrum-continuum",
+    name: "SPECTRUM & NUANCE CONTINUUM",
+    props: {
+      title: "THE ARCHITECTURE SPECTRUM",
+      subtitle: "FINDING THE PRAGMATIC ENGINEERING BALANCE",
+      leftLabel: "100% MONOLITH",
+      leftSub: "Simple Deployment • Single DB",
+      rightLabel: "100% MICROSERVICES",
+      rightSub: "High Complexity • Event-Driven",
+      currentValue: 68,
+      markerTitle: "MODULAR MONOLITH",
+      markerDesc: "The Optimal Sweet Spot for 99% of Startups",
+      accentColor: "#38bdf8",
+    },
+  },
+  {
+    triggers: [
+      "the iceberg illusion",
+      "iceberg illusion",
+      "iceberg model",
+      "tip of the iceberg",
+      "hidden reality iceberg",
+      "under the surface",
+      "hidden reality",
+      "iceberg",
+    ],
+    compositionId: "iceberg-model",
+    name: "THE ICEBERG ILLUSION",
+    props: {
+      title: "THE ICEBERG ILLUSION",
+      subtitle: "WHAT SUCCESS ACTUALLY DEMANDS",
+      surfaceTitle: "WHAT PEOPLE SEE (10%)",
+      surfaceItems: ["Viral Output", "Public Praise", "High Valuation", "Overnight Growth"],
+      underwaterTitle: "WHAT LIES BENEATH (90%)",
+      underwaterItems: [
+        "5 Years of Zero Recognition",
+        "Hundreds of Unanswered Pitch Mails",
+        "7 Critical Product Pivots",
+        "Relentless Unseen Discipline",
+      ],
+    },
+  },
+  {
+    triggers: [
+      "pros and cons comparison",
+      "pros and cons decision matrix",
+      "pros and cons",
+      "pros cons comparison",
+      "pros vs cons",
+      "advantages vs disadvantages",
+      "framework duel",
+      "comparison matrix",
+      "pros cons",
+      "tradeoffs",
+    ],
+    compositionId: "pros-cons-comparison",
+    name: "PROS & CONS DECISION MATRIX",
+    props: {
+      title: "FRAMEWORK DUEL: NEXT.JS VS VITE",
+      subtitle: "MAKING THE PRODUCTION ARCHITECTURE DECISION",
+      prosTitle: "KEY ADVANTAGES",
+      prosList: [
+        "Built-in SSR, ISR & Perfect SEO",
+        "Edge Network Caching out of the box",
+        "Massive Enterprise Ecosystem & Vercel DX",
+      ],
+      consTitle: "TRADE-OFFS & RISKS",
+      consList: [
+        "Serverless Cold Starts on Dynamic Lambdas",
+        "Vendor Lock-in Risk with Hosting Primitives",
+        "Complex Caching & Revalidation Mental Model",
+      ],
+      verdictBadge: "VERDICT: SSR HYBRID WINS FOR SCALE",
+    },
+  },
 ];
 
 /**
@@ -642,11 +873,13 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
         };
       } else {
         // badge, graphic, card, or specific motion graphic template
+        const targetSearch = (explicitText || elementType).toLowerCase().trim();
         const matchedConfig = GRAPHIC_CONFIGS.find(
           (c) =>
-            c.compositionId === elementType ||
-            elementType.includes(c.compositionId) ||
-            c.triggers.some((t) => elementType === t || elementType.includes(t))
+            c.compositionId === targetSearch ||
+            (explicitText && (c.compositionId === explicitText || c.triggers.some((t) => explicitText === t || explicitText.includes(t)))) ||
+            (elementType !== "graphic" && (c.compositionId === elementType || elementType.includes(c.compositionId))) ||
+            (targetSearch !== "graphic" && c.triggers.some((t) => targetSearch === t || (t.length > 3 && targetSearch.includes(t))))
         );
 
         const compositionId = matchedConfig ? matchedConfig.compositionId : "pop_up_badge";
@@ -716,11 +949,13 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
 
     const displayText = explicitText || beatRole.toUpperCase();
 
+    const targetSearch = (explicitText || elementType).toLowerCase().trim();
     const matchedConfig = GRAPHIC_CONFIGS.find(
       (c) =>
-        c.compositionId === elementType ||
-        elementType.includes(c.compositionId) ||
-        c.triggers.some((t) => elementType === t || elementType.includes(t))
+        c.compositionId === targetSearch ||
+        (explicitText && (c.compositionId === explicitText || c.triggers.some((t) => explicitText === t || explicitText.includes(t)))) ||
+        (elementType !== "graphic" && (c.compositionId === elementType || elementType.includes(c.compositionId))) ||
+        (targetSearch !== "graphic" && c.triggers.some((t) => targetSearch === t || (t.length > 3 && targetSearch.includes(t))))
     );
 
     const compositionId = matchedConfig ? matchedConfig.compositionId : "pop_up_badge";
@@ -1190,6 +1425,26 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
         if (roiMatch) {
           finalProps.roiMultiplier = `${roiMatch[1]}x ROI`;
         }
+      } else if (config.compositionId === "quadrant-matrix") {
+        const quadMatch = prompt.match(/(?:quadrant|q)\s*([1-4])\b/i);
+        if (quadMatch) {
+          finalProps.activeQuadrant = parseInt(quadMatch[1], 10);
+        }
+      } else if (config.compositionId === "spectrum-continuum") {
+        const valMatch = prompt.match(/(\d+)%/);
+        if (valMatch) {
+          finalProps.currentValue = Math.max(0, Math.min(100, parseInt(valMatch[1], 10)));
+        }
+      } else if (config.compositionId === "horizontal-process-flow") {
+        const stepMatch = prompt.match(/(?:step|phase)\s*([1-4])\b/i);
+        if (stepMatch) {
+          finalProps.activeStep = parseInt(stepMatch[1], 10);
+        }
+      } else if (config.compositionId === "feature-callout-pointer") {
+        const featureMatch = prompt.match(/(?:feature|for|pointing to)\s+['"]([^'"]+)['"]/i);
+        if (featureMatch) {
+          finalProps.headline = featureMatch[1].trim().toUpperCase();
+        }
       }
 
       let position = defaultPos;
@@ -1387,7 +1642,7 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
       end = Number((start + sfxItem.duration).toFixed(3));
     } else {
       // Check if prompt refers to headline/title or motion graphic entrance ("when the headline enters", "when banking notification appears", "at candlestick hud", etc.)
-      const graphicTriggerMatch = /(?:headline|title|badge|card|intro|graphic|chart|candlestick|compound|growth|curve|donut|portfolio|inflation|cash\s*burn|burn|banking|notification|waterfall|budget|debt|payoff|scale|balance|roi|flywheel|wealth|battle)/i.test(cleanPrompt);
+      const graphicTriggerMatch = /(?:headline|title|badge|card|intro|graphic|chart|candlestick|compound|growth|curve|donut|portfolio|inflation|cash\s*burn|burn|banking|notification|waterfall|budget|debt|payoff|scale|balance|roi|flywheel|wealth|battle|venn|sweet\s*spot|ikigai|funnel|dropoff|process|workflow|horizontal|blueprint|callout|pointer|reticle|hud|matrix|quadrant|eisenhower|spectrum|continuum|slider|iceberg|pros\s*and\s*cons|pros|cons)/i.test(cleanPrompt);
       const availableGraphics = (context.graphicsElements || context.trackSummary?.graphicsList || []) as any[];
       if (graphicTriggerMatch && availableGraphics.length > 0) {
         const targetGraphic = availableGraphics.find((g: any) => {
@@ -1404,6 +1659,14 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
           if (/\b(?:scale|balance|roi)\b/i.test(cleanPrompt) && (targetStr.includes("scale") || targetStr.includes("balance") || targetStr.includes("roi"))) return true;
           if (/\b(?:flywheel|wealth)\b/i.test(cleanPrompt) && (targetStr.includes("flywheel") || targetStr.includes("wealth"))) return true;
           if (/\b(?:battle|versus|duel)\b/i.test(cleanPrompt) && (targetStr.includes("battle") || targetStr.includes("versus") || targetStr.includes("duel"))) return true;
+          if (/\b(?:venn|sweet\s*spot|ikigai)\b/i.test(cleanPrompt) && (targetStr.includes("venn") || targetStr.includes("sweet") || targetStr.includes("ikigai"))) return true;
+          if (/\b(?:funnel|dropoff|drop\s*off)\b/i.test(cleanPrompt) && (targetStr.includes("funnel") || targetStr.includes("drop-off") || targetStr.includes("dropoff"))) return true;
+          if (/\b(?:process|workflow|horizontal|pipeline|blueprint)\b/i.test(cleanPrompt) && (targetStr.includes("process") || targetStr.includes("pipeline") || targetStr.includes("flow"))) return true;
+          if (/\b(?:callout|pointer|reticle|leader\s*line|hud)\b/i.test(cleanPrompt) && (targetStr.includes("callout") || targetStr.includes("pointer") || targetStr.includes("hud"))) return true;
+          if (/\b(?:matrix|quadrant|eisenhower)\b/i.test(cleanPrompt) && (targetStr.includes("matrix") || targetStr.includes("quadrant") || targetStr.includes("eisenhower"))) return true;
+          if (/\b(?:spectrum|continuum|slider|nuance)\b/i.test(cleanPrompt) && (targetStr.includes("spectrum") || targetStr.includes("continuum"))) return true;
+          if (/\b(?:iceberg|underwater|illusion)\b/i.test(cleanPrompt) && (targetStr.includes("iceberg") || targetStr.includes("illusion"))) return true;
+          if (/\b(?:pros|cons|tradeoffs|comparison)\b/i.test(cleanPrompt) && (targetStr.includes("pros") || targetStr.includes("cons") || targetStr.includes("comparison"))) return true;
           if (/\b(?:headline|title|hero|card|intro)\b/i.test(cleanPrompt) && /(?:headline|title|hero|card|intro)/i.test(targetStr)) return true;
           return false;
         }) || availableGraphics[0];
@@ -1425,6 +1688,15 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
             else if (comp.includes("scale") || comp.includes("roi")) signatureKey = "clink";
             else if (comp.includes("flywheel")) signatureKey = "whoosh";
             else if (comp.includes("battle")) signatureKey = "impact";
+            // 8 Explainer & Educational Motion Graphics Signature SFX
+            else if (comp.includes("venn") || comp.includes("sweet-spot") || comp.includes("ikigai")) signatureKey = "chime";
+            else if (comp.includes("funnel")) signatureKey = "whoosh";
+            else if (comp.includes("process") || comp.includes("horizontal-process")) signatureKey = "click";
+            else if (comp.includes("callout") || comp.includes("pointer")) signatureKey = "click";
+            else if (comp.includes("matrix") || comp.includes("quadrant")) signatureKey = "impact";
+            else if (comp.includes("spectrum") || comp.includes("continuum")) signatureKey = "whoosh";
+            else if (comp.includes("iceberg")) signatureKey = "impact";
+            else if (comp.includes("pros-cons") || comp.includes("pros")) signatureKey = "chime";
 
             if (SFX_ASSET_MAP[signatureKey]) {
               sfxItem = SFX_ASSET_MAP[signatureKey];
