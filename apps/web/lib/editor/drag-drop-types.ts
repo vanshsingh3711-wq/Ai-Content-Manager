@@ -15,7 +15,7 @@ export const EDITOR_DRAG_MIME = "application/x-editor-asset";
 
 export const CaptionDragPayloadSchema = z.object({
   type: z.literal("caption"),
-  stylePreset: z.enum(["tiktok_yellow", "hormozi_bold", "clean_white", "neon_glow"]),
+  stylePreset: z.string().default("tiktok_yellow") as z.ZodType<CaptionPreset>,
   text: z.string().optional(),
 });
 
@@ -51,12 +51,28 @@ export const VideoDragPayloadSchema = z.object({
   duration: z.number().positive().default(5.0),
 });
 
+export const TransitionDragPayloadSchema = z.object({
+  type: z.literal("transition"),
+  preset: z.enum([
+    "crossfade",
+    "fade_to_black",
+    "wipe_left",
+    "wipe_right",
+    "slide_up",
+    "zoom_in",
+    "whip_pan",
+  ]),
+  name: z.string(),
+  duration: z.number().positive().optional().default(0.5),
+});
+
 export const EditorDragPayloadSchema = z.discriminatedUnion("type", [
   CaptionDragPayloadSchema,
   BRollDragPayloadSchema,
   GraphicDragPayloadSchema,
   AudioDragPayloadSchema,
   VideoDragPayloadSchema,
+  TransitionDragPayloadSchema,
 ]);
 
 export type CaptionDragPayload = z.infer<typeof CaptionDragPayloadSchema>;
@@ -64,6 +80,7 @@ export type BRollDragPayload = z.infer<typeof BRollDragPayloadSchema>;
 export type GraphicDragPayload = z.infer<typeof GraphicDragPayloadSchema>;
 export type AudioDragPayload = z.infer<typeof AudioDragPayloadSchema>;
 export type VideoDragPayload = z.infer<typeof VideoDragPayloadSchema>;
+export type TransitionDragPayload = z.infer<typeof TransitionDragPayloadSchema>;
 export type EditorDragPayload = z.infer<typeof EditorDragPayloadSchema>;
 
 // 2. SERIALIZATION & DESERIALIZATION

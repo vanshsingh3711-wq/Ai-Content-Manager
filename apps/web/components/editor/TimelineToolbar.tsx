@@ -12,6 +12,7 @@ import {
   Zap,
   Sparkles,
   UserCheck,
+  Shapes,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -138,6 +139,14 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
 
         {/* Quick Add Buttons */}
         <div className="flex items-center gap-1 overflow-x-auto shrink-0 max-w-[150px] sm:max-w-none [scrollbar-width:none]">
+          <button
+            onClick={() => onOpenDrawer?.("library")}
+            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-emerald-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
+            title="Open Resource Library (Shapes, Captions, Transitions, SFX)"
+          >
+            <Shapes className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="hidden sm:inline">Library</span>
+          </button>
           <button
             onClick={handleAddText}
             className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"

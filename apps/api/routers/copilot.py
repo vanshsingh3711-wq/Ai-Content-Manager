@@ -3,7 +3,7 @@ import sys
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -55,7 +55,10 @@ CAPTURES_DIR = os.path.join(MEDIA_TEMP_DIR, "captures")
 RECORDINGS_DIR = os.path.join(MEDIA_TEMP_DIR, "recordings")
 os.makedirs(CAPTURES_DIR, exist_ok=True)
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
-URL_REGEX = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
+URL_REGEX = re.compile(
+    r"(?:https?://|www\.)[^\s\"'<>]+|(?:[a-zA-Z0-9-]+\.)+(?:com|org|io|dev|net|ai|co|app)(?:/[^\s\"'<>]*)?",
+    re.IGNORECASE
+)
 
 router = APIRouter(prefix="/api/v1/editor", tags=["AI Copilot"])
 
@@ -67,6 +70,8 @@ class EditorContextPayload(BaseModel):
     selected_item: Optional[Dict[str, Any]] = Field(default=None, description="Currently selected element")
     active_transcript_words: Optional[List[Dict[str, Any]]] = Field(default=None, description="Words near playhead")
     safe_zones: Optional[List[Dict[str, Any]]] = Field(default=None, description="Speaker face/body safe zones")
+    transcript_beats: Optional[List[Dict[str, Any]]] = Field(default=None, description="Script storytelling beats")
+    transcript: Optional[Union[Dict[str, Any], List[Any]]] = Field(default=None, description="Full transcript payload including beatSheet")
 
 
 class EditorCopilotOptions(BaseModel):
@@ -507,7 +512,8 @@ def extract_time_range_from_text(prompt: str, playhead: float, duration: float, 
             t2 = parse_time_token(between_match.group(2))
             if t1 < t2:
                 cleaned = re.sub(re.escape(between_match.group(0)), "", cleaned, flags=re.I).strip()
-                return round(t1, 2), min(duration, round(t2, 2)), cleaned, True
+                effective_duration = max(duration, t2)
+                return round(t1, 2), min(effective_duration, round(t2, 2)), cleaned, True
         except Exception:
             pass
 
@@ -519,7 +525,8 @@ def extract_time_range_from_text(prompt: str, playhead: float, duration: float, 
             t2 = parse_time_token(from_to_match.group(2))
             if t1 < t2:
                 cleaned = re.sub(re.escape(from_to_match.group(0)), "", cleaned, flags=re.I).strip()
-                return round(t1, 2), min(duration, round(t2, 2)), cleaned, True
+                effective_duration = max(duration, t2)
+                return round(t1, 2), min(effective_duration, round(t2, 2)), cleaned, True
         except Exception:
             pass
 
@@ -531,7 +538,8 @@ def extract_time_range_from_text(prompt: str, playhead: float, duration: float, 
             dur = parse_time_token(at_for_match.group(2))
             if dur > 0:
                 cleaned = re.sub(re.escape(at_for_match.group(0)), "", cleaned, flags=re.I).strip()
-                return round(t1, 2), min(duration, round(t1 + dur, 2)), cleaned, True
+                effective_duration = max(duration, t1 + dur)
+                return round(t1, 2), min(effective_duration, round(t1 + dur, 2)), cleaned, True
         except Exception:
             pass
 
@@ -541,9 +549,10 @@ def extract_time_range_from_text(prompt: str, playhead: float, duration: float, 
         try:
             t1 = parse_time_token(range_match.group(1))
             t2 = parse_time_token(range_match.group(2))
-            if t1 < t2 and t2 <= duration:
+            if t1 < t2:
                 cleaned = re.sub(re.escape(range_match.group(0)), "", cleaned, flags=re.I).strip()
-                return round(t1, 2), min(duration, round(t2, 2)), cleaned, True
+                effective_duration = max(duration, t2)
+                return round(t1, 2), min(effective_duration, round(t2, 2)), cleaned, True
         except Exception:
             pass
 
@@ -560,6 +569,50 @@ def extract_time_range_from_text(prompt: str, playhead: float, duration: float, 
     start_time = round(playhead, 2)
     end_time = min(duration, round(start_time + default_duration, 2))
     return start_time, end_time, cleaned, False
+
+
+def compute_safe_graphic_position(
+    safe_zones: Optional[List[Dict[str, Any]]],
+    default_pos: Optional[Dict[str, float]] = None
+) -> Dict[str, float]:
+    """
+    Computes placement coordinates (x, y percentages) avoiding presenter occlusion.
+    If presenter occupies center-top (e.g. x: 30-70, y: 15-55),
+    the graphic is safely placed in lower-third {x: 50, y: 75}.
+    """
+    pos = dict(default_pos or {"x": 50.0, "y": 35.0})
+    if not safe_zones:
+        return pos
+
+    px = float(pos.get("x", 50.0))
+    py = float(pos.get("y", 35.0))
+
+    collides = False
+    for zone in safe_zones:
+        zx = float(zone.get("x", zone.get("left", 0.0)))
+        zy = float(zone.get("y", zone.get("top", 0.0)))
+        zw = float(zone.get("width", zone.get("w", 0.0)))
+        zh = float(zone.get("height", zone.get("h", 0.0)))
+        if (zx <= px <= zx + zw) and (zy <= py <= zy + zh):
+            collides = True
+            break
+
+    if collides:
+        lower_third = {"x": 50.0, "y": 75.0}
+        lt_collides = False
+        for zone in safe_zones:
+            zx = float(zone.get("x", zone.get("left", 0.0)))
+            zy = float(zone.get("y", zone.get("top", 0.0)))
+            zw = float(zone.get("width", zone.get("w", 0.0)))
+            zh = float(zone.get("height", zone.get("h", 0.0)))
+            if (zx <= 50.0 <= zx + zw) and (zy <= 75.0 <= zy + zh):
+                lt_collides = True
+                break
+        if not lt_collides:
+            return lower_third
+        return {"x": 25.0, "y": 50.0}
+
+    return pos
 
 
 def determine_edit_scope(prompt: str) -> str:
@@ -613,9 +666,14 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
     if scope == "whole_video":
         max_edits = request.options.max_edits if (request.options and request.options.max_edits > 5) else 12
         if coordinate_whole_video_plan:
+            beats = request.context.transcript_beats
+            if not beats and isinstance(request.context.transcript, dict):
+                beats = request.context.transcript.get("beatSheet", {}).get("beats")
+
             plan = coordinate_whole_video_plan(
                 total_duration=duration,
                 prompt=clean_prompt,
+                transcript_beats=beats,
                 max_edits=max_edits,
             )
             raw_edits = plan.edits
@@ -666,9 +724,12 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                                 "id": broll_id,
                                 "name": title_text,
                                 "sourceUrl": source_url,
+                                "thumbnailUrl": preview_url,
                                 "start": start,
                                 "end": end,
                                 "opacity": 100,
+                                "volume": 0,
+                                "muted": True,
                                 "fitMode": "cover",
                                 "position": {"x": 50, "y": 50},
                                 "scale": 1.0,
@@ -705,7 +766,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                                 "props": props,
                                 "start": start,
                                 "end": end,
-                                "position": {"x": 50, "y": 35},
+                                "position": compute_safe_graphic_position(request.context.safe_zones),
                                 "scale": 1.0,
                                 "rotation": 0,
                                 "isUserLocked": False,
@@ -814,6 +875,8 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
         url_match = URL_REGEX.search(clean_prompt)
         if url_match:
             target_url = url_match.group(0).rstrip(".,;)")
+            if not target_url.startswith("http://") and not target_url.startswith("https://"):
+                target_url = f"https://{target_url}"
         elif any(k in lower for k in ["hacker news", "ycombinator"]):
             target_url = "https://news.ycombinator.com"
         elif any(k in lower for k in ["news", "article", "articles", "tech", "ai", "techcrunch", "the verge"]):
@@ -892,7 +955,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                 end=end_time,
                 track="broll",
                 title=f"Website Recording: {tab_title}",
-                description=f"Natural scrolling screen recording of {target_url} overlaid as B-roll footage.",
+                description=f"Natural scrolling screen recording of {target_url} overlaid as B-roll footage with narration preserved.",
                 reason=f"Natural website recording for: {target_url}",
                 is_destructive=False,
                 overlap_conflict=False,
@@ -904,9 +967,12 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                         "id": broll_id,
                         "name": f"Recording: {tab_title}",
                         "sourceUrl": video_url,
+                        "thumbnailUrl": preview_url,
                         "start": start_time,
                         "end": end_time,
                         "opacity": 100,
+                        "volume": 0,
+                        "muted": True,
                         "fitMode": "cover",
                         "position": {"x": 50, "y": 50},
                         "scale": 1.0,
@@ -964,17 +1030,57 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
         )
         summary = f"Prepared {trans_type.replace('_', ' ')} transition at {start_time:.1f}s."
 
+    # 2.5. BACKGROUND MUSIC / BGM REQUEST (With optional ducking)
+    elif re.search(r"\b(?:background\s*music|bgm|soundtrack|chill\s*music|lofi\s*music|ambient\s*music)\b", lower):
+        has_ducking = bool(re.search(r"\b(?:duck|ducking|whenever\s+i\s+speak|under\s+speech)\b", lower))
+        start_time = extracted_start if has_explicit_time else 0.0
+        end_time = extracted_end if has_explicit_time else duration
+        bgm_id = f"audio-bgm-{uuid.uuid4().hex[:8]}"
+        edits.append(
+            ProposedEditItem(
+                id=f"prop-{uuid.uuid4().hex[:6]}",
+                action_type="audio",
+                start=start_time,
+                end=end_time,
+                track="audio",
+                title=f"Background Music: Chill Lofi{' (Ducked)' if has_ducking else ''}",
+                description=f"Chill background music{' with -14dB automatic speech ducking' if has_ducking else ''} from {start_time:.1f}s to {end_time:.1f}s.",
+                reason=f"Matches music request '{clean_prompt}'.",
+                is_destructive=False,
+                overlap_conflict=False,
+                operation={
+                    "type": "add_element",
+                    "track": "audio",
+                    "element": {
+                        "id": bgm_id,
+                        "name": "Chill Background Music",
+                        "sourceUrl": "/assets/audio/chill-bgm.mp3",
+                        "start": start_time,
+                        "end": end_time,
+                        "volume": 35 if has_ducking else 50,
+                        "fadeIn": 1.0,
+                        "fadeOut": 1.5,
+                        "isBgm": True,
+                        "ducking": has_ducking,
+                        "duckingDb": -14.0 if has_ducking else None,
+                    }
+                },
+                status="pending"
+            )
+        )
+        summary = f"Prepared chill background music{' with -14dB narration ducking' if has_ducking else ''} for {end_time - start_time:.1f}s."
+
     # 3. SFX / SOUND EFFECT REQUEST
     elif re.search(r"\b(?:sfx|sound\s+effects?|whoosh|ding|pop|applause|riser|impact|ambient|chime|audio\s+cue)\b", lower):
         start_time = extracted_start
         end_time = min(duration, round(start_time + 1.0, 2)) if not has_explicit_time else extracted_end
-        sound_name = "whoosh-in"
+        sound_name = "whoosh"
         if "ding" in lower:
-            sound_name = "ding"
+            sound_name = "chime"
         elif "pop" in lower:
             sound_name = "pop"
         elif "applause" in lower:
-            sound_name = "applause"
+            sound_name = "chime"
         elif "riser" in lower:
             sound_name = "riser"
         elif "impact" in lower:
@@ -982,7 +1088,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
         elif "chime" in lower:
             sound_name = "chime"
         elif "whoosh" in lower:
-            sound_name = "whoosh-in"
+            sound_name = "whoosh"
 
         sfx_id = f"sfx-{uuid.uuid4().hex[:8]}"
         edits.append(
@@ -993,7 +1099,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                 end=end_time,
                 track="audio",
                 title=f"SFX: {sound_name.replace('-', ' ').title()}",
-                description=f"Audio accent ({sound_name}) at {start_time:.1f}s.",
+                description=f"Audio accent ({sound_name}) from {start_time:.1f}s to {end_time:.1f}s.",
                 reason=f"Matches sound effect request '{clean_prompt}'.",
                 is_destructive=False,
                 overlap_conflict=False,
@@ -1003,10 +1109,13 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                     "element": {
                         "id": sfx_id,
                         "name": f"SFX: {sound_name.title()}",
-                        "sourceUrl": f"https://cdn.ai-content-manager.com/sfx/{sound_name}.mp3",
+                        "sourceUrl": f"/assets/audio/{sound_name}.mp3",
                         "start": start_time,
                         "end": end_time,
                         "volume": 80,
+                        "fadeIn": 0.0,
+                        "fadeOut": 0.05,
+                        "isBgm": False,
                     }
                 },
                 status="pending"
@@ -1014,10 +1123,15 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
         )
         summary = f"Prepared SFX ({sound_name}) at {start_time:.1f}s."
 
-    # 4. EXPLICIT CAPTION / SUBTITLE / TITLE REQUEST
+    # 4. EXPLICIT CAPTION / SUBTITLE / TITLE REQUEST (Must NOT be an animated motion graphic)
     elif (
-        re.search(r"\b(?:captions?|subtitles?|title\s+saying|title\s+that\s+says|text\s+(?:saying|that\s+says))\b", lower)
-        or re.search(r"\b(?:add|insert|put)\s+(?:a\s+)?(?:title|text|header|caption|subtitle)\s*[:\s]?\s*[\"']", lower)
+        not re.search(r"\b(?:animat\w*|motion\s*graphics?)\b", lower)
+        and not re.search(r"\b(?:blue|cyan|emerald|green|amber|purple)\s+animated\b", lower)
+        and (
+            re.search(r"\b(?:captions?|subtitles?)\b", lower)
+            or (re.search(r"\b(?:title\s+saying|title\s+that\s+says|text\s+(?:saying|that\s+says))\b", lower) and not re.search(r"\b(?:blue|cyan|emerald|green|amber|purple|card|graphic)\b", lower))
+            or re.search(r"\b(?:add|insert|put)\s+(?:a\s+)?(?:header|caption|subtitle)\s*[:\s]?\s*[\"']", lower)
+        )
     ):
         start_time = extracted_start
         end_time = extracted_end
@@ -1091,11 +1205,38 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                         llm_handled = True
 
                     elif proposal.intent == "add_graphic":
-                        comp_id = (proposal.graphic_template or "hero_reveal").replace("_", "-")
-                        title_text = comp_id.replace("-", " ").title()
+                        tmpl = proposal.graphic_template or "hero-reveal"
+                        if tmpl in ("hero_reveal", "hero-reveal"):
+                            comp_id = "hero-reveal"
+                        elif tmpl in ("animated_counter", "animated-counter"):
+                            comp_id = "animated-counter"
+                        else:
+                            comp_id = tmpl.replace("_", "-")
+
+                        title_text = comp_id.replace("_", " ").replace("-", " ").title()
                         props = proposal.graphic_props or {}
 
-                        if comp_id == "app-screen-upload":
+                        if comp_id in ("hero_reveal", "hero-reveal"):
+                            title_text = "Hero Reveal"
+                            headline_val = props.get("headline") or props.get("title") or "The Solution"
+                            color_val = props.get("colorTheme") or ("blue" if "blue" in lower else "purple")
+                            props = {
+                                "headline": headline_val,
+                                "title": headline_val,
+                                "label": props.get("label", "KEY INSIGHT"),
+                                "supporting": props.get("supporting", "Accelerating workflow execution"),
+                                "colorTheme": color_val,
+                            }
+                        elif comp_id in ("animated_counter", "animated-counter"):
+                            title_text = "Animated Counter"
+                            props = {
+                                "from": props.get("from", 0),
+                                "to": props.get("to", 50000),
+                                "label": str(props.get("label", "SUBSCRIBERS")).upper(),
+                                "prefix": props.get("prefix", ""),
+                                "suffix": props.get("suffix", "k"),
+                            }
+                        elif comp_id == "app-screen-upload":
                             title_text = "App Screen Upload"
                             file_name = props.get("fileName") or "upload_video.mp4"
                             if "upload" not in file_name.lower():
@@ -1146,6 +1287,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                                 "personality": props.get("personality", "premium"),
                             }
 
+                        safe_pos = compute_safe_graphic_position(request.context.safe_zones)
                         graphic_id = f"graphic-{uuid.uuid4().hex[:8]}"
                         edit_item = ProposedEditItem(
                             id=f"prop-{uuid.uuid4().hex[:6]}",
@@ -1169,7 +1311,9 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                                     "props": props,
                                     "start": start_time,
                                     "end": end_time,
-                                    "position": {"x": 50, "y": 35},
+                                    "position": safe_pos,
+                                    "positionX": safe_pos["x"],
+                                    "positionY": safe_pos["y"],
                                     "scale": 1.0,
                                     "rotation": 0,
                                     "isUserLocked": False,
@@ -1211,7 +1355,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                             end=end_time,
                             track="broll",
                             title=f"Stock B-Roll: {title_text}",
-                            description=f"High-quality {orientation} stock footage ({width}x{height}) matching '{query_topic}' overlaying timeline from {start_time:.1f}s to {end_time:.1f}s.",
+                            description=f"High-quality {orientation} stock footage ({width}x{height}) matching '{query_topic}' overlaying timeline from {start_time:.1f}s to {end_time:.1f}s with speech audio preserved.",
                             reason=f"Matches narrative beat: {proposal.summary}",
                             is_destructive=False,
                             overlap_conflict=False,
@@ -1223,9 +1367,12 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                                     "id": broll_id,
                                     "name": title_text,
                                     "sourceUrl": source_url,
+                                    "thumbnailUrl": preview_url,
                                     "start": start_time,
                                     "end": end_time,
                                     "opacity": 100,
+                                    "volume": 0,
+                                    "muted": True,
                                     "fitMode": "cover",
                                     "position": {"x": 50, "y": 50},
                                     "scale": 1.0,
@@ -1323,7 +1470,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                                 end=end_time,
                                 track="broll",
                                 title=f"Website Recording: {tab_title}",
-                                description=f"Natural scrolling screen recording of {target_url} overlaid as B-roll footage.",
+                                description=f"Natural scrolling screen recording of {target_url} overlaid as B-roll footage with narration preserved.",
                                 reason=proposal.summary or f"Natural website screen recording of {target_url}.",
                                 is_destructive=False,
                                 overlap_conflict=False,
@@ -1335,9 +1482,12 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                                         "id": broll_id,
                                         "name": f"Recording: {tab_title}",
                                         "sourceUrl": video_url,
+                                        "thumbnailUrl": preview_url,
                                         "start": start_time,
                                         "end": end_time,
                                         "opacity": 100,
+                                        "volume": 0,
+                                        "muted": True,
                                         "fitMode": "cover",
                                         "position": {"x": 50, "y": 50},
                                         "scale": 1.0,
@@ -1385,6 +1535,61 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                         "dataPoint2": "Stage 2: +85%",
                         "dataPoint3": "Stage 3: +165% Surge",
                         "personality": "technical",
+                    }
+                elif (
+                    re.search(r"\b(?:counter|counting|subscribers?|followers?|views?)\b", lower)
+                    and re.search(r"\b(?:animat\w*|motion|card|graphic|kpi|ticker)\b", lower)
+                ) or re.search(r"\b(?:animated\s+counter|subscriber\s+counter|follower\s+counter|counting\s+to)\b", lower):
+                    comp_id = "animated-counter"
+                    title_text = "Animated Counter"
+                    count_match = re.search(r"\b(?:to|counting\s+to|reach(?:ing)?\s+to|at)?\s*([0-9]+(?:\.[0-9]+)?)\s*([kmb])?\b", lower)
+                    to_val = 50000
+                    suffix = "k"
+                    if count_match:
+                        base_num = float(count_match.group(1))
+                        unit = (count_match.group(2) or "").lower()
+                        if unit == "k":
+                            to_val = int(base_num * 1000)
+                            suffix = "k"
+                        elif unit == "m":
+                            to_val = int(base_num * 1000000)
+                            suffix = "M"
+                        elif unit == "b":
+                            to_val = int(base_num * 1000000000)
+                            suffix = "B"
+                        else:
+                            to_val = int(base_num)
+                            suffix = ""
+                    label = "SUBSCRIBERS" if "sub" in lower else "FOLLOWERS" if "follow" in lower else "METRIC COUNTER"
+                    props = {
+                        "from": 0,
+                        "to": to_val,
+                        "label": label,
+                        "prefix": "",
+                        "suffix": suffix,
+                    }
+                elif (
+                    re.search(r"\b(?:animated\s+title|title\s+saying|animated\s+headline|hero\s+reveal|title\s+card|text\s+card)\b", lower)
+                    or (re.search(r"\b(?:animat\w*|motion\s*graphics?)\b", lower) and re.search(r"\b(?:title|headline|card)\b", lower))
+                    or re.search(r"\b(?:blue|cyan|emerald|green|amber|purple)\s+animated\b", lower)
+                ):
+                    comp_id = "hero-reveal"
+                    title_text = "Hero Reveal"
+                    headline_match = re.search(r'(?:saying|titled|reading|with text)?\s*[\'"]([^\'"]+)[\'"]', clean_prompt, re.I)
+                    headline = headline_match.group(1).strip() if headline_match else ""
+                    if not headline:
+                        saying_match = re.search(r'\bsaying\s+([^,.;\n]+?)(?:\s+(?:from|between|at|to|for)\b|$)', clean_prompt, re.I)
+                        if saying_match:
+                            headline = saying_match.group(1).strip()
+                    if not headline:
+                        headline = "The Solution" if "solution" in lower else "Essential Insight"
+                    color_theme = "blue" if "blue" in lower else "cyan" if "cyan" in lower else "emerald" if "green" in lower or "emerald" in lower else "amber" if "amber" in lower or "yellow" in lower else "purple"
+                    props = {
+                        "headline": headline,
+                        "title": headline,
+                        "label": "KEY INSIGHT",
+                        "supporting": "Accelerating workflow execution",
+                        "colorTheme": color_theme,
                     }
                 elif re.search(r"\b(?:counter|metric|kpi|revenue|subscribers|users|numbers)\b", lower):
                     comp_id = "metric-reveal"
@@ -1443,12 +1648,16 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                 else:
                     comp_id = "hero-reveal"
                     title_text = "Hero Reveal"
+                    headline_match = re.search(r'(?:saying|titled)?\s*[\'"]([^\'"]+)[\'"]', clean_prompt, re.I)
+                    headline_val = headline_match.group(1).strip() if headline_match else "Essential Insight"
                     props = {
                         "label": "KEY TAKEAWAY",
-                        "headline": "Essential Insight",
+                        "headline": headline_val,
                         "supporting": clean_prompt,
+                        "colorTheme": "blue" if "blue" in lower else "purple",
                     }
 
+                safe_pos = compute_safe_graphic_position(request.context.safe_zones)
                 graphic_id = f"graphic-{uuid.uuid4().hex[:8]}"
                 edit_item = ProposedEditItem(
                     id=f"prop-{uuid.uuid4().hex[:6]}",
@@ -1456,7 +1665,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                     start=start_time,
                     end=end_time,
                     track="graphic",
-                    title=f"Motion Card: {comp_id.replace('-', ' ').title()}",
+                    title=f"Motion Card: {comp_id.replace('_', ' ').replace('-', ' ').title()}",
                     description=f"High-production Remotion motion graphic positioned non-destructively on graphics track.",
                     reason=f"Visualizes narrative concept from prompt '{clean_prompt}'.",
                     is_destructive=False,
@@ -1467,12 +1676,14 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                         "track": "graphic",
                         "element": {
                             "id": graphic_id,
-                            "name": comp_id.replace("-", " ").title(),
+                            "name": comp_id.replace("_", " ").replace("-", " ").title(),
                             "compositionId": comp_id,
                             "props": props,
                             "start": start_time,
                             "end": end_time,
-                            "position": {"x": 50, "y": 35},
+                            "position": safe_pos,
+                            "positionX": safe_pos["x"],
+                            "positionY": safe_pos["y"],
                             "scale": 1.0,
                             "rotation": 0,
                             "isUserLocked": False,
@@ -1496,14 +1707,16 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                 end_time = extracted_end
 
                 query_topic = re.sub(
-                    r"\b(?:b-?roll|broll|footage|video|clip|person|showing|of|i want|want|a screen in which|a screen showing|screen showing|screen|user is|on screen|from|between|at|to)\b",
+                    r"\b(?:add|relevant|insert|put|overlay|b-?roll|broll|footage|video|clip|person|showing|of|i want|want|a screen in which|a screen showing|screen showing|screen|user is|on screen|from|between|at|to|and|keep|my|our|the|narration|audible|audio|clear|uninterrupted)\b",
                     "",
                     lower,
                     flags=re.I
                 ).strip()
                 query_topic = re.sub(r"\s+", " ", query_topic).strip()
                 if not query_topic or len(query_topic) < 3:
-                    if "upload" in lower:
+                    if "coding" in lower or "code" in lower:
+                        query_topic = "laptop coding developer"
+                    elif "upload" in lower:
                         query_topic = "user uploading video on screen"
                     elif "screen" in lower:
                         query_topic = "computer screen technology"
@@ -1537,7 +1750,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                     end=end_time,
                     track="broll",
                     title=f"Stock B-Roll: {title_text}",
-                    description=f"High-quality {orientation} stock footage ({width}x{height}) matching '{query_topic}' overlaying timeline from {start_time:.1f}s to {end_time:.1f}s.",
+                    description=f"High-quality {orientation} stock footage ({width}x{height}) matching '{query_topic}' overlaying timeline from {start_time:.1f}s to {end_time:.1f}s with speech narration preserved.",
                     reason=f"Matches user creative request '{clean_prompt}' from {start_time:.1f}s to {end_time:.1f}s.",
                     is_destructive=False,
                     overlap_conflict=False,
@@ -1549,9 +1762,12 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                             "id": broll_id,
                             "name": title_text,
                             "sourceUrl": source_url,
+                            "thumbnailUrl": preview_url,
                             "start": start_time,
                             "end": end_time,
                             "opacity": 100,
+                            "volume": 0,
+                            "muted": True,
                             "fitMode": "cover",
                             "position": {"x": 50, "y": 50},
                             "scale": 1.0,

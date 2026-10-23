@@ -14,9 +14,9 @@ STYLE PROFILE INSTRUCTIONS:
 RULES:
 1. 'cut': Remove ONLY genuine mistakes or extremely long unnecessary pauses.
 2. 'b_roll': Use when visually reinforcing an important concept. Provide 'trigger_id', 'search_query', and a strong 'reason'.
-3. **HIGH RETENTION PACING (CRITICAL):** This is a high-energy TikTok/Reels style video. Visuals must change every 1.5 to 3.0 seconds. 
-4. **EXACT SENTENCE MAPPING:** Never stretch a single b_roll clip over multiple different sentences. If sentence 1 is about "money" and sentence 2 is about "time", you MUST output two separate b_roll events. Map the visuals exactly to the words being spoken at that exact timestamp.
-5. **Transitions**: Provide a `transition` (e.g., "fade", "crossfade", "slide", "push", "zoom", "wipe", "morph") if the incoming B-roll should blend smoothly from the previous visual. Leave null for a clean cut. Transition selection should depend on the relationship between scenes.
+3. **HIGH RETENTION PACING (CRITICAL):** This is a high-energy TikTok/Reels style video. Visuals must change every 1.5 to 3.0 seconds (optimal clip length is 2.0 to 2.5s). Never let a single visual linger past 3 seconds without a cut or motion graphic overlay.
+4. **EXACT METAPHOR & WORD MAPPING:** Never stretch a single b_roll clip over multiple different sentences or metaphors. If sentence 1 is about 'searching for a needle in a haystack' and sentence 2 is 'just buy the whole haystack', output TWO distinct b_roll events (e.g., magnifying glass close-up inspection ➔ expansive skyline/harbor). Match the stock footage visual directly to the words being spoken.
+5. **SMOOTH DISSOLVES & TRANSITIONS**: Provide a `transition` (default to 'fade' or 'crossfade') to ensure buttery-smooth scene dissolves and eliminate abrupt hard-cut flashing. Provide other transitions ('slide', 'zoom', 'wipe') when appropriate for energetic scene shifts.
 
 OUTPUT SCHEMA (JSON):
 {{
@@ -39,7 +39,7 @@ OUTPUT SCHEMA (JSON):
         is_faceless = beat_sheet.get("is_faceless", False) or ("faceless" in str(ua).lower())
         if beat_sheet and beat_sheet.get("beats"):
             if is_faceless:
-                treatment_rule = "2. TREATMENT ASSIGNMENT (FACELESS MODE): Prioritize beats with 'treatment': 'b_roll', but you MUST ALSO generate b-roll for beats that need visual background footage (including beats with motion_graphic, kinetic_text, or untreated gaps) so the video maintains continuous, high-retention visual stock footage without black screens."
+                treatment_rule = "2. TREATMENT ASSIGNMENT (FACELESS MODE): Prioritize beats with 'treatment': 'b_roll', and generate B-roll for visual background footage (including relevant interviews, speakers, or thematic concepts). Keep all B-roll clips concise (2.0s - 4.0s) so visuals change rapidly without lingering too long."
             else:
                 treatment_rule = "2. TREATMENT ASSIGNMENT (TALKING HEAD MODE): This is a TALKING HEAD video with an on-camera speaker. Only generate 'b_roll' for beats with 'treatment': 'b_roll'. Do NOT generate b-roll for beats where treatment is 'none' — those segments MUST show the speaker speaking directly to the audience on camera!"
 

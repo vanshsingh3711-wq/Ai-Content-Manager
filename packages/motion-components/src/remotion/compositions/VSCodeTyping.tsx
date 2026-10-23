@@ -2,12 +2,18 @@ import React from 'react';
 import { AbsoluteFill, useVideoConfig, useCurrentFrame } from 'remotion';
 import { COLORS, FONT, useExitFade } from '../shared';
 
-interface Props { title: string; activeFile: string; code: string; language?: string; personality?: string; }
+interface Props { title?: string; activeFile?: string; code?: string; command?: string; language?: string; personality?: string; }
 
-export const VSCodeTyping: React.FC<Props> = ({ title, activeFile, code, language = 'python' }) => {
+export const VSCodeTyping: React.FC<Props> = (props) => {
   const { durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
   const exit = useExitFade(durationInFrames);
+
+  const title = props.title || 'VS CODE';
+  const activeFile = props.activeFile || 'main.py';
+  const code = props.code || props.command || 'python main.py';
+  const language = props.language || 'python';
+
   const lines = code.split('\n');
   // Reveal 1 char per frame after frame 10
   const totalChars = code.length;

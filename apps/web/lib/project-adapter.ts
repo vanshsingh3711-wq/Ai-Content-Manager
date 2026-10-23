@@ -181,6 +181,8 @@ export function timelineProjectToSceneDefinition(
         src: clip.sourceUrl,
         fit: clip.fitMode || "cover",
         opacity: (clip.opacity ?? 100) / 100,
+        volume: (clip.volume ?? 0) / 100,
+        muted: clip.muted ?? true,
         position: { x: pixelX, y: pixelY },
         metadata: {
           trackType: "broll",
@@ -188,6 +190,8 @@ export function timelineProjectToSceneDefinition(
           thumbnailUrl: clip.thumbnailUrl,
           rotation: clip.rotation,
           rawPosition: { x: posX, y: posY },
+          volume: clip.volume ?? 0,
+          muted: clip.muted ?? true,
         },
       },
       animation: clip.animation,
@@ -200,8 +204,10 @@ export function timelineProjectToSceneDefinition(
     const endFrame = secondsToFrames(clip.end, fps);
     const durationInFrames = Math.max(1, endFrame - startFrame);
 
+    const isFaceless = (project as any).videoType === "faceless_short" || (project as any).isFaceless || (project as any).settings?.video_type === "faceless_short" || (project as any).settings?.is_faceless;
+    const defaultPosY = isFaceless ? 50 : 75;
     const posX = clip.position?.x ?? clip.positionX ?? 50;
-    const posY = clip.position?.y ?? clip.positionY ?? 75;
+    const posY = clip.position?.y ?? clip.positionY ?? defaultPosY;
     const pixelX = percentToPixels(posX, canvas.width);
     const pixelY = percentToPixels(posY, canvas.height);
     const scale = clip.scale ?? 1.0;
@@ -309,6 +315,8 @@ export function timelineProjectToSceneDefinition(
       metadata: {
         name: clip.name,
         isBgm: clip.isBgm,
+        ducking: clip.ducking,
+        duckingDb: clip.duckingDb,
       },
     };
   });
@@ -419,6 +427,8 @@ export function sceneDefinitionToTimelineProject(
           start,
           end,
           opacity: Math.round((elem.videoConfig?.opacity ?? 1.0) * 100),
+          volume: meta.volume ?? (elem.videoConfig?.volume !== undefined ? Math.round((elem.videoConfig.volume as number) * 100) : 0),
+          muted: meta.muted ?? true,
           fitMode: (elem.videoConfig?.fit === "contain" ? "contain" : "cover"),
           position: { x: posX, y: posY },
           positionX: posX,
@@ -496,6 +506,8 @@ export function sceneDefinitionToTimelineProject(
       fadeIn: framesToSeconds(a.fadeInFrames ?? 0, fps),
       fadeOut: framesToSeconds(a.fadeOutFrames ?? 0, fps),
       isBgm: a.type === "music" || meta.isBgm === true,
+      ducking: meta.ducking ?? (a.type === "music" || meta.isBgm === true),
+      duckingDb: meta.duckingDb ?? -14.0,
     };
   });
 
@@ -553,6 +565,8 @@ export function compileTimelineProjectToEdits(project: TimelineProject) {
   (tracks.videoTrack || []).forEach((c) => {
     edits.push({
       id: c.id,
+      trigger_id: c.id,
+      action: "cut",
       type: "cut",
       start: c.start,
       end: c.end,
@@ -569,13 +583,21 @@ export function compileTimelineProjectToEdits(project: TimelineProject) {
   (tracks.brollTrack || []).forEach((b) => {
     edits.push({
       id: b.id,
+      trigger_id: b.id,
+      action: "b_roll",
       type: "broll",
       start: b.start,
       end: b.end,
       sourceUrl: b.sourceUrl,
+      path: b.sourceUrl,
+      broll_path: b.localPath || b.sourceUrl,
+      localPath: b.localPath,
+      broll_query: b.name || "cutaway",
       opacity: b.opacity ?? 100,
       fitMode: b.fitMode || "cover",
       name: b.name,
+      volume: b.volume ?? 0,
+      muted: b.muted ?? true,
     });
   });
 
@@ -583,6 +605,8 @@ export function compileTimelineProjectToEdits(project: TimelineProject) {
   (tracks.textTrack || []).forEach((cap) => {
     edits.push({
       id: cap.id,
+      trigger_id: cap.id,
+      action: "subtitle",
       type: "subtitle",
       start: cap.start,
       end: cap.end,
@@ -597,11 +621,17 @@ export function compileTimelineProjectToEdits(project: TimelineProject) {
   (tracks.graphicsTrack || []).forEach((g) => {
     edits.push({
       id: g.id,
+      trigger_id: g.id,
+      action: "motion_graphics",
       type: "motion_graphic",
       start: g.start,
       end: g.end,
       name: g.name,
       compositionId: g.compositionId,
+      template: g.compositionId,
+      motion_graphics_type: g.compositionId,
+      motion_graphics_targets: g.props || {},
+      motion_graphics_text: g.props?.text || g.name,
       props: g.props || {},
       position: g.position || { x: 50, y: 50 },
       scale: g.scale ?? 1.0,
@@ -612,12 +642,15 @@ export function compileTimelineProjectToEdits(project: TimelineProject) {
   (tracks.audioTrack || []).forEach((a) => {
     edits.push({
       id: a.id,
+      trigger_id: a.id,
+      action: a.isBgm ? "audio" : "sfx",
       type: "audio",
       start: a.start,
       end: a.end,
       sourceUrl: a.sourceUrl,
       volume: a.volume ?? 80,
       isBgm: !!a.isBgm,
+      sound_effect: a.name || "pop",
     });
   });
 

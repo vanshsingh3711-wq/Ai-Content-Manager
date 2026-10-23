@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   PanelLeft,
   Sparkles,
+  History,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -26,6 +27,8 @@ interface EditorTopNavProps {
   onToggleDrawer?: () => void;
   isAssistantOpen?: boolean;
   onToggleAssistant?: () => void;
+  isHistoryOpen?: boolean;
+  onToggleHistory?: () => void;
 }
 
 export function EditorTopNav({
@@ -35,6 +38,8 @@ export function EditorTopNav({
   onToggleDrawer,
   isAssistantOpen,
   onToggleAssistant,
+  isHistoryOpen,
+  onToggleHistory,
 }: EditorTopNavProps) {
   const {
     project,
@@ -186,8 +191,24 @@ export function EditorTopNav({
         </button>
       </div>
 
-      {/* Right: AI Copilot & Export Buttons */}
+      {/* Right: History, AI Copilot & Export Buttons */}
       <div className="flex items-center gap-2">
+        {onToggleHistory && (
+          <button
+            onClick={onToggleHistory}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-sm",
+              isHistoryOpen
+                ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-emerald-500/10"
+                : "border-neutral-800 bg-neutral-900/80 text-neutral-300 hover:text-white hover:border-neutral-700"
+            )}
+            title="Project Version History & Checkpoints"
+          >
+            <History className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Versions</span>
+          </button>
+        )}
+
         {onToggleAssistant && (
           <button
             onClick={onToggleAssistant}

@@ -49,6 +49,49 @@ ALLOWED_COMPOSITIONS = {
     "kinetic_text",
     "app_screen_upload",
     "app-screen-upload",
+    "animated_counter",
+    "animated-counter",
+    "showdown_duel",
+    "showdown-duel",
+    "battle_chart",
+    "battle-chart",
+    "wall_street_failure_hook",
+    "wall-street-failure-hook",
+    "compound_formula",
+    "compound-formula",
+    # Universal Educational & Cognitive Motion Graphics Pack
+    "spotlight_cone",
+    "spotlight-cone",
+    "perception_gauge",
+    "perception-gauge",
+    "brain_neural_scan",
+    "brain-neural-scan",
+    "cognitive_dialogue",
+    "cognitive-dialogue",
+    # Universal Phase 1: Newspaper & Document Highlighter
+    "newspaper_highlighter",
+    "newspaper-highlighter",
+    # Universal Phase 2: Magnifying Glass & Detail Callout
+    "magnifying_glass_zoom",
+    "magnifying-glass-zoom",
+    # Universal Phase 3: Urgency / Risk Dial Gauge
+    "urgency_dial_gauge",
+    "urgency-dial-gauge",
+    # Universal Phase 4: Mind Map & Concept Node Web
+    "mind_map_node_web",
+    "mind-map-node-web",
+    # Universal Phase 5: Timeline Roadmap & Milestone Pathway
+    "timeline_roadmap",
+    "timeline-roadmap",
+    # Universal Phase 6: Hierarchy Pyramid & Foundation Architecture
+    "hierarchy_pyramid",
+    "hierarchy-pyramid",
+    # Universal Phase 7: Tactile Checklist & Decision Matrix
+    "tactile_checklist_stamp",
+    "tactile-checklist-stamp",
+    # Universal Phase 8: Split Slider Comparison & Transformation Wipe
+    "split_slider_comparison",
+    "split-slider-comparison",
     # Cooked Motion Templates
     "cooked_card",
     "cooked_likes",
@@ -59,6 +102,45 @@ ALLOWED_COMPOSITIONS = {
     "cooked_progress",
     "cooked_toasts",
     "cooked_flow",
+    # Creator & Broadcast Pack
+    "lower_third",
+    "lower-third",
+    "subscribe_badge",
+    "subscribe-badge",
+    "countdown_timer",
+    "countdown-timer",
+    "review_card",
+    "review-card",
+    "social_handles",
+    "social-handles",
+    "animated_kpi",
+    "animated-kpi",
+    # Vector Shapes Pack
+    "shape",
+    "shape_element",
+    "shape-element",
+    "animated_arrow",
+    "animated-arrow",
+    # Creator, Badge & Utility Pack
+    "pop_up_badge",
+    "pop-up-badge",
+    "badge",
+    "notes_checklist",
+    "notes-checklist",
+    "checklist",
+    "social_post",
+    "social-post",
+    "tweet",
+    "progress_bar",
+    "progress-bar",
+    "completion_progress",
+    "completion-progress",
+    "timer",
+    "countdown",
+    "review",
+    # Effects Pack
+    "effect_overlay",
+    "effect-overlay",
 }
 
 
@@ -95,6 +177,7 @@ def render_motion_graphic(
         json.dump(render_props, f)
         props_file = f.name
 
+    output_path = os.path.abspath(output_path)
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
     try:
@@ -120,9 +203,17 @@ def render_motion_graphic(
         print(f"[RemotionRenderer] 🎬 Rendering '{comp_kebab}' ({duration_frames}f @ {fps}fps, {width}x{height})")
         print(f"[RemotionRenderer] Props: {json.dumps(props, indent=2)}")
 
+        cmd_env = dict(os.environ)
+        custom_tmp = os.path.join(_PROJECT_ROOT, "media_temp", "tmp")
+        os.makedirs(custom_tmp, exist_ok=True)
+        cmd_env["TMPDIR"] = custom_tmp
+        cmd_env["TEMP"] = custom_tmp
+        cmd_env["TMP"] = custom_tmp
+
         result = subprocess.run(
             cmd,
             cwd=MOTION_PKG_DIR,
+            env=cmd_env,
             capture_output=True,
             text=True,
             timeout=timeout_sec,
@@ -161,14 +252,19 @@ def build_props_from_edit(edit: Dict[str, Any]) -> Dict[str, Any]:
     targets = edit.get("motion_graphics_targets", {})
     personality = edit.get("personality", "premium")
 
+    # Base props preserving all targets passed in by planner or inspector
+    props: Dict[str, Any] = dict(targets) if isinstance(targets, dict) else {}
+    props["personality"] = personality
+
     if comp_id.startswith("cooked_") or comp_id.startswith("cooked-"):
-        props = dict(targets) if isinstance(targets, dict) else {}
-        props["personality"] = personality
         return props
 
     # Template-specific prop mapping
     PROP_MAPS = {
-        "hero_reveal":        {"label": "label", "headline": "headline", "supporting": "supporting"},
+        "hero_reveal":        {"label": "label", "headline": "headline", "supporting": "supporting", "colorTheme": "colorTheme", "accentColor": "accentColor"},
+        "hero-reveal":        {"label": "label", "headline": "headline", "supporting": "supporting", "colorTheme": "colorTheme", "accentColor": "accentColor"},
+        "animated_counter":   {"label": "label", "from": "from", "to": "to", "prefix": "prefix", "suffix": "suffix"},
+        "animated-counter":   {"label": "label", "from": "from", "to": "to", "prefix": "prefix", "suffix": "suffix"},
         "metric_reveal":      {"label": "label", "metric": "metric", "delta": "delta"},
         "quote_reveal":       {"quote": "quote", "author": "author"},
         "step_sequence":      {"title": "title", "step1": "step1", "step2": "step2", "step3": "step3", "step4": "step4"},
@@ -180,15 +276,59 @@ def build_props_from_edit(edit: Dict[str, Any]) -> Dict[str, Any]:
         "browser_walkthrough":{"url": "url", "tabTitle": "tabTitle", "highlightText": "highlightText"},
         "vscode_code_typing": {"title": "title", "activeFile": "activeFile", "code": "code", "language": "language"},
         "kinetic_text":       {"text": "text"},
+        "animated_arrow":     {"direction": "direction", "accentColor": "accentColor"},
+        "animated-arrow":     {"direction": "direction", "accentColor": "accentColor"},
+        "pop_up_badge":       {"text": "text", "label": "label", "accentColor": "accentColor"},
+        "pop-up-badge":       {"text": "text", "label": "label", "accentColor": "accentColor"},
+        "showdown_duel":      {"title": "title", "wagerAmount": "wagerAmount", "timeframe": "timeframe", "side1Title": "side1Title", "side1Sub": "side1Sub", "side1Fee": "side1Fee", "side2Title": "side2Title", "side2Sub": "side2Sub", "side2Fee": "side2Fee"},
+        "showdown-duel":      {"title": "title", "wagerAmount": "wagerAmount", "timeframe": "timeframe", "side1Title": "side1Title", "side1Sub": "side1Sub", "side1Fee": "side1Fee", "side2Title": "side2Title", "side2Sub": "side2Sub", "side2Fee": "side2Fee"},
+        "battle_chart":       {"title": "title", "subtitle": "subtitle", "sp500Label": "sp500Label", "sp500Return": "sp500Return", "hedgeLabel": "hedgeLabel", "hedgeReturn": "hedgeReturn", "deltaLabel": "deltaLabel", "side1Sub": "side1Sub", "side1FooterLabel": "side1FooterLabel", "side1FooterVal": "side1FooterVal", "side2Sub": "side2Sub", "side2FooterLabel": "side2FooterLabel", "side2FooterVal": "side2FooterVal", "deltaSub": "deltaSub"},
+        "battle-chart":       {"title": "title", "subtitle": "subtitle", "sp500Label": "sp500Label", "sp500Return": "sp500Return", "hedgeLabel": "hedgeLabel", "hedgeReturn": "hedgeReturn", "deltaLabel": "deltaLabel", "side1Sub": "side1Sub", "side1FooterLabel": "side1FooterLabel", "side1FooterVal": "side1FooterVal", "side2Sub": "side2Sub", "side2FooterLabel": "side2FooterLabel", "side2FooterVal": "side2FooterVal", "deltaSub": "deltaSub"},
+        "compound_formula":   {"title": "title", "autoAmount": "autoAmount", "compoundTotal": "compoundTotal", "step1Title": "step1Title", "step1Sub": "step1Sub", "step1Badge": "step1Badge", "step1Icon": "step1Icon", "step2Title": "step2Title", "step2Sub": "step2Sub", "step2Badge": "step2Badge", "step2Icon": "step2Icon", "step3Title": "step3Title", "step3Sub": "step3Sub", "step3Prefix": "step3Prefix", "step3Suffix": "step3Suffix", "step3Icon": "step3Icon", "bottomBanner": "bottomBanner", "bannerIcon": "bannerIcon"},
+        "compound-formula":   {"title": "title", "autoAmount": "autoAmount", "compoundTotal": "compoundTotal", "step1Title": "step1Title", "step1Sub": "step1Sub", "step1Badge": "step1Badge", "step1Icon": "step1Icon", "step2Title": "step2Title", "step2Sub": "step2Sub", "step2Badge": "step2Badge", "step2Icon": "step2Icon", "step3Title": "step3Title", "step3Sub": "step3Sub", "step3Prefix": "step3Prefix", "step3Suffix": "step3Suffix", "step3Icon": "step3Icon", "bottomBanner": "bottomBanner", "bannerIcon": "bannerIcon"},
+        "wall_street_failure_hook": {"headline": "headline", "badge": "badge", "source": "source", "failureRate": "failureRate", "label": "label", "failLabel": "failLabel", "passLabel": "passLabel", "bottomStamp": "bottomStamp", "stampEmoji": "stampEmoji"},
+        "wall-street-failure-hook": {"headline": "headline", "badge": "badge", "source": "source", "failureRate": "failureRate", "label": "label", "failLabel": "failLabel", "passLabel": "passLabel", "bottomStamp": "bottomStamp", "stampEmoji": "stampEmoji"},
+        # Universal Educational & Cognitive Pack
+        "spotlight_cone":     {"headline": "headline", "subtext": "subtext", "badge": "badge", "egoPercent": "egoPercent", "tagline": "tagline"},
+        "spotlight-cone":     {"headline": "headline", "subtext": "subtext", "badge": "badge", "egoPercent": "egoPercent", "tagline": "tagline"},
+        "perception_gauge":   {"title": "title", "badge": "badge", "perceivedLabel": "perceivedLabel", "perceivedValue": "perceivedValue", "perceivedSub": "perceivedSub", "actualLabel": "actualLabel", "actualValue": "actualValue", "actualSub": "actualSub", "deltaLabel": "deltaLabel", "deltaSub": "deltaSub"},
+        "perception-gauge":   {"title": "title", "badge": "badge", "perceivedLabel": "perceivedLabel", "perceivedValue": "perceivedValue", "perceivedSub": "perceivedSub", "actualLabel": "actualLabel", "actualValue": "actualValue", "actualSub": "actualSub", "deltaLabel": "deltaLabel", "deltaSub": "deltaSub"},
+        "brain_neural_scan":  {"title": "title", "badge": "badge", "cortexTitle": "cortexTitle", "cortexSub": "cortexSub", "amygdalaTitle": "amygdalaTitle", "amygdalaSub": "amygdalaSub", "verdictBadge": "verdictBadge", "verdictSub": "verdictSub"},
+        "brain-neural-scan":  {"title": "title", "badge": "badge", "cortexTitle": "cortexTitle", "cortexSub": "cortexSub", "amygdalaTitle": "amygdalaTitle", "amygdalaSub": "amygdalaSub", "verdictBadge": "verdictBadge", "verdictSub": "verdictSub"},
+        "cognitive_dialogue": {"title": "title", "badge": "badge", "firstPersonText": "firstPersonText", "firstPersonLabel": "firstPersonLabel", "thirdPersonText": "thirdPersonText", "thirdPersonLabel": "thirdPersonLabel", "bottomCallout": "bottomCallout"},
+        "cognitive-dialogue": {"title": "title", "badge": "badge", "firstPersonText": "firstPersonText", "firstPersonLabel": "firstPersonLabel", "thirdPersonText": "thirdPersonText", "thirdPersonLabel": "thirdPersonLabel", "bottomCallout": "bottomCallout"},
+        # Universal Phase 1: Newspaper & Document Highlighter
+        "newspaper_highlighter": {"outlet": "outlet", "date": "date", "headline": "headline", "bodyText": "bodyText", "highlightText": "highlightText", "markerColor": "markerColor", "stamp": "stamp"},
+        "newspaper-highlighter": {"outlet": "outlet", "date": "date", "headline": "headline", "bodyText": "bodyText", "highlightText": "highlightText", "markerColor": "markerColor", "stamp": "stamp"},
+        # Universal Phase 2: Magnifying Glass & Detail Callout
+        "magnifying_glass_zoom": {"backgroundSnippet": "backgroundSnippet", "zoomTarget": "zoomTarget", "calloutTitle": "calloutTitle", "calloutDetail": "calloutDetail", "calloutBadge": "calloutBadge"},
+        "magnifying-glass-zoom": {"backgroundSnippet": "backgroundSnippet", "zoomTarget": "zoomTarget", "calloutTitle": "calloutTitle", "calloutDetail": "calloutDetail", "calloutBadge": "calloutBadge"},
+        # Universal Phase 3: Urgency / Risk Dial Gauge
+        "urgency_dial_gauge": {"title": "title", "badge": "badge", "value": "value", "unit": "unit", "zoneLabel": "zoneLabel", "subtext": "subtext"},
+        "urgency-dial-gauge": {"title": "title", "badge": "badge", "value": "value", "unit": "unit", "zoneLabel": "zoneLabel", "subtext": "subtext"},
+        # Universal Phase 4: Mind Map & Concept Node Web
+        "mind_map_node_web": {"title": "title", "badge": "badge", "centerTitle": "centerTitle", "centerIcon": "centerIcon", "node1Title": "node1Title", "node1Desc": "node1Desc", "node1Icon": "node1Icon", "node2Title": "node2Title", "node2Desc": "node2Desc", "node2Icon": "node2Icon", "node3Title": "node3Title", "node3Desc": "node3Desc", "node3Icon": "node3Icon"},
+        "mind-map-node-web": {"title": "title", "badge": "badge", "centerTitle": "centerTitle", "centerIcon": "centerIcon", "node1Title": "node1Title", "node1Desc": "node1Desc", "node1Icon": "node1Icon", "node2Title": "node2Title", "node2Desc": "node2Desc", "node2Icon": "node2Icon", "node3Title": "node3Title", "node3Desc": "node3Desc", "node3Icon": "node3Icon"},
+        # Universal Phase 5: Timeline Roadmap & Milestone Pathway
+        "timeline_roadmap": {"title": "title", "badge": "badge", "step1Title": "step1Title", "step1Date": "step1Date", "step1Desc": "step1Desc", "step2Title": "step2Title", "step2Date": "step2Date", "step2Desc": "step2Desc", "step3Title": "step3Title", "step3Date": "step3Date", "step3Desc": "step3Desc"},
+        "timeline-roadmap": {"title": "title", "badge": "badge", "step1Title": "step1Title", "step1Date": "step1Date", "step1Desc": "step1Desc", "step2Title": "step2Title", "step2Date": "step2Date", "step2Desc": "step2Desc", "step3Title": "step3Title", "step3Date": "step3Date", "step3Desc": "step3Desc"},
+        # Universal Phase 6: Hierarchy Pyramid & Foundation Architecture
+        "hierarchy_pyramid": {"title": "title", "badge": "badge", "tier1Title": "tier1Title", "tier1Desc": "tier1Desc", "tier2Title": "tier2Title", "tier2Desc": "tier2Desc", "tier3Title": "tier3Title", "tier3Desc": "tier3Desc"},
+        "hierarchy-pyramid": {"title": "title", "badge": "badge", "tier1Title": "tier1Title", "tier1Desc": "tier1Desc", "tier2Title": "tier2Title", "tier2Desc": "tier2Desc", "tier3Title": "tier3Title", "tier3Desc": "tier3Desc"},
+        # Universal Phase 7: Tactile Checklist & Decision Matrix
+        "tactile_checklist_stamp": {"title": "title", "badge": "badge", "item1Text": "item1Text", "item1Status": "item1Status", "item2Text": "item2Text", "item2Status": "item2Status", "item3Text": "item3Text", "item3Status": "item3Status", "verdictText": "verdictText", "verdictStatus": "verdictStatus", "synthesis": "synthesis"},
+        "tactile-checklist-stamp": {"title": "title", "badge": "badge", "item1Text": "item1Text", "item1Status": "item1Status", "item2Text": "item2Text", "item2Status": "item2Status", "item3Text": "item3Text", "item3Status": "item3Status", "verdictText": "verdictText", "verdictStatus": "verdictStatus", "synthesis": "synthesis"},
+        # Universal Phase 8: Split Slider Comparison & Transformation Wipe
+        "split_slider_comparison": {"title": "title", "badge": "badge", "leftTag": "leftTag", "leftTitle": "leftTitle", "leftMetric": "leftMetric", "leftDetail": "leftDetail", "leftIcon": "leftIcon", "rightTag": "rightTag", "rightTitle": "rightTitle", "rightMetric": "rightMetric", "rightDetail": "rightDetail", "rightIcon": "rightIcon", "sliderStart": "sliderStart", "sliderEnd": "sliderEnd", "synthesis": "synthesis"},
+        "split-slider-comparison": {"title": "title", "badge": "badge", "leftTag": "leftTag", "leftTitle": "leftTitle", "leftMetric": "leftMetric", "leftDetail": "leftDetail", "leftIcon": "leftIcon", "rightTag": "rightTag", "rightTitle": "rightTitle", "rightMetric": "rightMetric", "rightDetail": "rightDetail", "rightIcon": "rightIcon", "sliderStart": "sliderStart", "sliderEnd": "sliderEnd", "synthesis": "synthesis"},
     }
 
     prop_map = PROP_MAPS.get(comp_id, {})
-    props: Dict[str, Any] = {"personality": personality}
 
     for remotion_key, target_key in prop_map.items():
-        value = targets.get(target_key) or targets.get(remotion_key)
+        value = targets.get(target_key) if target_key in targets else targets.get(remotion_key)
         if value is not None:
-            props[remotion_key] = str(value)
+            props[remotion_key] = value
 
     return props
 

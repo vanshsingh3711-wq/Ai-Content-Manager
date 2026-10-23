@@ -24,7 +24,7 @@ class EditDecision(BaseModel):
     end: Optional[float] = Field(None, description="End timestamp for cuts.")
     search_query: Optional[str] = Field(None, description="Keywords for Pexels B-roll video search if action is 'b_roll'.")
     sound_effect: Optional[str] = Field(None, description="Sound effect name (e.g. 'whoosh', 'pop', 'ding') if action is 'sfx'.")
-    motion_graphics_type: Optional[str] = Field(None, description="Type of motion composition (e.g. hero_reveal, metric_reveal, step_sequence, quote_reveal)")
+    motion_graphics_type: Optional[str] = Field(None, description="Type of motion composition (e.g. hero_reveal, showdown_duel, battle_chart, compound_formula, wall_street_failure_hook, metric_reveal, step_sequence, quote_reveal)")
     motion_graphics_targets: Optional[dict] = Field(None, description="Dictionary of targets for the composition (e.g. {'headline': 'DATA-DRIVEN', 'label': 'NEW SYSTEM'})")
     motion_graphics_personality: Optional[str] = Field(None, description="Physics personality (e.g. energetic, premium, technical)")
     character_action: Optional[str] = Field(None, description="Action for 2D character (e.g., 'pointing', 'surprised', 'explaining') if action is 'character'.")

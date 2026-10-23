@@ -12,6 +12,8 @@ import {
   Sparkles,
   GripVertical,
   Mic,
+  Shapes,
+  Check,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -24,8 +26,10 @@ import {
   EditorDragPayload,
 } from "@/lib/editor/drag-drop-types";
 import { TranscriptDrawer } from "./TranscriptDrawer";
+import { ResourceLibraryDrawer } from "./ResourceLibraryDrawer";
+import { CAPTION_TEMPLATES } from "@/lib/editor/caption-templates";
 
-export type MediaDrawerTab = "media" | "captions" | "broll" | "graphics" | "audio" | "transcript";
+export type MediaDrawerTab = "library" | "media" | "captions" | "broll" | "graphics" | "audio" | "transcript";
 
 interface MediaDrawerProps {
   activeTab?: MediaDrawerTab;
@@ -74,9 +78,14 @@ const MOTION_GRAPHIC_PRESETS = [
     duration: 4.0,
     props: {
       title: "GROWTH TREND",
+      badgeText: "SURGE +165%",
       dataPoint1: "Stage 1: Baseline",
+      val1: "1.0x",
       dataPoint2: "Stage 2: +85%",
+      val2: "1.85x",
       dataPoint3: "Stage 3: +165% Surge",
+      val3: "2.65x 🔥",
+      accentColor: "#22d3ee",
       personality: "technical",
     },
   },
@@ -140,11 +149,15 @@ export function MediaDrawer({
   const [brollSearch, setBrollSearch] = useState("");
   const [captionInput, setCaptionInput] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<CaptionPreset>("tiktok_yellow");
+  const [captionFeedback, setCaptionFeedback] = useState<string | null>(null);
 
   const {
     project,
     playheadTime,
+    selectedItem,
     addCaption,
+    updateCaption,
+    dispatchOperation,
     addBRollClip,
     addAudioClip,
     addGraphicElement,
@@ -153,7 +166,10 @@ export function MediaDrawer({
     useShallow((state) => ({
       project: state.project,
       playheadTime: state.playheadTime,
+      selectedItem: state.selectedItem,
       addCaption: state.addCaption,
+      updateCaption: state.updateCaption,
+      dispatchOperation: state.dispatchOperation,
       addBRollClip: state.addBRollClip,
       addAudioClip: state.addAudioClip,
       addGraphicElement: state.addGraphicElement,
@@ -237,33 +253,46 @@ export function MediaDrawer({
     setCaptionInput("");
   };
 
-  const presets: { id: CaptionPreset; label: string; previewClass: string }[] = [
-    {
-      id: "tiktok_yellow",
-      label: "TikTok Yellow",
-      previewClass: "bg-black text-yellow-300 font-extrabold border border-yellow-400/40",
-    },
-    {
-      id: "hormozi_bold",
-      label: "Hormozi Bold",
-      previewClass: "bg-red-600 text-white font-black border border-white",
-    },
-    {
-      id: "clean_white",
-      label: "Clean Minimal",
-      previewClass: "bg-black/70 text-white font-semibold",
-    },
-    {
-      id: "neon_glow",
-      label: "Cyber Glow",
-      previewClass: "bg-slate-900 text-cyan-300 font-bold border border-cyan-400/50",
-    },
-  ];
+  const handleApplyPreset = (presetId: CaptionPreset) => {
+    setSelectedPreset(presetId);
+    const existingCaptions = project.tracks.textTrack || [];
+
+    if (existingCaptions.length > 0) {
+      if (selectedItem?.type === "caption") {
+        updateCaption(selectedItem.id, { stylePreset: presetId });
+        setCaptionFeedback(`Applied '${presetId.replace(/_/g, " ")}' effect to selected text`);
+      } else {
+        const subOps = existingCaptions.map((c) => ({
+          type: "update_properties" as const,
+          targetId: c.id,
+          targetType: "caption" as const,
+          properties: { stylePreset: presetId },
+        }));
+
+        dispatchOperation({
+          type: "batch",
+          operations: subOps,
+          description: `Apply ${presetId.replace(/_/g, " ")} caption effect to text`,
+        });
+        setCaptionFeedback(
+          `Applied '${presetId.replace(/_/g, " ")}' effect to text (${existingCaptions.length} captions)`
+        );
+      }
+
+      setTimeout(() => setCaptionFeedback(null), 3500);
+    }
+  };
+
+  const presets = CAPTION_TEMPLATES.map((tmpl) => ({
+    id: tmpl.id,
+    label: tmpl.name,
+    previewClass: tmpl.previewClass,
+  }));
 
   return (
     <aside
       className={cn(
-        "w-64 md:w-72 border-r border-neutral-900 bg-neutral-950 flex flex-col z-30 transition-transform select-none shadow-2xl",
+        "w-72 md:w-80 border-r border-neutral-900 bg-neutral-950 flex flex-col z-30 transition-transform select-none shadow-2xl",
         isOpenMobile ? "fixed inset-y-0 left-0 translate-x-0" : "hidden md:flex"
       )}
     >
@@ -282,6 +311,20 @@ export function MediaDrawer({
 
       {/* Top Tabs */}
       <div className="flex items-center border-b border-neutral-900 p-1 gap-0.5 bg-neutral-950 overflow-x-auto no-scrollbar">
+        <button
+          onClick={() => handleTabSelect("library")}
+          className={cn(
+            "flex-1 py-1.5 px-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
+            currentTab === "library"
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs"
+              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
+          )}
+          title="Shared Resource Library (Shapes, Captions, Transitions, SFX)"
+        >
+          <Shapes className="w-3 h-3 text-emerald-400" />
+          <span>Library</span>
+        </button>
+
         <button
           onClick={() => handleTabSelect("media")}
           className={cn(
@@ -368,7 +411,10 @@ export function MediaDrawer({
       </div>
 
       {/* Drawer Content */}
-      <div className="flex-1 overflow-y-auto p-3 text-neutral-300">
+      <div className={cn("flex-1 overflow-y-auto text-neutral-300", (currentTab === "library" || currentTab === "broll" || currentTab === "graphics") ? "p-0" : "p-3")}>
+        {/* TAB 0: RESOURCE LIBRARY */}
+        {currentTab === "library" && <ResourceLibraryDrawer />}
+
         {/* TAB 1: MEDIA UPLOAD */}
         {currentTab === "media" && (
           <div className="space-y-4">
@@ -422,6 +468,13 @@ export function MediaDrawer({
         {/* TAB 2: CAPTIONS & TEXT */}
         {currentTab === "captions" && (
           <div className="space-y-4">
+            {captionFeedback && (
+              <div className="p-2 bg-emerald-950/60 border border-emerald-800 text-emerald-300 rounded-lg text-xs flex items-center gap-1.5 animate-in fade-in">
+                <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate">{captionFeedback}</span>
+              </div>
+            )}
+
             <form onSubmit={handleAddCaptionSubmit} className="space-y-2">
               <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">
                 Add Subtitle / Text
@@ -446,13 +499,35 @@ export function MediaDrawer({
             {/* Presets */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-[11px] font-semibold text-neutral-500">Caption Presets</h4>
-                <span className="text-[10px] text-yellow-400/80 font-mono">Drag to canvas</span>
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                  <h4 className="text-[11px] font-semibold text-neutral-300">Caption Style Effects</h4>
+                </div>
+                <span className="text-[10px] text-yellow-400/80 font-mono">Click to apply effect</span>
               </div>
+
+              {project.tracks.textTrack?.length > 0 && (
+                <div className="mb-2 flex items-center justify-between gap-1 text-[10px] px-1 py-1 rounded bg-neutral-900/60 border border-neutral-800">
+                  <span className="text-neutral-400 truncate">
+                    {selectedItem?.type === "caption"
+                      ? "1 caption selected"
+                      : `${project.tracks.textTrack.length} captions on timeline`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset(selectedPreset)}
+                    className="px-2 py-0.5 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 text-[10px] font-semibold transition-colors cursor-pointer"
+                  >
+                    Apply to All Text
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2">
                 {presets.map((preset) => (
                   <div
                     key={preset.id}
+                    data-testid={`caption-preset-${preset.id}`}
                     draggable
                     onDragStart={(e) =>
                       handleDragStart(e, {
@@ -461,11 +536,12 @@ export function MediaDrawer({
                         text: captionInput.trim() || preset.label,
                       })
                     }
-                    onClick={() => setSelectedPreset(preset.id)}
+                    onClick={() => handleApplyPreset(preset.id as CaptionPreset)}
+                    title="Click to apply caption effect to text"
                     className={cn(
-                      "p-2 rounded-lg border text-left transition-all text-xs flex flex-col justify-between cursor-grab active:cursor-grabbing group hover:border-yellow-400/60 shadow-sm",
+                      "p-2 rounded-lg border text-left transition-all text-xs flex flex-col justify-between cursor-pointer active:scale-95 group hover:border-yellow-400/60 shadow-sm",
                       selectedPreset === preset.id
-                        ? "border-yellow-400/60 bg-yellow-400/5"
+                        ? "border-yellow-400/60 bg-yellow-400/10 ring-1 ring-yellow-400/30"
                         : "border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900"
                     )}
                   >
@@ -485,127 +561,12 @@ export function MediaDrawer({
 
         {/* TAB 3: B-ROLL OVERLAYS */}
         {currentTab === "broll" && (
-          <div className="space-y-3">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-neutral-500" />
-              <input
-                type="text"
-                value={brollSearch}
-                onChange={(e) => setBrollSearch(e.target.value)}
-                placeholder="Search stock footage..."
-                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white placeholder-neutral-500 outline-none focus:border-white"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[11px] font-semibold text-neutral-500">Popular Stock Clips</h4>
-                <span className="text-[10px] text-yellow-400/80 font-mono">Drag to canvas</span>
-              </div>
-              {STOCK_BROLL.filter((clip) =>
-                clip.name.toLowerCase().includes(brollSearch.toLowerCase()) ||
-                clip.tag.toLowerCase().includes(brollSearch.toLowerCase())
-              ).map((clip, i) => (
-                <div
-                  key={i}
-                  draggable
-                  onDragStart={(e) =>
-                    handleDragStart(e, {
-                      type: "broll",
-                      name: clip.name,
-                      sourceUrl: clip.url,
-                      duration: 3.0,
-                    })
-                  }
-                  className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-yellow-400/50 transition-all flex items-center justify-between cursor-grab active:cursor-grabbing group shadow-sm"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <GripVertical className="w-3.5 h-3.5 text-neutral-600 group-hover:text-yellow-400 shrink-0" />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-semibold text-neutral-200 truncate">{clip.name}</span>
-                      <span className="text-[10px] text-neutral-500">{clip.tag}</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      addBRollClip({
-                        sourceUrl: clip.url,
-                        name: clip.name,
-                        start: playheadTime,
-                        end: playheadTime + 3.0,
-                        opacity: 100,
-                        fitMode: "cover",
-                      })
-                    }
-                    className="p-1 rounded bg-white hover:bg-neutral-200 text-black shadow cursor-pointer shrink-0 ml-2"
-                    title="Insert at Playhead"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <ResourceLibraryDrawer initialCategory="B-Roll Stock" />
         )}
 
         {/* TAB 4: MOTION GRAPHICS CARDS */}
         {currentTab === "graphics" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-[11px] font-semibold text-neutral-500">Motion Graphics Cards</h4>
-              <span className="text-[10px] text-yellow-400 font-mono">Drag to canvas</span>
-            </div>
-
-            <div className="space-y-2">
-              {MOTION_GRAPHIC_PRESETS.map((card, i) => (
-                <div
-                  key={i}
-                  draggable
-                  onDragStart={(e) =>
-                    handleDragStart(e, {
-                      type: "graphic",
-                      compositionId: card.compositionId,
-                      name: card.name,
-                      duration: card.duration,
-                      props: card.props,
-                    })
-                  }
-                  className="p-2.5 rounded-xl bg-neutral-900/90 border border-neutral-800 hover:border-yellow-400/60 hover:bg-neutral-900 transition-all flex items-center justify-between cursor-grab active:cursor-grabbing group shadow-sm"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <GripVertical className="w-3.5 h-3.5 text-neutral-600 group-hover:text-yellow-400 shrink-0" />
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-white truncate">{card.name}</span>
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 font-mono">
-                          {card.badge}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-neutral-400 truncate">{card.description}</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      addGraphicElement({
-                        compositionId: card.compositionId,
-                        name: card.name,
-                        props: card.props,
-                        start: playheadTime,
-                        end: playheadTime + card.duration,
-                        position: { x: 50, y: 50 },
-                        scale: 1.0,
-                        rotation: 0,
-                      })
-                    }
-                    className="p-1 rounded bg-yellow-400 hover:bg-yellow-300 text-black shadow cursor-pointer shrink-0 ml-2"
-                    title="Insert at Playhead"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <ResourceLibraryDrawer initialCategory="Motion Graphics" />
         )}
 
         {/* TAB 5: AUDIO TRACKS */}

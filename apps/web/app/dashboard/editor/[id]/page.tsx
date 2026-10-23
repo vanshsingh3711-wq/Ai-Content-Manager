@@ -11,6 +11,7 @@ import { InspectorPanel } from "@/components/editor/InspectorPanel";
 import { MobileBottomBar } from "@/components/editor/MobileBottomBar";
 import { ChatAssistantDrawer } from "@/components/editor/ChatAssistantDrawer";
 import { RenderExportModal } from "@/components/editor/RenderExportModal";
+import { VersionHistoryDrawer } from "@/components/editor/VersionHistoryDrawer";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { TimelineProject } from "@/lib/timeline-types";
 import { convertVisualTimelineToSafeZones } from "@/lib/layout/subject-avoidance";
@@ -25,8 +26,12 @@ export default function StudioEditorPage() {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isDesktopDrawerOpen, setIsDesktopDrawerOpen] = useState(true);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const isRealProject = Boolean(projectId && projectId !== "new" && projectId !== "demo");
+  const [isLoading, setIsLoading] = useState(isRealProject);
+  const [isLoadedFromServer, setIsLoadedFromServer] = useState(!isRealProject);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -49,14 +54,113 @@ export default function StudioEditorPage() {
   useEffect(() => {
     if (!mounted) return;
 
-    // Use getState() directly to avoid stale closures overwriting the draft
-    const currentProject = useTimelineStore.getState().project;
-    if (currentProject.id !== "default-project") {
-      return;
-    }
-
     const loadProject = async () => {
-      // Default sample project to let users play immediately
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+      // If opening an existing video project from API, fetch persisted timeline, visual timeline & transcript
+      if (isRealProject) {
+        setIsLoading(true);
+        try {
+          const [videoJobRes, timelineRes, visualRes, transcriptRes] = await Promise.all([
+            fetch(`${apiBase}/api/v1/videos/${projectId}`).catch(() => null),
+            fetch(`${apiBase}/api/v1/videos/${projectId}/timeline`).catch(() => null),
+            fetch(`${apiBase}/api/v1/videos/${projectId}/visual-timeline`).catch(() => null),
+            fetch(`${apiBase}/api/v1/videos/${projectId}/transcript`).catch(() => null),
+          ]);
+
+          let activeProject: TimelineProject | null = null;
+          let videoJob: any = null;
+          if (videoJobRes && videoJobRes.ok) {
+            videoJob = await videoJobRes.json();
+          }
+
+          if (timelineRes && timelineRes.ok) {
+            const serverProject = await timelineRes.json();
+            if (serverProject && serverProject.tracks) {
+              activeProject = {
+                ...serverProject,
+                id: projectId,
+                videoId: projectId,
+                title: videoJob?.title || serverProject.title || "Studio Video",
+              };
+            }
+          }
+
+          if (!activeProject) {
+            // Fallback for real project whose timeline is not yet compiled
+            const dur = parseFloat(videoJob?.settings?.duration || 12.0);
+            activeProject = {
+              id: projectId,
+              videoId: projectId,
+              title: videoJob?.title || "Studio Video",
+              aspectRatio: videoJob?.settings?.aspect_ratio || "9:16",
+              duration: dur,
+              fps: 30,
+              tracks: {
+                videoTrack: [],
+                brollTrack: [],
+                textTrack: [],
+                audioTrack: [],
+                graphicsTrack: [],
+              },
+            };
+          }
+
+          // Ensure base video clip exists if media was rendered or uploaded
+          const playableMedia = videoJob?.rendered_url || videoJob?.source_url;
+          const localProxyUrl = `${apiBase}/api/v1/videos/${projectId}/rendered-file`;
+          const vTrack = activeProject.tracks.videoTrack || [];
+          if (vTrack.length === 0) {
+            activeProject.tracks.videoTrack = [
+              {
+                id: `clip-${projectId}`,
+                name: activeProject.title || "AI Generated Video",
+                sourceUrl: localProxyUrl,
+                proxyUrl: localProxyUrl,
+                start: 0,
+                end: activeProject.duration,
+                sourceStart: 0,
+                sourceEnd: activeProject.duration,
+                speed: 1,
+                volume: 100,
+                zoomFactor: 1.0,
+              },
+            ];
+          } else {
+            for (const clip of vTrack) {
+              clip.proxyUrl = localProxyUrl;
+              if (!clip.sourceUrl || (clip.sourceUrl.includes("amazonaws.com") && !clip.sourceUrl.includes("X-Amz-"))) {
+                clip.sourceUrl = localProxyUrl;
+              }
+            }
+          }
+
+          if (visualRes && visualRes.ok) {
+            const visualData = await visualRes.json();
+            const convertedZones = convertVisualTimelineToSafeZones(visualData, activeProject.duration);
+            if (convertedZones.length > 0) {
+              activeProject.safeZones = convertedZones;
+            }
+          }
+
+          if (transcriptRes && transcriptRes.ok) {
+            const transcriptData = await transcriptRes.json();
+            if (transcriptData && Array.isArray(transcriptData.words) && transcriptData.words.length > 0) {
+              activeProject.transcript = transcriptData;
+            }
+          }
+
+          initProject(activeProject);
+          setIsLoadedFromServer(true);
+        } catch (err) {
+          console.error("Failed to load server project:", err);
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // Default sample project for demo / new
       const sampleProject: TimelineProject = {
         id: projectId,
         title: "Viral TikTok Reel",
@@ -109,101 +213,50 @@ export default function StudioEditorPage() {
           ],
           audioTrack: [],
         },
-        safeZones: [
-          {
-            id: "sample-presenter-sz-1",
-            timestamp: 0,
-            duration: 12.0,
-            x: 25,
-            y: 35,
-            width: 50,
-            height: 55,
-            confidence: 0.96,
-            type: "subject",
-          },
-        ],
-        transcript: {
-          videoId: projectId,
-          words: [
-            { word: "Welcome", start: 0.5, end: 1.1, probability: 0.98 },
-            { word: "to", start: 1.15, end: 1.35, probability: 0.99 },
-            { word: "the", start: 1.4, end: 1.6, probability: 0.99 },
-            { word: "future", start: 1.65, end: 2.3, probability: 0.97 },
-            { word: "of", start: 2.35, end: 2.55, probability: 0.99 },
-            { word: "automated", start: 2.6, end: 3.2, probability: 0.96 },
-            { word: "video", start: 3.25, end: 3.7, probability: 0.98 },
-            { word: "creation.", start: 3.75, end: 4.3, probability: 0.95 },
-            { word: "Build", start: 4.5, end: 5.0, probability: 0.99 },
-            { word: "viral", start: 5.05, end: 5.5, probability: 0.97 },
-            { word: "clips", start: 5.55, end: 6.0, probability: 0.98 },
-            { word: "like", start: 6.05, end: 6.35, probability: 0.99 },
-            { word: "a", start: 6.4, end: 6.55, probability: 0.99 },
-            { word: "pro", start: 6.6, end: 7.2, probability: 0.98 },
-            { word: "with", start: 7.3, end: 7.6, probability: 0.99 },
-            { word: "synchronized", start: 7.65, end: 8.4, probability: 0.95 },
-            { word: "motion", start: 8.45, end: 9.0, probability: 0.97 },
-            { word: "graphics.", start: 9.05, end: 9.8, probability: 0.96 },
-            { word: "Subscribe", start: 10.0, end: 10.7, probability: 0.99 },
-            { word: "for", start: 10.75, end: 11.0, probability: 0.99 },
-            { word: "more!", start: 11.05, end: 11.8, probability: 0.98 },
-          ],
-          beatSheet: {
-            beats: [
-              { id: 1, start: 0.5, end: 4.3, text: "Welcome to the future of automated video creation", role: "hook", energy: "high", importance: 5 },
-              { id: 2, start: 4.5, end: 9.8, text: "Build viral clips like a pro with synchronized motion graphics", role: "story", energy: "medium", importance: 4 },
-              { id: 3, start: 10.0, end: 12.0, text: "Subscribe for more content", role: "cta", energy: "high", importance: 5 },
-            ],
-          },
-          text: "Welcome to the future of automated video creation. Build viral clips like a pro with synchronized motion graphics. Subscribe for more!",
-        },
       };
 
-      // If opening an existing video project from API, fetch pre-computed visual timeline & transcript
-      if (projectId && projectId !== "new") {
-        try {
-          const [visualRes, transcriptRes] = await Promise.all([
-            fetch(`/api/v1/videos/${projectId}/visual-timeline`).catch(() => null),
-            fetch(`/api/v1/videos/${projectId}/transcript`).catch(() => null),
-          ]);
-
-          if (visualRes && visualRes.ok) {
-            const visualData = await visualRes.json();
-            const convertedZones = convertVisualTimelineToSafeZones(visualData, sampleProject.duration);
-            if (convertedZones.length > 0) {
-              sampleProject.safeZones = convertedZones;
-            }
-          }
-
-          if (transcriptRes && transcriptRes.ok) {
-            const transcriptData = await transcriptRes.json();
-            if (transcriptData && Array.isArray(transcriptData.words) && transcriptData.words.length > 0) {
-              sampleProject.transcript = transcriptData;
-            }
-          }
-        } catch {
-          // Graceful fallback to default sample project when offline or testing
-        }
-      }
-
       initProject(sampleProject);
+      setIsLoadedFromServer(true);
+      setIsLoading(false);
     };
 
     loadProject();
-  }, [mounted, projectId, initProject]);
+  }, [mounted, projectId, isRealProject, initProject]);
+
+  // Debounced Auto-Save to Backend: only when loaded from server
+  useEffect(() => {
+    if (!mounted || !isLoadedFromServer || !projectId || projectId === "new" || project.id === "default-project") return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        await fetch(`${apiBase}/api/v1/videos/${projectId}/timeline`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project }),
+        });
+      } catch {
+        // Silently tolerate temporary network blips during local edit sessions
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [mounted, isLoadedFromServer, projectId, project]);
 
   const handleExport = () => {
     setExportModalOpen(true);
   };
 
-  const handleOpenDrawer = (tab: "media" | "captions" | "broll" | "audio") => {
+  const handleOpenDrawer = (tab: MediaDrawerTab) => {
     setActiveDrawerTab(tab);
     setIsMobileDrawerOpen(true);
   };
 
-  if (!mounted) {
+  if (!mounted || isLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-neutral-500">
-        Loading editor workspace...
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-neutral-400 gap-3">
+        <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm font-medium">Loading project timeline...</span>
       </div>
     );
   }
@@ -218,6 +271,8 @@ export default function StudioEditorPage() {
         onToggleDrawer={() => setIsDesktopDrawerOpen(!isDesktopDrawerOpen)}
         isAssistantOpen={isAssistantOpen}
         onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
+        isHistoryOpen={isHistoryOpen}
+        onToggleHistory={() => setIsHistoryOpen(!isHistoryOpen)}
       />
 
       {/* 2. Workspace Body */}
@@ -264,6 +319,17 @@ export default function StudioEditorPage() {
       <ChatAssistantDrawer
         isOpen={isAssistantOpen}
         onClose={() => setIsAssistantOpen(false)}
+      />
+
+      {/* Cloud Version History & Checkpoint Drawer */}
+      <VersionHistoryDrawer
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        videoId={projectId}
+        currentProject={project}
+        onRestoreProject={(restoredProject) => {
+          initProject(restoredProject);
+        }}
       />
     </div>
   );

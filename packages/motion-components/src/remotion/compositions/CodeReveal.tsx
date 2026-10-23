@@ -2,13 +2,16 @@ import React from 'react';
 import { AbsoluteFill, useVideoConfig, interpolate, useCurrentFrame } from 'remotion';
 import { COLORS, FONT, useFadeUp, useExitFade } from '../shared';
 
-interface Props { code: string; language?: string; highlight?: string; personality?: string; }
+interface Props { code?: string; command?: string; language?: string; highlight?: string; personality?: string; }
 
-export const CodeReveal: React.FC<Props> = ({ code, language = 'python', highlight }) => {
+export const CodeReveal: React.FC<Props> = (props) => {
   const { durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
   const exit = useExitFade(durationInFrames);
-  const lines = code.split('\n');
+
+  const rawCode = props.code || props.command || 'console.log("Ready");';
+  const language = props.language || 'python';
+  const lines = rawCode.split('\n');
   // Typewriter: reveal one line every 6 frames
   const visibleLines = Math.min(lines.length, Math.floor((frame - 8) / 6) + 1);
 

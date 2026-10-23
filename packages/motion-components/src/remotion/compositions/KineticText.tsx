@@ -2,12 +2,13 @@ import React from 'react';
 import { AbsoluteFill, useVideoConfig, spring, useCurrentFrame } from 'remotion';
 import { COLORS, FONT, useExitFade } from '../shared';
 
-interface Props { text: string; personality?: string; }
+interface Props { text?: string; headline?: string; personality?: string; }
 
-export const KineticText: React.FC<Props> = ({ text }) => {
+export const KineticText: React.FC<Props> = (props) => {
   const { durationInFrames, fps } = useVideoConfig();
   const frame = useCurrentFrame();
   const exit = useExitFade(durationInFrames);
+  const text = props.text || props.headline || 'THIS IS THE HOOK';
   const words = text.split(' ');
 
   return (

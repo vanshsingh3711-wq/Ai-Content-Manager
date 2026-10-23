@@ -179,6 +179,8 @@ export function ChatAssistantDrawer({ isOpen, onClose }: ChatAssistantDrawerProp
             selected_item: selectedItem,
             safe_zones: context.safeZones,
             active_transcript_words: context.transcriptWords,
+            transcript_beats: project.transcript?.beatSheet?.beats,
+            transcript: project.transcript,
           },
           options: {
             max_edits: 5,

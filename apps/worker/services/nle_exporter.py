@@ -25,6 +25,17 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
+TRANSITION_PRESET_MAP: Dict[str, Dict[str, str]] = {
+    "crossfade": {"premiere_name": "Cross Dissolve", "category": "Dissolve", "fcpxml_name": "Cross Dissolve", "effect_id": "r_crossfade"},
+    "fade_to_black": {"premiere_name": "Dip to Black", "category": "Dissolve", "fcpxml_name": "Dip to Black", "effect_id": "r_fade_to_black"},
+    "wipe_left": {"premiere_name": "Wipe Left", "category": "Wipe", "fcpxml_name": "Wipe Left", "effect_id": "r_wipe_left"},
+    "wipe_right": {"premiere_name": "Wipe Right", "category": "Wipe", "fcpxml_name": "Wipe Right", "effect_id": "r_wipe_right"},
+    "slide_up": {"premiere_name": "Slide Up", "category": "Slide", "fcpxml_name": "Slide Up", "effect_id": "r_slide_up"},
+    "zoom_in": {"premiere_name": "Cross Zoom", "category": "Zoom", "fcpxml_name": "Cross Zoom", "effect_id": "r_zoom_in"},
+    "whip_pan": {"premiere_name": "Whip Pan", "category": "Wipe", "fcpxml_name": "Whip Pan", "effect_id": "r_whip_pan"},
+}
+
+
 # ---------------------------------------------------------------------------
 # Timing & Rational Time Helpers
 # ---------------------------------------------------------------------------
@@ -418,6 +429,32 @@ def collect_timeline_items(
             "text": text,
         })
 
+    # 2b. Extract Subtitles from edits directly
+    for e_raw in edits:
+        e = e_raw if isinstance(e_raw, dict) else (e_raw.model_dump() if hasattr(e_raw, "model_dump") else e_raw.__dict__)
+        if e.get("action") == "subtitle" or e.get("type") == "subtitle":
+            s_text = str(e.get("text", "")).strip()
+            if not s_text:
+                continue
+            s_start = float(e.get("start", 0.0))
+            s_end = float(e.get("end", s_start + 1.0))
+            tl_s = map_time_fn(s_start)
+            tl_e = map_time_fn(s_end)
+            if tl_s is None or tl_e is None or tl_e <= tl_s:
+                tl_s = s_start
+                tl_e = s_end
+            sf = seconds_to_frames(tl_s, fps)
+            ef = seconds_to_frames(tl_e, fps)
+            # Avoid duplicate if already matched by timestamp_map
+            if not any(abs(s["start_s"] - tl_s) < 0.05 and s["text"] == s_text for s in subtitles):
+                subtitles.append({
+                    "start_f": sf,
+                    "len_f": max(1, ef - sf),
+                    "start_s": tl_s,
+                    "end_s": tl_e,
+                    "text": s_text,
+                })
+
     # Deduplicate and sort subtitles
     subtitles.sort(key=lambda s: s["start_s"])
 
@@ -443,6 +480,7 @@ def generate_cmx3600_edl(
     source_filename: str,
     kept_segments: List[Dict[str, Any]],
     timebase: int = 30,
+    transitions: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """Generates industry-standard CMX3600 EDL for the jump cuts."""
     lines = [
@@ -458,6 +496,12 @@ def generate_cmx3600_edl(
         tl_out = format_timecode(seg["timeline_end_f"], timebase)
         lines.append(f"{k:03d}  AX       V     C        {src_in} {src_out} {tl_in} {tl_out}")
         lines.append(f"* FROM CLIP NAME: {source_filename}")
+
+        # Check for matching transition at cut
+        for tr in (transitions or []):
+            if abs(tr["start_f"] - seg["timeline_start_f"]) <= 2:
+                pr = tr.get("preset", "crossfade")
+                lines.append(f"* TRANSITION: {pr.upper()} ({tr['len_f']} FRAMES)")
         lines.append("")
     return "\n".join(lines)
 
@@ -580,19 +624,31 @@ def generate_premiere_xmeml(
             ET.SubElement(lk, "trackindex").text = "1"
             ET.SubElement(lk, "clipindex").text = str(k)
 
-    # V1 Transitions (Phase 4)
+    # V1 Transitions (Phase 5)
     for tr in (transitions or []):
         trans_item = ET.SubElement(v1_track, "transitionitem")
+        add_rate(trans_item)
         ET.SubElement(trans_item, "start").text = str(tr["start_f"])
         ET.SubElement(trans_item, "end").text = str(tr["start_f"] + tr["len_f"])
         ET.SubElement(trans_item, "alignment").text = tr.get("alignment", "center")
         eff = ET.SubElement(trans_item, "effect")
-        p_name = tr.get("preset", "crossfade").replace("_", " ").title()
+        preset = tr.get("preset", "crossfade")
+        info = TRANSITION_PRESET_MAP.get(preset, {
+            "premiere_name": preset.replace("_", " ").title(),
+            "category": "Dissolve" if "fade" in preset else "Wipe",
+        })
+        p_name = info["premiere_name"]
         ET.SubElement(eff, "name").text = p_name
-        ET.SubElement(eff, "effectid").text = tr.get("preset", "crossfade")
-        ET.SubElement(eff, "effectcategory").text = "Dissolve" if "fade" in tr.get("preset", "") else "Wipe"
+        ET.SubElement(eff, "effectid").text = preset
+        ET.SubElement(eff, "effectcategory").text = info["category"]
         ET.SubElement(eff, "effecttype").text = "transition"
         ET.SubElement(eff, "mediatype").text = "video"
+
+        # Add sequence marker for transition boundary
+        markers.append({
+            "start_f": tr["start_f"],
+            "text": f"Transition: {p_name} ({tr['len_f']} frames)",
+        })
 
     # V2: Motion Graphics Overlays
     if mg_overlays:
@@ -667,7 +723,15 @@ def generate_fcpxml_1_10(
     resources = ET.SubElement(root, "resources")
 
     if transitions:
-        ET.SubElement(resources, "effect", id="r_crossfade", name="Cross Dissolve")
+        for tr in transitions:
+            pr = tr.get("preset", "crossfade")
+            info = TRANSITION_PRESET_MAP.get(pr, {
+                "fcpxml_name": pr.replace("_", " ").title(),
+                "effect_id": f"r_{pr}",
+            })
+            eff_id = info["effect_id"]
+            if not any(el.attrib.get("id") == eff_id for el in resources.findall("effect")):
+                ET.SubElement(resources, "effect", id=eff_id, name=info["fcpxml_name"])
 
     # Format definitions
     ET.SubElement(resources, "format", id="r_seq_fmt", name=f"FFVideoFormat{width}x{height}p{timebase}",
@@ -724,8 +788,9 @@ def generate_fcpxml_1_10(
                         tcStart="0s", tcFormat="NDF", audioLayout="stereo", audioRate="48k")
     spine = ET.SubElement(seq, "spine")
 
-    # Spine primary clips (the jump cut)
+    # Spine primary clips and transitions (Phase 5)
     spine_clips: List[ET.Element] = []
+    used_transitions = set()
     for k, seg in enumerate(kept_segments):
         c = ET.SubElement(spine, "asset-clip", ref="r_src", name=f"{source_p.stem} [{k + 1}]",
                           offset=T(seg["timeline_start_f"]),
@@ -734,11 +799,32 @@ def generate_fcpxml_1_10(
                           format="r_src_fmt", tcFormat="NDF")
         spine_clips.append(c)
 
-    # Spine Transitions (Phase 4)
-    for tr in (transitions or []):
-        p_name = tr.get("preset", "crossfade").replace("_", " ").title()
-        t_el = ET.SubElement(spine, "transition", name=p_name, offset=T(tr["start_f"]), duration=T(tr["len_f"]))
-        ET.SubElement(t_el, "filter-video", ref="r_crossfade", name=p_name)
+        # Insert transition immediately after this segment if it anchors at or near the boundary
+        seg_end_f = seg["timeline_end_f"]
+        for idx_tr, tr in enumerate(transitions or []):
+            if idx_tr in used_transitions:
+                continue
+            trans_center = tr["start_f"] + tr["len_f"] // 2
+            if abs(trans_center - seg_end_f) <= max(2, tr["len_f"] // 2) or abs(tr["start_f"] - seg_end_f) <= 2:
+                pr = tr.get("preset", "crossfade")
+                info = TRANSITION_PRESET_MAP.get(pr, {
+                    "fcpxml_name": pr.replace("_", " ").title(),
+                    "effect_id": f"r_{pr}",
+                })
+                t_el = ET.SubElement(spine, "transition", name=info["fcpxml_name"], offset=T(tr["start_f"]), duration=T(tr["len_f"]))
+                ET.SubElement(t_el, "filter-video", ref=info["effect_id"], name=info["fcpxml_name"])
+                used_transitions.add(idx_tr)
+
+    # Any remaining transitions not anchored to a segment boundary
+    for idx_tr, tr in enumerate(transitions or []):
+        if idx_tr not in used_transitions:
+            pr = tr.get("preset", "crossfade")
+            info = TRANSITION_PRESET_MAP.get(pr, {
+                "fcpxml_name": pr.replace("_", " ").title(),
+                "effect_id": f"r_{pr}",
+            })
+            t_el = ET.SubElement(spine, "transition", name=info["fcpxml_name"], offset=T(tr["start_f"]), duration=T(tr["len_f"]))
+            ET.SubElement(t_el, "filter-video", ref=info["effect_id"], name=info["fcpxml_name"])
 
     # Attach overlays, audio cues, markers to the primary clip covering their start time
     anchors: Dict[int, List[ET.Element]] = {k: [] for k in range(len(spine_clips))}
@@ -924,6 +1010,29 @@ def export_nle_project(
         media_assets=media_assets,
     )
 
+    # Merge any transitions directly in settings or timeline_project
+    extra_trans = settings.get("transitions") or settings.get("timeline_project", {}).get("transitions") or []
+    for tr in extra_trans:
+        p_name = tr.get("preset", "crossfade")
+        t_dur = float(tr.get("duration", 0.5) or 0.5)
+        trans_start = tr.get("start")
+        if trans_start is None:
+            from_id = tr.get("fromClipId") or tr.get("from_clip_id")
+            for seg in kept_segments:
+                if str(seg.get("seg_idx")) == str(from_id) or seg.get("id") == from_id or f"v-{seg.get('seg_idx')+1}" == str(from_id):
+                    trans_start = seg.get("timeline_end", seg.get("timeline_end_s", 0.0)) - (t_dur / 2)
+                    break
+        trans_start_s = float(trans_start if trans_start is not None else 0.0)
+        transitions.append({
+            "from_clip_id": tr.get("fromClipId") or tr.get("from_clip_id"),
+            "to_clip_id": tr.get("toClipId") or tr.get("to_clip_id"),
+            "preset": p_name,
+            "duration": t_dur,
+            "start_f": seconds_to_frames(trans_start_s, fps),
+            "len_f": max(1, seconds_to_frames(t_dur, fps)),
+            "alignment": tr.get("alignment", "center"),
+        })
+
     clean_name = re.sub(r"[^\w\-_]", "_", project_name) or "video_project"
 
     # 1. Write SRT Subtitles
@@ -937,6 +1046,7 @@ def export_nle_project(
         source_filename=Path(raw_video_path).name,
         kept_segments=kept_segments,
         timebase=timebase,
+        transitions=transitions,
     )
     edl_file = out_path / f"{clean_name}.edl"
     edl_file.write_text(edl_content, encoding="utf-8")

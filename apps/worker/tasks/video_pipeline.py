@@ -1,11 +1,13 @@
 import os
 import sys
 import shutil
+import subprocess
 import traceback
 import uuid
 import json
 import time
 import concurrent.futures
+from typing import Optional, Any
 from celery import Task
 from celery_app import celery_app
 from config import get_worker_db, get_worker_settings
@@ -24,12 +26,14 @@ from services.job_manager import (
     set_job_status_completed,
     set_job_status_failed
 )
+from services.render_tracker import update_render_progress
 # Import Services
 from services.media_extractor import extract_audio_track, get_ffmpeg_binary_path
 from services.transcriber import transcribe_and_compress, calculate_transcription_coverage
 from services.silence_detector import detect_silences
 from services.audio_analysis import classify_audio_regions
 from services.visual_analysis import analyze_visual_context, UnifiedAnalysis
+from services.ai_director import EditList
 from services.broll_planner import generate_broll_plan
 from services.motion_graphic_planner import generate_motion_graphics_plan
 from services.character_planner import generate_character_plan
@@ -318,16 +322,19 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         with PipelineStep(4, 8, "MULTI-AGENT AI DIRECTORS", "Parallel execution of B-Roll, Motion Graphics, and Character Planners"):
             set_job_status_ai_directing(job_uuid)
             style_pref = job_settings.get("video_style", "viral")
-            log_info(f"AI Directing Models -> Story & Motion Graphics: {mg_model} | B-Roll & Visuals: {broll_model}")
+            is_faceless_job = (job_video_type == VideoType.FACELESS_SHORT or "faceless" in str(job_video_type).lower())
+            log_info(f"AI Directing Models -> Story & Motion Graphics: {mg_model} | B-Roll & Visuals: {broll_model} | Faceless: {is_faceless_job}")
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 future_broll = executor.submit(generate_broll_plan, unified_json_str, broll_model, style_pref)
                 future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, mg_model, style_pref)
-                future_char = executor.submit(generate_character_plan, unified_json_str, char_model, style_pref)
+                future_char = None
+                if not is_faceless_job:
+                    future_char = executor.submit(generate_character_plan, unified_json_str, char_model, style_pref)
 
                 broll_plan = future_broll.result()
                 mg_plan = future_mg.result()
-                char_plan = future_char.result()
+                char_plan = future_char.result() if future_char else EditList(edits=[])
                 
             # Save the plans for debugging/comparison
             with open(os.path.join(assets_dir, "broll_plan.json"), "w") as f:
@@ -344,6 +351,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                 char_plan=char_plan,
                 ai_model_pref=ai_model_pref,
                 deterministic_cuts=deterministic_cuts,
+                is_faceless=is_faceless_job,
             )
             edit_decision_list = generate_sfx_plan(
                 unified_analysis_json=unified_json_str,
@@ -389,8 +397,36 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 7: ASSET SOURCING & SUBTITLES ---
         with PipelineStep(7, 8, "ASSET SOURCING & DYNAMIC SUBTITLES", "Pexels Video API & ASS Karaoke formatting"):
+            edits_for_broll = list(validated_edits)
+            if is_faceless:
+                # In faceless mode, guarantee at least 10-14 unique stock footage clips for rich background rotation
+                seen_triggers = {e.get("trigger_id") for e in edits_for_broll if e.get("action") == "b_roll"}
+                if broll_plan and getattr(broll_plan, "edits", None):
+                    for b_edit in broll_plan.edits:
+                        b_dict = b_edit.model_dump() if hasattr(b_edit, "model_dump") else (b_edit if isinstance(b_edit, dict) else b_edit.__dict__)
+                        tid = b_dict.get("trigger_id")
+                        if tid and tid not in seen_triggers and b_dict.get("action") == "b_roll":
+                            edits_for_broll.append(b_dict)
+                            seen_triggers.add(tid)
+                if len(seen_triggers) < 10 and beat_sheet_dict and "beats" in beat_sheet_dict:
+                    for b in beat_sheet_dict["beats"]:
+                        b_id = f"beat_{b['id']}"
+                        if b_id not in seen_triggers:
+                            query = b.get("focus_phrase") or b.get("text", "")[:40]
+                            edits_for_broll.append({
+                                "action": "b_roll",
+                                "trigger_id": b_id,
+                                "search_query": query,
+                                "start": b["start"],
+                                "end": b["end"],
+                                "reason": f"Background footage diversity for beat {b['id']}",
+                            })
+                            seen_triggers.add(b_id)
+                            if len(seen_triggers) >= 12:
+                                break
+
             broll_map = fetch_broll_assets(
-                validated_edits,
+                edits_for_broll,
                 output_dir=assets_dir,
                 job_settings=job_settings,
             )
@@ -426,22 +462,15 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                         log_warning(f"Could not build continuous stock background: {e}")
             
             caption_preset = job_settings.get("caption_preset", "tiktok_yellow")
-            highlight_color = "&H0000FFFF"
-            primary_color = "&H00FFFFFF"
-            if caption_preset == "neon_cyber":
-                highlight_color = "&H00FFFF00"
-            elif caption_preset == "modern_clean":
-                highlight_color = "&H00E0E0E0"
-            elif caption_preset == "boxed_pill":
-                highlight_color = "&H0000A5FF"
+            aspect_ratio = job_settings.get("aspect_ratio", "9:16")
 
             generate_ass_subtitles(
                 timestamp_map=timestamp_map,
                 output_ass_path=subtitle_ass_path,
                 edits=validated_edits,
-                font_size=50,
-                primary_color=primary_color,
-                highlight_color=highlight_color,
+                caption_preset=caption_preset,
+                aspect_ratio=aspect_ratio,
+                is_faceless=is_faceless,
             )
 
         # --- STEP 7.5: 3D AVATAR RENDERING ---
@@ -535,45 +564,348 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
 
 @celery_app.task(bind=True, name="tasks.render_timeline_pipeline")
-def render_timeline_pipeline(self: Task, job_id: str, project_data: dict) -> dict:
+def render_timeline_pipeline(self: Any, *args, **kwargs) -> dict:
     """
     Renders user-customized timeline project edits into production MP4 and NLE files.
+    Executes real FFmpeg compositing, overlays, subtitles, and audio mixing.
     """
-    job_uuid = uuid.UUID(job_id) if isinstance(job_id, str) else job_id
+    job_id = None
+    project_data = None
+
+    if args:
+        if args[0] is None and len(args) > 1:
+            job_id = args[1]
+            if len(args) > 2:
+                project_data = args[2]
+        else:
+            job_id = args[0]
+            if len(args) > 1:
+                project_data = args[1]
+
+    if not job_id and "job_id" in kwargs:
+        job_id = kwargs["job_id"]
+    if not project_data and "project_data" in kwargs:
+        project_data = kwargs["project_data"]
+
+    if project_data is None:
+        project_data = {}
+
+    job_uuid = uuid.UUID(str(job_id)) if isinstance(job_id, (str, uuid.UUID)) else uuid.uuid4()
     temp_job_dir = os.path.join(settings.TEMP_DIR, str(job_uuid))
     os.makedirs(temp_job_dir, exist_ok=True)
+    assets_dir = os.path.join(temp_job_dir, "assets")
+    os.makedirs(assets_dir, exist_ok=True)
+    raw_video_path = os.path.join(temp_job_dir, "raw_source.mp4")
+    rendered_mp4_path = os.path.join(temp_job_dir, "final_rendered.mp4")
+    subtitle_ass_path = os.path.join(temp_job_dir, "subtitles.ass")
 
+    log_header("TIMELINE COMPOSITOR PIPELINE", job_id=str(job_uuid))
+
+    # 1. Fetch Job from PostgreSQL
     session = get_worker_db()
     job = session.get(VideoJob, job_uuid)
     if not job:
         session.close()
+        log_error(f"Job {job_id} not found")
         return {"status": "error", "message": f"Job {job_id} not found"}
 
     title = job.title or "Studio Video"
-    raw_video_path = job.source_url or ""
+    source_url = job.source_url or ""
+    edl_raw = job.edit_decision_list
+    stored_settings = job.settings or {}
     session.close()
 
-    # Pre-generate NLE exports
+    set_job_status_rendering(job_uuid)
+    render_id = str(project_data.get("render_id") or f"render_{job_uuid.hex[:12]}")
+    update_render_progress(
+        render_id=render_id,
+        video_id=str(job_uuid),
+        progress=15,
+        stage="compiling",
+        message="Validating timeline edits and source media...",
+    )
+
     try:
-        from services.nle_exporter import export_nle_project
-        edits = project_data.get("edits", [])
-        timestamp_map = project_data.get("timestamp_map", {})
-        job_settings = project_data.get("settings", {})
-        nle_export_dir = os.path.join(temp_job_dir, "nle_export")
-        export_nle_project(
-            output_dir=nle_export_dir,
-            project_name=title,
+        # 2. Extract edits, timestamp_map, settings
+        edl_data = {}
+        if project_data and isinstance(project_data, dict) and ("edits" in project_data or "timeline_project" in project_data):
+            edl_data = project_data
+        elif edl_raw:
+            try:
+                parsed = json.loads(edl_raw) if isinstance(edl_raw, str) else edl_raw
+                if isinstance(parsed, dict):
+                    if "edl" in parsed:
+                        edl_data = parsed["edl"]
+                    elif "edits" in parsed:
+                        edl_data = parsed
+                    elif "timeline_project" in parsed:
+                        try:
+                            from routers.videos import _compile_timeline_project_to_edl
+                            edl_data = _compile_timeline_project_to_edl(parsed["timeline_project"])
+                        except Exception:
+                            edl_data = parsed.get("timeline_project", {})
+                elif isinstance(parsed, list):
+                    edl_data = {"edits": parsed}
+            except Exception as e:
+                log_warning(f"Error parsing job EDL: {e}")
+
+        edits = edl_data.get("edits") or []
+        timestamp_map = edl_data.get("timestamp_map") or {}
+        job_settings = {**stored_settings, **(edl_data.get("settings") or {})}
+        if "USE_GRANULAR_OVERLAYS" not in job_settings:
+            job_settings["USE_GRANULAR_OVERLAYS"] = True
+
+        # 3. Resolve or Synthesize Base Video
+        ffmpeg_bin = get_ffmpeg_binary_path()
+        base_ready = False
+        candidate_source = source_url
+        if not candidate_source:
+            for e in edits:
+                if (e.get("action") == "cut" or e.get("type") == "cut") and e.get("sourceUrl"):
+                    candidate_source = e.get("sourceUrl")
+                    break
+
+        if candidate_source:
+            if candidate_source.startswith("http://") or candidate_source.startswith("https://"):
+                try:
+                    stage_raw_video(candidate_source, raw_video_path, settings.TEMP_DIR)
+                    if os.path.exists(raw_video_path) and os.path.getsize(raw_video_path) > 1024:
+                        base_ready = True
+                except Exception as ex:
+                    log_warning(f"Could not download source video: {ex}")
+            elif os.path.exists(candidate_source) and os.path.getsize(candidate_source) > 1024:
+                if os.path.abspath(candidate_source) != os.path.abspath(raw_video_path):
+                    shutil.copy2(candidate_source, raw_video_path)
+                base_ready = True
+
+        if not base_ready:
+            # Synthesize solid canvas base video
+            total_duration = float(job_settings.get("duration", 10.0))
+            if total_duration <= 0:
+                total_duration = 10.0
+            target_aspect = job_settings.get("aspect_ratio", "9:16")
+            if target_aspect == "16:9":
+                bw, bh = 1920, 1080
+            elif target_aspect == "1:1":
+                bw, bh = 1080, 1080
+            elif target_aspect == "4:5":
+                bw, bh = 1080, 1350
+            else:
+                bw, bh = 1080, 1920
+
+            cmd = [
+                ffmpeg_bin, "-y",
+                "-f", "lavfi", "-i", f"color=c=black:s={bw}x{bh}:d={total_duration}:r=30",
+                "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+                "-c:v", "libx264", "-preset", "ultrafast",
+                "-c:a", "aac", "-shortest",
+                "-pix_fmt", "yuv420p",
+                raw_video_path,
+            ]
+            subprocess.run(cmd, check=True, capture_output=True)
+            log_info(f"Synthesized blank base canvas ({bw}x{bh}, {total_duration}s) at {raw_video_path}")
+
+        update_render_progress(
+            render_id=render_id,
+            video_id=str(job_uuid),
+            progress=30,
+            stage="compiling",
+            message="Base video canvas resolved and validated",
+        )
+
+        # 4. Resolve B-Roll Assets
+        broll_map = {}
+        media_temp_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "media_temp"))
+        recordings_dir = os.path.join(media_temp_dir, "recordings")
+        captures_dir = os.path.join(media_temp_dir, "captures")
+
+        for e in edits:
+            if e.get("action") == "b_roll" or e.get("type") == "broll":
+                tid = str(e.get("trigger_id") or e.get("id") or "")
+                b_src = e.get("broll_path") or e.get("localPath") or e.get("path") or e.get("sourceUrl")
+                if not tid or not b_src:
+                    continue
+
+                # A. Direct local file on disk
+                if os.path.exists(b_src) and os.path.getsize(b_src) > 1024:
+                    broll_map[tid] = b_src
+                # B. Relative recording API URL
+                elif b_src.startswith("/api/v1/editor/recordings/"):
+                    fname = b_src.split("/api/v1/editor/recordings/")[-1].split("?")[0]
+                    rec_disk_path = os.path.join(recordings_dir, fname)
+                    if os.path.exists(rec_disk_path) and os.path.getsize(rec_disk_path) > 1024:
+                        broll_map[tid] = rec_disk_path
+                # C. Relative capture API URL
+                elif b_src.startswith("/api/v1/editor/captures/"):
+                    fname = b_src.split("/api/v1/editor/captures/")[-1].split("?")[0]
+                    cap_disk_path = os.path.join(captures_dir, fname)
+                    if os.path.exists(cap_disk_path) and os.path.getsize(cap_disk_path) > 1024:
+                        broll_map[tid] = cap_disk_path
+                # D. Remote HTTP/HTTPS URL
+                elif b_src.startswith("http://") or b_src.startswith("https://"):
+                    dest = os.path.join(assets_dir, f"{tid}.mp4")
+                    try:
+                        stage_raw_video(b_src, dest, settings.TEMP_DIR)
+                        if os.path.exists(dest) and os.path.getsize(dest) > 1024:
+                            broll_map[tid] = dest
+                    except Exception as ex:
+                        log_warning(f"B-roll download failed for {tid}: {ex}")
+
+        update_render_progress(
+            render_id=render_id,
+            video_id=str(job_uuid),
+            progress=45,
+            stage="rendering",
+            message=f"Staged {len(broll_map)} B-roll asset(s)",
+        )
+
+        # 5. Dynamic Subtitles (.ass)
+        has_subs = False
+        sub_edits = [e for e in edits if e.get("action") == "subtitle" or e.get("type") == "subtitle"]
+        if sub_edits or timestamp_map:
+            try:
+                if not (os.path.exists(subtitle_ass_path) and os.path.getsize(subtitle_ass_path) > 100):
+                    is_faceless_val = ("faceless" in str((settings or {}).get("video_type", "")).lower() or bool((settings or {}).get("is_faceless", False)))
+                    generate_ass_subtitles(
+                        timestamp_map=timestamp_map,
+                        output_ass_path=subtitle_ass_path,
+                        edits=edits,
+                        caption_preset=(settings or {}).get("caption_preset", "tiktok_yellow"),
+                        aspect_ratio=(settings or {}).get("aspect_ratio", "9:16"),
+                        is_faceless=is_faceless_val,
+                    )
+                if os.path.exists(subtitle_ass_path) and os.path.getsize(subtitle_ass_path) > 0:
+                    has_subs = True
+            except Exception as sub_err:
+                log_warning(f"Subtitle generation warning: {sub_err}")
+
+        update_render_progress(
+            render_id=render_id,
+            video_id=str(job_uuid),
+            progress=60,
+            stage="rendering",
+            message="Dynamic subtitles generated",
+        )
+
+        # 6. Compositor Rendering via FFmpeg
+        update_render_progress(
+            render_id=render_id,
+            video_id=str(job_uuid),
+            progress=70,
+            stage="compositing",
+            message=f"Executing FFmpeg multi-track compositing ({len(edits)} edits)...",
+        )
+        log_info(f"Rendering timeline edits ({len(edits)} edits) to {rendered_mp4_path}...")
+        render_video_pipeline(
             raw_video_path=raw_video_path,
+            output_mp4_path=rendered_mp4_path,
+            subtitle_ass_path=subtitle_ass_path if has_subs else None,
+            broll_map=broll_map,
             edits=edits,
             timestamp_map=timestamp_map,
             settings=job_settings,
-            create_zip=True,
         )
-    except Exception as e:
-        print(f"[Worker: RenderTimeline] NLE export warning: {e}")
 
-    return {
-        "status": "success",
-        "job_id": str(job_uuid),
-        "message": "Render completed successfully",
-    }
+        # 7. Deliver Final Rendered File to permanent temp path
+        final_dest = os.path.join(settings.TEMP_DIR, f"{job_uuid}.mp4")
+        if os.path.abspath(rendered_mp4_path) != os.path.abspath(final_dest):
+            shutil.copy2(rendered_mp4_path, final_dest)
+        log_info(f"Final MP4 written to: {final_dest} ({os.path.getsize(final_dest)} bytes)")
+
+        # 7b. Generate lightweight 540p proxy for smooth browser scrubbing
+        proxy_dest = os.path.join(settings.TEMP_DIR, f"{job_uuid}_proxy.mp4")
+        proxy_url = None
+        try:
+            from services.media_extractor import generate_video_proxy
+            if os.path.exists(final_dest) and os.path.getsize(final_dest) > 1024:
+                generate_video_proxy(final_dest, proxy_dest, target_height=540)
+                proxy_url = f"/api/v1/videos/{job_uuid}/proxy-file"
+                log_info(f"540p scrubbing proxy generated: {proxy_dest}")
+        except Exception as proxy_err:
+            log_warning(f"Proxy generation warning (non-fatal): {proxy_err}")
+
+        update_render_progress(
+            render_id=render_id,
+            video_id=str(job_uuid),
+            progress=85,
+            stage="compositing",
+            message="Generated 540p lightweight scrubbing proxy",
+            extra={"proxy_url": proxy_url},
+        )
+
+        # 8. Pre-generate NLE exports
+        try:
+            from services.nle_exporter import export_nle_project
+            nle_export_dir = os.path.join(temp_job_dir, "nle_export")
+            export_nle_project(
+                output_dir=nle_export_dir,
+                project_name=title,
+                raw_video_path=raw_video_path,
+                edits=edits,
+                timestamp_map=timestamp_map,
+                settings=job_settings,
+                create_zip=True,
+            )
+        except Exception as nle_err:
+            log_warning(f"NLE export warning: {nle_err}")
+
+        update_render_progress(
+            render_id=render_id,
+            video_id=str(job_uuid),
+            progress=95,
+            stage="exporting_nle",
+            message="Packaging NLE multi-track sequences",
+            extra={"proxy_url": proxy_url},
+        )
+
+        # 9. Mark Job Completed
+        final_url = f"/api/v1/videos/{job_uuid}/rendered-file"
+        payload_to_save = {
+            "timeline_project": project_data.get("timeline_project") if project_data and "timeline_project" in project_data else (
+                json.loads(edl_raw).get("timeline_project") if edl_raw and "timeline_project" in edl_raw else None
+            ),
+            "edl": edl_data,
+            "edits": edits,
+            "timestamp_map": timestamp_map,
+            "settings": job_settings,
+            "proxy_url": proxy_url,
+        }
+        set_job_status_completed(job_uuid, final_url, json.dumps(payload_to_save))
+
+        update_render_progress(
+            render_id=render_id,
+            video_id=str(job_uuid),
+            progress=100,
+            stage="completed",
+            message="Render completed successfully",
+            extra={
+                "download_url": final_url,
+                "proxy_url": proxy_url,
+                "file_size": os.path.getsize(final_dest) if os.path.exists(final_dest) else 0,
+            },
+        )
+
+        return {
+            "status": "success",
+            "job_id": str(job_uuid),
+            "rendered_url": final_url,
+            "proxy_url": proxy_url,
+            "file_size": os.path.getsize(final_dest),
+            "message": "Render completed successfully",
+        }
+
+
+    except Exception as exc:
+        err_stack = traceback.format_exc()
+        log_error(f"Render pipeline failure for Job {job_id}:\n{err_stack}")
+        set_job_status_failed(job_uuid, err_stack)
+        update_render_progress(
+            render_id=render_id if "render_id" in locals() else f"render_{job_uuid.hex[:12]}",
+            video_id=str(job_uuid),
+            progress=0,
+            stage="error",
+            message=f"Render pipeline failure: {exc}",
+        )
+        if self and hasattr(self, "retry"):
+            raise self.retry(exc=exc, countdown=10)
+        raise

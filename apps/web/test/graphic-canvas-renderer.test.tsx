@@ -197,5 +197,222 @@ describe("GraphicCanvasRenderer Component", () => {
     expect(screen.getByText("Top Post")).toBeDefined();
     expect(screen.getByText("LIVE WEB")).toBeDefined();
   });
+
+  it("renders effect_overlay with tactical night vision HUD and indicators", () => {
+    const mockGraphic: GraphicElement = {
+      id: "fx-nv-1",
+      name: "Tactical Night Vision",
+      compositionId: "effect_overlay",
+      props: {
+        effectType: "night_vision",
+        intensity: 90,
+        scopeVignette: true,
+      },
+      start: 1.0,
+      end: 6.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={2.5} />);
+
+    expect(screen.getByText(/IR-NIGHT-VISION \[ON\]/i)).toBeDefined();
+    expect(screen.getByText(/\+ 0.00 MIL \+/i)).toBeDefined();
+    expect(screen.getByText(/NVD-MILSPEC-GEN3/i)).toBeDefined();
+  });
+
+  it("renders effect_overlay with cinematic vignette", () => {
+    const mockGraphic: GraphicElement = {
+      id: "fx-vig-1",
+      name: "Cinematic Vignette",
+      compositionId: "effect-overlay",
+      props: {
+        effectType: "vignette",
+        intensity: 85,
+        feather: 60,
+      },
+      start: 0.0,
+      end: 5.0,
+    };
+
+    const { container } = render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={2.0} />);
+    expect(container.firstChild).toBeDefined();
+  });
+
+  it("renders dedicated hero-reveal headline card with category badge and accent styling", () => {
+    const mockGraphic: GraphicElement = {
+      id: "hero-1",
+      name: "Hero Reveal Headline",
+      compositionId: "hero_reveal",
+      props: {
+        headline: "REVOLUTIONARY AI WORKFLOW",
+        supporting: "ENTERPRISE RELEASE",
+        subtext: "Create cinematic videos 10x faster with prompt-driven motion graphics.",
+        accentColor: "#38bdf8",
+      },
+      start: 0.0,
+      end: 4.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={1.0} />);
+
+    expect(screen.getByText("REVOLUTIONARY AI WORKFLOW")).toBeDefined();
+    expect(screen.getByText("ENTERPRISE RELEASE")).toBeDefined();
+    expect(screen.getByText("Create cinematic videos 10x faster with prompt-driven motion graphics.")).toBeDefined();
+  });
+
+  it("renders cooked-notes with custom step parameters item1, item2, item3", () => {
+    const mockGraphic: GraphicElement = {
+      id: "notes-1",
+      name: "Action Items Checklist",
+      compositionId: "cooked-notes",
+      props: {
+        title: "3 Rules for Viral Retention",
+        item1: "1. Hook within 2 seconds",
+        item2: "2. Fast-paced visual b-roll",
+        item3: "3. Clear CTA at the climax",
+      },
+      start: 0.0,
+      end: 4.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={1.5} />);
+
+    expect(screen.getByText("📝 3 Rules for Viral Retention")).toBeDefined();
+    expect(screen.getByText("1. Hook within 2 seconds")).toBeDefined();
+    expect(screen.getByText("2. Fast-paced visual b-roll")).toBeDefined();
+    expect(screen.getByText("3. Clear CTA at the climax")).toBeDefined();
+  });
+
+  it("renders pop-up-badge with glowing icon and text", () => {
+    const mockGraphic: GraphicElement = {
+      id: "badge-1",
+      name: "Pop Up Badge",
+      compositionId: "pop_up_badge",
+      props: {
+        text: "TRENDING TOPIC",
+        icon: "🔥",
+        accentColor: "#f43f5e",
+      },
+      start: 0.0,
+      end: 3.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={1.0} />);
+
+    expect(screen.getByText("TRENDING TOPIC")).toBeDefined();
+    expect(screen.getByText("🔥")).toBeDefined();
+  });
+
+  it("renders kinetic-text with bold sequential words", () => {
+    const mockGraphic: GraphicElement = {
+      id: "kt-1",
+      name: "Kinetic Text",
+      compositionId: "kinetic-text",
+      props: {
+        text: "STOP SCROLLING RIGHT NOW",
+        accentColor: "#38bdf8",
+      },
+      start: 0.0,
+      end: 3.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={1.5} />);
+
+    expect(screen.getByText("STOP")).toBeDefined();
+    expect(screen.getByText("SCROLLING")).toBeDefined();
+    expect(screen.getByText("RIGHT")).toBeDefined();
+    expect(screen.getByText("NOW")).toBeDefined();
+  });
+
+  it("renders icon-reveal with big concept emoji and title", () => {
+    const mockGraphic: GraphicElement = {
+      id: "ir-1",
+      name: "Icon Reveal",
+      compositionId: "icon-reveal",
+      props: {
+        concept: "🚀",
+        label: "HYPER GROWTH",
+        sublabel: "10X Acceleration",
+        accentColor: "#10b981",
+      },
+      start: 0.0,
+      end: 4.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={1.0} />);
+
+    expect(screen.getByText("🚀")).toBeDefined();
+    expect(screen.getByText("HYPER GROWTH")).toBeDefined();
+    expect(screen.getByText("10X Acceleration")).toBeDefined();
+  });
+
+  it("renders cooked-chat with conversation dialogue bubbles", () => {
+    const mockGraphic: GraphicElement = {
+      id: "chat-1",
+      name: "Chat Dialogue",
+      compositionId: "cooked-chat",
+      props: {
+        messages: [
+          { from: "them", text: "How did you create this edit?" },
+          { from: "me", text: "With AI Content Manager in 60 seconds!" },
+        ],
+      },
+      start: 0.0,
+      end: 4.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={2.0} />);
+
+    expect(screen.getByText("How did you create this edit?")).toBeDefined();
+    expect(screen.getByText("With AI Content Manager in 60 seconds!")).toBeDefined();
+    expect(screen.getByText("Direct Message")).toBeDefined();
+  });
+
+  it("renders cooked-flow with multi-step pipeline nodes", () => {
+    const mockGraphic: GraphicElement = {
+      id: "flow-1",
+      name: "Workflow Flow",
+      compositionId: "cooked-flow",
+      props: {
+        title: "AUTOMATION ENGINE",
+        nodes: [
+          { label: "1. Capture Video" },
+          { label: "2. Generate B-Roll" },
+          { label: "3. Publish to Reels" },
+        ],
+      },
+      start: 0.0,
+      end: 4.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={2.0} />);
+
+    expect(screen.getByText("AUTOMATION ENGINE")).toBeDefined();
+    expect(screen.getByText("1. Capture Video")).toBeDefined();
+    expect(screen.getByText("2. Generate B-Roll")).toBeDefined();
+    expect(screen.getByText("3. Publish to Reels")).toBeDefined();
+  });
+
+  it("renders animated-counter when provided startValue and endValue from MediaDrawer", () => {
+    const mockGraphic: GraphicElement = {
+      id: "counter-1",
+      name: "Animated Counter",
+      compositionId: "animated_counter",
+      props: {
+        label: "COMMUNITY MEMBERS",
+        startValue: 0,
+        endValue: 100000,
+        prefix: "",
+        suffix: "k",
+      },
+      start: 0.0,
+      end: 4.0,
+    };
+
+    render(<GraphicCanvasRenderer graphic={mockGraphic} playheadTime={2.0} />);
+
+    expect(screen.getByText("COMMUNITY MEMBERS")).toBeDefined();
+    expect(screen.getByText(/k/i)).toBeDefined();
+  });
 });
+
 

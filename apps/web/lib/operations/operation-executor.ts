@@ -15,6 +15,7 @@ import {
   BatchOperation,
   TrackItemType,
   Position,
+  TransitionPreset,
 } from "./operation-types";
 
 import {
@@ -48,6 +49,96 @@ export function validateOperation(rawOp: unknown): EditOperation {
  */
 export function safeValidateOperation(rawOp: unknown) {
   return EditOperationSchema.safeParse(rawOp);
+}
+
+export interface TransitionHandleReport {
+  isValid: boolean;
+  handleA: number; // Tail handle available on Clip A
+  handleB: number; // Head handle available on Clip B
+  requiredHandleA: number; // Required handle for alignment
+  requiredHandleB: number;
+  maxDuration: number; // Maximum transition duration supported by handles
+  clampedDuration: number;
+  hasSufficientHandles: boolean;
+  fallbackPreset?: TransitionPreset;
+}
+
+/**
+ * Validates whether two adjacent clips have sufficient head/tail handles to support
+ * a transition of duration D.
+ * 
+ * In standard NLE conventions:
+ * - Clip A (outgoing) must have sufficient tail handle: clipA.sourceEnd - clipA.end >= D/2
+ * - Clip B (incoming) must have sufficient head handle: clipB.start - clipB.sourceStart >= D/2
+ * If handles are insufficient:
+ * - maxDuration is clamped to 2 * min(handleA, handleB)
+ * - If handles are 0, fallbackPreset is suggested ("fade_to_black" dip to black requires 0 handles)
+ */
+export function validateTransitionHandles(
+  fromClip: VideoClip | BRollClip,
+  toClip: VideoClip | BRollClip,
+  duration: number,
+  alignment: "center" | "start" | "end" = "center"
+): TransitionHandleReport {
+  const dur = Math.max(0.01, duration);
+
+  // 1. Tail handle on Clip A (extra source media after cut point)
+  const fromSourceEnd = (fromClip as any).sourceEnd ?? fromClip.end;
+  const fromMediaDuration = (fromClip as any).mediaDuration;
+  let handleA = 0;
+  if (typeof (fromClip as any).tailHandle === "number") {
+    handleA = Math.max(0, (fromClip as any).tailHandle);
+  } else if (typeof fromMediaDuration === "number") {
+    handleA = Math.max(0, fromMediaDuration - fromSourceEnd);
+  } else {
+    handleA = Math.max(0, fromSourceEnd - fromClip.end);
+  }
+
+  // 2. Head handle on Clip B (extra source media before in point)
+  const toSourceStart = (toClip as any).sourceStart ?? 0;
+  let handleB = 0;
+  if (typeof (toClip as any).headHandle === "number") {
+    handleB = Math.max(0, (toClip as any).headHandle);
+  } else if (toClip.start > toSourceStart) {
+    handleB = Math.max(0, toClip.start - toSourceStart);
+  } else {
+    handleB = Math.max(0, toSourceStart);
+  }
+
+  let requiredHandleA = 0;
+  let requiredHandleB = 0;
+  let maxDuration = 0;
+
+  if (alignment === "center") {
+    requiredHandleA = Number((dur / 2).toFixed(4));
+    requiredHandleB = Number((dur / 2).toFixed(4));
+    maxDuration = Number((2 * Math.min(handleA, handleB)).toFixed(4));
+  } else if (alignment === "start") {
+    requiredHandleA = dur;
+    requiredHandleB = 0;
+    maxDuration = handleA;
+  } else {
+    // end
+    requiredHandleA = 0;
+    requiredHandleB = dur;
+    maxDuration = handleB;
+  }
+
+  const hasSufficientHandles = handleA >= requiredHandleA && handleB >= requiredHandleB;
+  const clampedDuration = Math.min(dur, Math.max(0.1, Number(maxDuration.toFixed(3))));
+  const fallbackPreset: TransitionPreset = "fade_to_black";
+
+  return {
+    isValid: true,
+    handleA: Number(handleA.toFixed(4)),
+    handleB: Number(handleB.toFixed(4)),
+    requiredHandleA,
+    requiredHandleB,
+    maxDuration: Number(maxDuration.toFixed(4)),
+    clampedDuration,
+    hasSufficientHandles,
+    fallbackPreset,
+  };
 }
 
 /**
@@ -370,6 +461,14 @@ export function executeOperation(
       const trackList = [...(nextProject.tracks[trackKey] as any[])];
       const newElem = JSON.parse(JSON.stringify(op.element));
 
+      if (op.track === "broll") {
+        newElem.volume = newElem.volume ?? 0;
+        newElem.muted = newElem.muted ?? true;
+        if (!newElem.sourceUrl && newElem.src) {
+          newElem.sourceUrl = newElem.src;
+        }
+      }
+
       if (op.index !== undefined && op.index >= 0 && op.index <= trackList.length) {
         trackList.splice(op.index, 0, newElem);
       } else {
@@ -425,6 +524,13 @@ export function executeOperation(
       }
 
       (nextProject.tracks as any)[trackKey] = updatedList;
+
+      // Clean up orphaned transitions attached to the deleted clip
+      if (op.targetType === "video" || op.targetType === "broll") {
+        nextProject.transitions = (nextProject.transitions || []).filter(
+          (t) => t.fromClipId !== op.targetId && t.toClipId !== op.targetId
+        );
+      }
 
       // Recalculate duration based on remaining video clips
       if (nextProject.tracks.videoTrack.length > 0) {
@@ -582,15 +688,47 @@ export function executeOperation(
     }
 
     case "add_transition": {
+      const trackKey = (op.track === "video" ? "videoTrack" : "brollTrack") as keyof typeof nextProject.tracks;
+      const trackList = (nextProject.tracks[trackKey] as any[]) || [];
+      const fromClip = trackList.find((c) => c.id === op.fromClipId);
+      const toClip = trackList.find((c) => c.id === op.toClipId);
+
+      let effectiveDuration = op.duration;
+      let effectivePreset = op.preset;
+
+      if (fromClip && toClip) {
+        const report = validateTransitionHandles(fromClip, toClip, op.duration, op.alignment);
+
+        if (op.validateHandles && !report.hasSufficientHandles && !op.autoClamp && !op.enforceFallback) {
+          throw new OperationExecutionError(
+            `Insufficient handles for transition between '${op.fromClipId}' and '${op.toClipId}'. Required: [${report.requiredHandleA}s, ${report.requiredHandleB}s], Available: [${report.handleA}s, ${report.handleB}s].`,
+            op
+          );
+        }
+
+        if (op.autoClamp && !report.hasSufficientHandles) {
+          if (report.maxDuration >= 0.1) {
+            effectiveDuration = report.clampedDuration;
+          } else {
+            // No handles available: fallback to fade_to_black which doesn't require media overlap
+            effectivePreset = report.fallbackPreset ?? "fade_to_black";
+          }
+        } else if (op.enforceFallback && !report.hasSufficientHandles) {
+          effectivePreset = report.fallbackPreset ?? "fade_to_black";
+        }
+      }
+
       const list = [...(nextProject.transitions || [])];
-      const existingIdx = list.findIndex((t) => t.id === op.id);
+      const existingIdx = list.findIndex(
+        (t) => t.id === op.id || (t.fromClipId === op.fromClipId && t.toClipId === op.toClipId)
+      );
       const item: TransitionItem = {
         id: op.id,
         track: op.track,
         fromClipId: op.fromClipId,
         toClipId: op.toClipId,
-        preset: op.preset,
-        duration: op.duration,
+        preset: effectivePreset,
+        duration: effectiveDuration,
         alignment: op.alignment,
       };
       if (existingIdx !== -1) {

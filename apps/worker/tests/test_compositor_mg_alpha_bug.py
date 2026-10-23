@@ -30,7 +30,7 @@ def test_mg_pre_path_propagates_to_segment_actions():
          patch("services.compositor.os.makedirs"), \
          patch("services.compositor._validate_rendered_output"):
         
-        settings = {"USE_GRANULAR_OVERLAYS": True}
+        settings = {"USE_GRANULAR_OVERLAYS": True, "ENABLE_SEGMENT_CACHE": False}
         
         mock_result = MagicMock()
         mock_result.returncode = 0

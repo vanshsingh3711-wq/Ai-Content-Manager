@@ -23,6 +23,43 @@ ALLOWED_TEMPLATES = {
     "cooked_progress",
     "cooked_toasts",
     "cooked_flow",
+    # Creator & App Templates
+    "app_screen_upload",
+    "lower_third",
+    "subscribe_badge",
+    "countdown_timer",
+    "review_card",
+    "social_handles",
+    "animated_kpi",
+    "animated_arrow",
+    "pop_up_badge",
+    "shape",
+    # High-Impact Finance & Versus Packs
+    "showdown_duel",
+    "battle_chart",
+    "compound_formula",
+    "wall_street_failure_hook",
+    # Universal Educational & Cognitive Pack
+    "spotlight_cone",
+    "perception_gauge",
+    "brain_neural_scan",
+    "cognitive_dialogue",
+    # Universal Phase 1: Newspaper & Document Highlighter
+    "newspaper_highlighter",
+    # Universal Phase 2: Magnifying Glass & Detail Callout
+    "magnifying_glass_zoom",
+    # Universal Phase 3: Urgency / Risk Dial Gauge
+    "urgency_dial_gauge",
+    # Universal Phase 4: Mind Map & Concept Node Web
+    "mind_map_node_web",
+    # Universal Phase 5: Timeline Roadmap & Milestone Pathway
+    "timeline_roadmap",
+    # Universal Phase 6: Hierarchy Pyramid & Foundation Architecture
+    "hierarchy_pyramid",
+    # Universal Phase 7: Tactile Checklist & Decision Matrix
+    "tactile_checklist_stamp",
+    # Universal Phase 8: Split Slider Comparison & Transformation Wipe
+    "split_slider_comparison",
 }
 
 # These are Remotion compositions
@@ -39,6 +76,22 @@ REMOTION_ONLY_TEMPLATES = {
     "cooked_progress",
     "cooked_toasts",
     "cooked_flow",
+    "showdown_duel",
+    "battle_chart",
+    "compound_formula",
+    "wall_street_failure_hook",
+    "spotlight_cone",
+    "perception_gauge",
+    "brain_neural_scan",
+    "cognitive_dialogue",
+    "newspaper_highlighter",
+    "magnifying_glass_zoom",
+    "urgency_dial_gauge",
+    "mind_map_node_web",
+    "timeline_roadmap",
+    "hierarchy_pyramid",
+    "tactile_checklist_stamp",
+    "split_slider_comparison",
 }
 
 def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:
@@ -76,6 +129,38 @@ RULES:
    - "cooked_progress"      (targets: 'label', 'progress')
    - "cooked_toasts"        (targets: 'title', 'message')
    - "cooked_flow"          (targets: 'nodes' list of items with 'label')
+   - "showdown_duel"        (targets: 'title', 'wagerAmount', 'timeframe', 'side1Title', 'side1Sub', 'side1Fee', 'side2Title', 'side2Sub', 'side2Fee')
+   - "battle_chart"         (targets: 'title', 'subtitle', 'sp500Label', 'sp500Return', 'hedgeLabel', 'hedgeReturn', 'deltaLabel')
+   - "compound_formula"     (targets: 'title', 'autoAmount', 'compoundTotal')
+   - "wall_street_failure_hook" (targets: 'headline', 'badge', 'source', 'failureRate')
+   - "spotlight_cone"       (targets: 'headline', 'subtext', 'badge', 'egoPercent', 'tagline')
+   - "perception_gauge"     (targets: 'title', 'badge', 'perceivedLabel', 'perceivedValue', 'actualLabel', 'actualValue', 'deltaLabel')
+   - "brain_neural_scan"    (targets: 'title', 'badge', 'cortexTitle', 'cortexSub', 'amygdalaTitle', 'amygdalaSub', 'verdictBadge')
+   - "cognitive_dialogue"   (targets: 'title', 'badge', 'firstPersonText', 'thirdPersonText', 'bottomCallout')
+   - "newspaper_highlighter" (targets: 'outlet', 'headline', 'preText', 'highlightText', 'postText', 'markerColor', 'stamp', 'badge')
+   - "magnifying_glass_zoom" (targets: 'title', 'badge', 'backgroundSnippet', 'zoomTarget', 'calloutTitle', 'calloutDetail')
+   - "urgency_dial_gauge"   (targets: 'title', 'badge', 'value', 'unit', 'zoneLabel', 'subtext')
+   - "mind_map_node_web"    (targets: 'title', 'badge', 'centerTitle', 'centerIcon', 'node1Title', 'node1Desc', 'node1Icon', 'node2Title', 'node2Desc', 'node2Icon', 'node3Title', 'node3Desc', 'node3Icon')
+   - "timeline_roadmap"     (targets: 'title', 'badge', 'step1Phase', 'step1Title', 'step1Desc', 'step1Icon', 'step1Badge', 'step2Phase', 'step2Title', 'step2Desc', 'step2Icon', 'step2Badge', 'step3Phase', 'step3Title', 'step3Desc', 'step3Icon', 'step3Badge', 'synthesis')
+   - "hierarchy_pyramid"    (targets: 'title', 'badge', 'tier1Title', 'tier1Subtitle', 'tier1Pct', 'tier1Icon', 'tier2Title', 'tier2Subtitle', 'tier2Pct', 'tier2Icon', 'tier3Title', 'tier3Subtitle', 'tier3Pct', 'tier3Icon', 'synthesis')
+   - "tactile_checklist_stamp" (targets: 'title', 'badge', 'item1Text', 'item1Detail', 'item1Status', 'item2Text', 'item2Detail', 'item2Status', 'item3Text', 'item3Detail', 'item3Status', 'verdictText', 'verdictStatus', 'synthesis')
+   - "split_slider_comparison" (targets: 'title', 'badge', 'leftTag', 'leftTitle', 'leftMetric', 'leftDetail', 'leftIcon', 'rightTag', 'rightTitle', 'rightMetric', 'rightDetail', 'rightIcon', 'sliderStart', 'sliderEnd', 'synthesis')
+     * Use "newspaper_highlighter" for leaked documents, official reports, study citations, breaking investigations, or highlighting critical evidence in a text clipping.
+     * Use "magnifying_glass_zoom" for inspecting fine-print contract clauses, auditing financial terms, examining fine details, or uncovering hidden rules.
+     * Use "urgency_dial_gauge" for extreme urgency, risk meters, stress overload, volatile spikes, inflation rates, or danger thresholds.
+     * Use "mind_map_node_web" for concept frameworks, multi-branching systems, synaptic webs, or breaking down a core thesis into 3 interconnected pillars.
+     * Use "timeline_roadmap" for step-by-step pathways, chronological execution roadmaps, milestone sequences, 30-day plans, or progressive multi-stage journeys.
+     * Use "hierarchy_pyramid" for 3-tier foundation-to-mastery pyramids, Maslow hierarchies, 80/20 leverage stacks, or base-to-apex structural breakdowns.
+     * Use "tactile_checklist_stamp" for pass/fail audits, business viability testing, 3-point qualification checklists, or slamming tactile stamps onto criteria.
+     * Use "split_slider_comparison" for dramatic before vs after comparisons, manual vs automated transformations, efficiency wipes, or old paradigm vs new paradigm head-to-heads.
+     * Use "spotlight_cone" for the Spotlight Effect, social anxiety, ego overestimation, awkward moments, or feeling observed.
+     * Use "perception_gauge" for cognitive bias experiments, perceived fear vs empirical reality gaps, or expectation vs reality.
+     * Use "brain_neural_scan" when explaining neurobiology, amygdala emotional hijack vs prefrontal cortex logic, or the Solomon Paradox.
+     * Use "cognitive_dialogue" for mental framing shifts, Illeism (3rd person self-talk), internal monologue vs objective observer detachment.
+     * Use "showdown_duel" for direct head-to-head match-ups, wagers, rivalries, or 'Option A vs Option B' showdowns.
+     * Use "battle_chart" for comparing performance results, testing benchmarks, ROI, or competing percentage returns.
+     * Use "wall_street_failure_hook" when delivering shock failure/success rates out of 100 with an interactive visual matrix.
+     * Use "compound_formula" when presenting an actionable multi-step system, recurring financial routine, or exponential compounding hockey-stick curve.
      * Use "kinetic_text" for punchy single-line statements, hooks, or quick emphasis.
      * Use "cooked_likes" for follower growth, audience counts, likes, or subscriber milestones.
      * Use "cooked_terminal" or "vscode_code_typing" when executing CLI commands, npm/pip commands, or scripts.
@@ -130,12 +215,11 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
 2. TREATMENT ASSIGNMENT: You must ONLY generate 'motion_graphics' edits for beats that have `"treatment": "motion_graphic"` OR `"treatment": "kinetic_text"`. 
    - If treatment is "kinetic_text", you MUST use the "kinetic_text" template with targets: 'text'.
    - DO NOT generate motion graphics for beats with any other treatment (like b_roll) or 'none'.
-3. ROLE MAPPING: Use the beat's 'role' to guide the type of motion graphic.
-   - 'list' or 'process' roles MUST map to 'step_sequence' and include all items.
-   - 'comparison' roles MUST map to 'before_after' or 'split'. Do NOT use 'chart_reveal' unless the beat explicitly has numeric data.
-   - 'statistic' roles MUST map to 'metric_reveal'.
-4. NUMBERS: You MUST NOT use 'chart_reveal', 'metric_reveal', or 'animated_counter' unless the beat text actually contains real numbers.
-5. EMPHASIS & CONTENT: You MUST populate the targets (like 'headline', 'quote', 'label') with the exact 'focus_phrase' or 'text' from the beat. Do NOT use placeholder text or invent your own words.
+3. SUGGESTED TEMPLATE & ROLE MAPPING:
+   - If the beat contains `"suggested_template"`, you MUST prioritize using that specific template (e.g., "compound_formula", "battle_chart", "urgency_dial_gauge", "stat_card_highlight", "split_slider_comparison", "step_sequence").
+   - NEVER default everything to "hero_reveal"! Use rich educational & finance motion graphics matching the beat's topic and suggested_template.
+4. NUMBERS: For numeric templates ('chart_reveal', 'metric_reveal', 'animated_counter'), ensure numbers are relevant to the beat.
+5. EMPHASIS & CONTENT: Populate the targets (like 'headline', 'quote', 'label', 'autoAmount', 'compoundTotal', 'title') with the key words, statistics, and phrases from the beat.
 6. TRIGGER ID: You must use the beat's ID formatted as 'beat_1', 'beat_2', etc. as the trigger_id instead of the transcript chunk IDs.
 7. You MUST NOT generate motion graphics that violate these rules. The beat sheet is the master timeline.
 """
@@ -143,7 +227,26 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
         pass
 
     import re
-    WHITELIST = {"vs", "before", "after", "step", "1", "2", "3", "4", "5", "to", "and", "the", "a", "of", "is", "in", "it", "on", "for", "with"}
+    WHITELIST = {
+        "vs", "versus", "before", "after", "step", "1", "2", "3", "4", "5", "to", "and", "the", "a", "of", "is",
+        "in", "it", "on", "for", "with", "rule", "formula", "bank", "banks", "rate", "danger", "risk", "metric",
+        "return", "growth", "money", "power", "loss", "cash", "investing", "saving", "doubling", "double", "years",
+        "time", "warning", "critical", "verdict", "key", "insight", "claim", "proof", "example", "result", "option",
+        "annual", "total", "yield", "alpha", "index", "fund", "funds", "wall", "street", "market", "test",
+        "comparison", "target", "stat", "stats", "kpi", "free", "freedom", "financial", "alert", "paradigm", "shift",
+        "drain", "draining", "power", "powerless", "safe", "broke", "wealth", "timeline", "audit", "math", "account"
+    }
+
+    EXEMPT_TARGET_KEYS = {
+        "code", "command", "output", "url", "handle", "activeFile", "language", "name", "app", "avatar",
+        "badge", "label", "title", "subtitle", "zoneLabel", "deltaLabel", "unit", "outlet", "stamp", "markerColor",
+        "sp500Label", "hedgeLabel", "side1Title", "side2Title", "side1Sub", "side2Sub", "side1Fee", "side2Fee",
+        "tier1Title", "tier2Title", "tier3Title", "step1Title", "step2Title", "step3Title", "step1Badge", "step2Badge", "step3Badge",
+        "step1Icon", "step2Icon", "step3Icon", "leftTag", "rightTag", "leftTitle", "rightTitle", "leftDetail", "rightDetail",
+        "leftIcon", "rightIcon", "tagline", "verdictBadge", "author", "synthesis", "calloutTitle", "calloutDetail",
+        "cortexTitle", "amygdalaTitle", "sliderStart", "sliderEnd", "sp500Return", "hedgeReturn", "failureRate"
+    }
+
     max_retries = 3
     
     print(f"\n[MOTION GRAPHICS PLANNER] Asking LLM ({ai_model_pref}) to plan dense documentary-style motion graphics...")
@@ -197,7 +300,7 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
                                 errors.append(
                                     f"Edit {edit.trigger_id} uses 'before_after' but beat text does not contain a strong contrast "
                                     f"keyword (e.g., 'vs', 'unlike') comparing two named things. Beat: '{beat.get('text')[:80]}'. "
-                                    f"Use 'hero_reveal' or 'quote_reveal' instead."
+                                    f"Use 'split_slider_comparison', 'battle_chart', or 'stat_card_highlight' instead."
                                 )
 
                         is_numeric_template = mg_type in ['chart_reveal', 'metric_reveal', 'animated_counter', 'metric']
@@ -205,7 +308,7 @@ You have been provided with a pre-computed Beat Sheet in the Context. This is yo
                             errors.append(f"Edit {edit.trigger_id} uses numeric template '{mg_type}' but beat text contains no numbers: {beat.get('text')}")
                         
                         for k, v in getattr(edit, 'motion_graphics_targets', {}).items():
-                            if k in ("code", "command", "output", "url", "handle", "activeFile", "language", "name", "app", "avatar"):
+                            if k in EXEMPT_TARGET_KEYS:
                                 continue
                             if isinstance(v, str):
                                 # Text validation

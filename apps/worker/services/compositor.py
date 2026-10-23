@@ -6,10 +6,12 @@ import tempfile
 import json
 import sys
 import math
+import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 from services.media_extractor import get_ffmpeg_binary_path
 from services.editing_config import EDITING_CONFIG
 from services.sfx_manager import fetch_sfx
+
 
 
 # ---------------------------------------------------------------------------
@@ -34,17 +36,20 @@ def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     result = subprocess.run(final_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         stderr_text = result.stderr or ""
-        # Write full cmd and stderr to a temp file for debugging
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".log", mode="w") as f:
-            f.write("CMD:\n" + " ".join(final_cmd) + "\n\nSTDERR:\n" + stderr_text)
-            log_path = f.name
-        
+        log_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".log", mode="w") as f:
+                f.write("CMD:\n" + " ".join(final_cmd) + "\n\nSTDERR:\n" + stderr_text)
+                log_path = f.name
+        except Exception:
+            pass
+
         stderr_preview = stderr_text[-3000:]
-        _log("STDERR", f"({label}) Failed! Debug log saved to {log_path}\n{stderr_preview}")
+        _log("STDERR", f"({label}) Failed! {('Log: ' + log_path) if log_path else ''}\n{stderr_preview}")
         raise RuntimeError(
-            f"FFmpeg failed for '{label}' (exit code {result.returncode}). Log: {log_path}\n{stderr_preview}"
+            f"FFmpeg failed for '{label}' (exit code {result.returncode}).\n{stderr_preview}"
         )
+
     return result
 
 def _render_canvas_composition(comp_id: str, props: dict, duration_sec: float, fps: float, width: int, height: int, temp_dir: str, prefix: str) -> Optional[str]:
@@ -510,8 +515,80 @@ def _build_segment_timeline(
                     cloned["seg_overlap_start"] = overlap_start
                     cloned["seg_overlap_end"] = overlap_end
                     seg["actions"].append(cloned)
-                    
+
+    # Attach segment transitions across cut boundaries if specified in edits
+    transition_edits = [
+        e for e in edits
+        if e.get("action") in ("transition", "add_transition") or e.get("type") == "add_transition"
+    ]
+    kept_timeline = [s for s in timeline if not s.get("is_cut")]
+    for tr in transition_edits:
+        tr_preset = tr.get("preset", "crossfade")
+        tr_dur = float(tr.get("duration", 0.5) or 0.5)
+        tr_start = tr.get("start")
+        for i in range(len(kept_timeline) - 1):
+            s_curr = kept_timeline[i]
+            s_next = kept_timeline[i + 1]
+            if tr_start is not None:
+                if abs(float(tr_start) - s_curr["end"]) <= 1.0:
+                    s_curr["transition_out"] = {"preset": tr_preset, "duration": tr_dur}
+                    s_next["transition_in"] = {"preset": tr_preset, "duration": tr_dur}
+                    break
+            else:
+                s_curr["transition_out"] = {"preset": tr_preset, "duration": tr_dur}
+                s_next["transition_in"] = {"preset": tr_preset, "duration": tr_dur}
+                break
+
     return timeline
+
+
+def compute_segment_cache_key(
+    raw_video_path: str,
+    start_t: float,
+    end_t: float,
+    filter_complex: str,
+    extra_inputs: Optional[List[str]] = None,
+    codec: str = "libx264",
+    fps: float = 30.0,
+    target_w: int = 1080,
+    target_h: int = 1920,
+) -> str:
+    """
+    Computes a deterministic SHA-256 fingerprint for an intermediate render segment.
+    Factors in source media metadata, exact time slices, canvas resolution,
+    codec options, and the full multi-layer filtergraph string.
+    """
+    hasher = hashlib.sha256()
+
+    # 1. Source file signature
+    if raw_video_path and os.path.exists(raw_video_path):
+        try:
+            st = os.stat(raw_video_path)
+            hasher.update(f"src:{raw_video_path}:{st.st_size}:{st.st_mtime_ns}".encode("utf-8"))
+        except Exception:
+            hasher.update(f"src:{raw_video_path}".encode("utf-8"))
+    else:
+        hasher.update(f"src:{raw_video_path}".encode("utf-8"))
+
+    # 2. Slice timing & output resolution
+    hasher.update(f":{start_t:.4f}:{end_t:.4f}:{fps:.2f}:{target_w}x{target_h}:{codec}".encode("utf-8"))
+
+    # 3. Filtergraph
+    hasher.update(filter_complex.encode("utf-8"))
+
+    # 4. Extra input assets (B-roll, overlays, sound effects, cutouts)
+    if extra_inputs:
+        for extra in extra_inputs:
+            if extra and os.path.exists(extra):
+                try:
+                    est = os.stat(extra)
+                    hasher.update(f":extra:{extra}:{est.st_size}:{est.st_mtime_ns}".encode("utf-8"))
+                except Exception:
+                    hasher.update(f":extra:{extra}".encode("utf-8"))
+            else:
+                hasher.update(f":extra:{extra}".encode("utf-8"))
+
+    return hasher.hexdigest()[:24]
 
 
 # ---------------------------------------------------------------------------
@@ -571,7 +648,13 @@ def render_video_pipeline(
     kept_segments = [s for s in timeline if not s["is_cut"]]
 
     import tempfile
-    temp_dir = tempfile.mkdtemp(prefix="ai_compositor_")
+    base_temp = (
+        settings.get("temp_dir")
+        or os.environ.get("COMPOSITOR_TEMP_DIR")
+        or os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "media_temp"))
+    )
+    os.makedirs(base_temp, exist_ok=True)
+    temp_dir = tempfile.mkdtemp(prefix="ai_compositor_", dir=base_temp)
 
     # Pre-synthesize procedural SFX kit calibrated to dialog volume
     speech_db = -21.0
@@ -586,6 +669,28 @@ def render_video_pipeline(
 
     if not kept_segments:
         kept_segments = [{"start": 0.0, "end": total_duration, "chunk_id": "FULL", "actions": [], "is_cut": False}]
+
+    if settings.get("continuous_composition") or settings.get("SINGLE_PASS_COMPOSITION"):
+        _log("TIMELINE", "Using continuous single-pass composition (zero segment chopping, zero concat blinking)")
+        full_actions = []
+        for e in edits:
+            cloned = dict(e)
+            e_start = e.get("start")
+            e_end = e.get("end")
+            if e_start is None: e_start = 0.0
+            if e_end is None: e_end = total_duration
+            cloned["original_start"] = float(e_start)
+            cloned["original_end"] = float(e_end)
+            cloned["seg_overlap_start"] = float(e_start)
+            cloned["seg_overlap_end"] = float(e_end)
+            full_actions.append(cloned)
+        kept_segments = [{
+            "start": 0.0,
+            "end": total_duration,
+            "chunk_id": "FULL_CONTINUOUS",
+            "actions": full_actions,
+            "is_cut": False
+        }]
 
     use_granular = settings.get("USE_GRANULAR_OVERLAYS", False)
 
@@ -624,6 +729,15 @@ def render_video_pipeline(
                 edit["_pre_mg_path"] = mg_path
 
     # Studio Depth Matting: pre-render speaker cutouts for any behind cards
+    # Check for direct cutout paths provided in edits
+    for edit in edits:
+        if not edit.get("_pre_cutout_path"):
+            cand = edit.get("cutout_path") or edit.get("speaker_cutout")
+            if cand and os.path.exists(cand):
+                edit["_pre_cutout_path"] = cand
+                edit["_cutout_start"] = edit.get("start", 0.0)
+                edit["_cutout_end"] = edit.get("end", total_duration)
+
     try:
         from services.depth_matting import (
             extract_behind_ranges,
@@ -631,24 +745,35 @@ def render_video_pipeline(
             is_depth_matting_available
         )
         behind_ranges = extract_behind_ranges(edits, timestamp_map, total_duration, fps=source_fps)
-        if behind_ranges and is_depth_matting_available():
+        can_matte = is_depth_matting_available() or settings.get("mock_depth_matting")
+        if behind_ranges and can_matte:
             _log("DEPTH_MATTE", f"Found {len(behind_ranges)} behind range(s). Pre-rendering studio depth cutouts...")
             for r_idx, rng in enumerate(behind_ranges):
                 cutout_path = os.path.join(temp_dir, f"cutout_{r_idx:02d}.mov")
                 try:
-                    cut_range_to_prores(
-                        video_path=raw_video_path,
-                        start_s=rng["start"],
-                        end_s=rng["end"],
-                        output_mov_path=cutout_path,
-                        fps=source_fps,
-                        width=target_w,
-                        height=target_h
-                    )
+                    if settings.get("mock_depth_matting"):
+                        rng_dur = max(0.1, rng["end"] - rng["start"])
+                        mock_cmd = [
+                            ffmpeg_bin, "-y", "-threads", "2", "-hide_banner",
+                            "-f", "lavfi", "-i", f"color=c=black@0.0:s={target_w}x{target_h}:d={rng_dur:.3f}:r={source_fps}",
+                            "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le",
+                            cutout_path
+                        ]
+                        subprocess.run(mock_cmd, capture_output=True, check=True)
+                    else:
+                        cut_range_to_prores(
+                            video_path=raw_video_path,
+                            start_s=rng["start"],
+                            end_s=rng["end"],
+                            output_mov_path=cutout_path,
+                            fps=source_fps,
+                            width=target_w,
+                            height=target_h
+                        )
                     for edit in edits:
                         eid = str(edit.get("_edit_id") or edit.get("trigger_id") or "")
                         if eid in rng["edit_ids"] or (
-                            (str(edit.get("layer", "")).lower() == "behind" or str(edit.get("depth", "")).lower() == "behind")
+                            (str(edit.get("layer", "")).lower() == "behind" or str(edit.get("depth", "")).lower() == "behind" or edit.get("layout", {}).get("variant") == "cutout")
                             and edit.get("start", 0.0) >= rng["start"] - 0.1
                             and edit.get("end", total_duration) <= rng["end"] + 0.1
                         ):
@@ -773,7 +898,16 @@ def render_video_pipeline(
                         cmd.extend(["-ss", str(max(0, offset)), "-t", str(rel_end - rel_start), "-i", mg_path])
                         
                         mg_v = f"[mg_{mg_count}_v]"
-                        filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{mg_v};")
+                        frag_dur = max(0.1, rel_end - rel_start)
+                        mg_fade_in = min(0.35, frag_dur / 4.0)
+                        mg_fade_out = min(0.35, frag_dur / 4.0)
+                        mg_out_st = max(0.0, frag_dur - mg_fade_out)
+                        filter_str.append(
+                            f"[{input_idx}:v]format=yuva420p,"
+                            f"fade=t=in:st=0:d={mg_fade_in:.3f}:alpha=1,"
+                            f"fade=t=out:st={mg_out_st:.3f}:d={mg_fade_out:.3f}:alpha=1,"
+                            f"setpts=PTS-STARTPTS+{rel_start}/TB{mg_v};"
+                        )
                         filter_str.append(f"{current_v}{mg_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_mg_{mg_count}];")
                         current_v = f"[with_mg_{mg_count}]"
                         input_idx += 1
@@ -793,54 +927,65 @@ def render_video_pipeline(
                         mg_count += 1
                         
                 elif action_type == "b_roll":
-                    tid = a.get("trigger_id")
-                    if tid and tid in broll_map:
-                        broll_path_a = broll_map[tid]
-                        if os.path.exists(broll_path_a) and os.path.getsize(broll_path_a) > 1024:
-                            offset = a.get("seg_overlap_start", seg["start"]) - a.get("original_start", seg["start"])
-                            cmd.extend(["-ss", str(max(0, offset)), "-an", "-t", str(rel_end - rel_start), "-i", broll_path_a])
-                            bv = f"[broll_{broll_count}_v]"
-                            broll_transition = a.get("transition")
+                    tid = a.get("trigger_id") or a.get("id")
+                    broll_path_a = broll_map.get(tid) if (tid and tid in broll_map) else None
+                    if not broll_path_a:
+                        candidate = a.get("broll_path") or a.get("localPath") or a.get("path") or a.get("sourceUrl")
+                        if candidate and os.path.exists(candidate) and os.path.getsize(candidate) > 1024:
+                            broll_path_a = candidate
+                    if broll_path_a and os.path.exists(broll_path_a) and os.path.getsize(broll_path_a) > 1024:
+                        offset = a.get("seg_overlap_start", seg["start"]) - a.get("original_start", seg["start"])
+                        cmd.extend(["-ss", str(max(0, offset)), "-an", "-t", str(rel_end - rel_start), "-i", broll_path_a])
+                        bv = f"[broll_{broll_count}_v]"
+                        broll_transition = a.get("transition", "fade")
+                        frag_dur = max(0.1, rel_end - rel_start)
+                        fade_in_d = min(0.35, frag_dur / 3.0)
+                        fade_out_d = min(0.35, frag_dur / 3.0)
+                        fade_out_st = max(0.0, frag_dur - fade_out_d)
+                        
+                        broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                        broll_filter += f",fade=t=in:st=0:d={fade_in_d:.3f},fade=t=out:st={fade_out_st:.3f}:d={fade_out_d:.3f}"
+                        broll_filter += f",setpts=PTS-STARTPTS+{rel_start}/TB{bv};"
+                        filter_str.append(broll_filter)
+                        
+                        overlay_x, overlay_y = "0", "0"
+                        if broll_transition == "slide" or broll_transition == "push":
+                            overlay_x = f"'if(lte(t,{rel_start}+0.5), -w+(w/0.5)*(t-{rel_start}), 0)'"
                             
-                            broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
-                            if broll_transition in ["fade", "crossfade", "morph"]:
-                                broll_filter += f",fade=t=in:st=0:d=0.5"
-                            broll_filter += f",setpts=PTS-STARTPTS+{rel_start}/TB{bv};"
-                            filter_str.append(broll_filter)
-                            
-                            overlay_x, overlay_y = "0", "0"
-                            if broll_transition == "slide" or broll_transition == "push":
-                                overlay_x = f"'if(lte(t,{rel_start}+0.5), -w+(w/0.5)*(t-{rel_start}), 0)'"
-                                
-                            filter_str.append(f"{current_v}{bv}overlay=x={overlay_x}:y={overlay_y}:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_broll_{broll_count}];")
-                            current_v = f"[with_broll_{broll_count}]"
+                        filter_str.append(f"{current_v}{bv}overlay=x={overlay_x}:y={overlay_y}:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_broll_{broll_count}];")
+                        current_v = f"[with_broll_{broll_count}]"
+                        input_idx += 1
+
+                        # Studio Depth Matting for behind B-roll
+                        cutout_path = a.get("_pre_cutout_path")
+                        if cutout_path and os.path.exists(cutout_path):
+                            cutout_start = a.get("_cutout_start", seg["start"])
+                            cutout_offset = a.get("seg_overlap_start", seg["start"]) - cutout_start
+                            cmd.extend(["-ss", str(max(0, cutout_offset)), "-t", str(rel_end - rel_start), "-i", cutout_path])
+                            cutout_v = f"[cutout_br_{broll_count}_v]"
+                            filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{cutout_v};")
+                            filter_str.append(f"{current_v}{cutout_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_cutout_br_{broll_count}];")
+                            current_v = f"[with_cutout_br_{broll_count}]"
                             input_idx += 1
 
-                            # Studio Depth Matting for behind B-roll
-                            cutout_path = a.get("_pre_cutout_path")
-                            if cutout_path and os.path.exists(cutout_path):
-                                cutout_start = a.get("_cutout_start", seg["start"])
-                                cutout_offset = a.get("seg_overlap_start", seg["start"]) - cutout_start
-                                cmd.extend(["-ss", str(max(0, cutout_offset)), "-t", str(rel_end - rel_start), "-i", cutout_path])
-                                cutout_v = f"[cutout_br_{broll_count}_v]"
-                                filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS+{rel_start}/TB{cutout_v};")
-                                filter_str.append(f"{current_v}{cutout_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_cutout_br_{broll_count}];")
-                                current_v = f"[with_cutout_br_{broll_count}]"
-                                input_idx += 1
-
-                            broll_count += 1
+                        broll_count += 1
                             
             # To ensure the legacy block doesn't trigger when using granular overlays:
             broll_path = None
             mg_path = None
         else:
             broll_path = None
+            broll_action = None
             if "b_roll" in action_types:
                 for a in seg["actions"]:
-                    if a["action"] == "b_roll" and a.get("trigger_id") in broll_map:
-                        candidate = broll_map[a["trigger_id"]]
-                        if os.path.exists(candidate) and os.path.getsize(candidate) > 1024:
+                    if a["action"] == "b_roll":
+                        tid = a.get("trigger_id")
+                        candidate = broll_map.get(tid) if (tid and tid in broll_map) else None
+                        if not candidate:
+                            candidate = a.get("broll_path") or a.get("localPath") or a.get("path") or a.get("sourceUrl")
+                        if candidate and os.path.exists(candidate) and os.path.getsize(candidate) > 1024:
                             broll_path = candidate
+                            broll_action = a
                             break
 
             mg_path = None
@@ -869,6 +1014,8 @@ def render_video_pipeline(
         character_action = None
         has_sfx = False
         sfx_keyword = "pop"
+        sfx_source_url = None
+        sfx_volume = 80.0
         sfx_delay_ms = 0
 
         for a in seg["actions"]:
@@ -881,6 +1028,8 @@ def render_video_pipeline(
             if a.get("action") == "sfx" or a.get("sound_effect"):
                 has_sfx = True
                 sfx_keyword = a.get("sound_effect", "pop")
+                sfx_source_url = a.get("sourceUrl") or a.get("source_url")
+                sfx_volume = float(a.get("volume", 80) or 80)
                 rel_s = max(0.0, a.get("seg_overlap_start", seg["start"]) - seg["start"])
                 sfx_delay_ms = int(round(rel_s * 1000))
 
@@ -922,6 +1071,14 @@ def render_video_pipeline(
             filter_str.append(f"{current_v}[broll_v]overlay=x={overlay_x}:y={overlay_y}:eof_action=pass[with_broll];")
             current_v = "[with_broll]"
             input_idx += 1
+
+            cutout_path = broll_action.get("_pre_cutout_path") if broll_action else None
+            if cutout_path and os.path.exists(cutout_path):
+                cmd.extend(["-i", cutout_path])
+                filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[cutout_br_v];")
+                filter_str.append(f"{current_v}[cutout_br_v]overlay=x=0:y=0:eof_action=pass[with_cutout_br];")
+                current_v = "[with_cutout_br]"
+                input_idx += 1
             
         if mg_path:
             cmd.extend(["-i", mg_path])
@@ -959,23 +1116,58 @@ def render_video_pipeline(
             input_idx += 1
             
         if has_sfx:
-            from services.audio_sfx_synthesizer import resolve_cue_name
-            cue_resolved = resolve_cue_name(sfx_keyword)
-            cached_sfx = os.path.join(sfx_kit_dir, f"{cue_resolved}.wav")
-            if os.path.exists(cached_sfx):
-                sfx_path = cached_sfx
-            else:
-                sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
-                sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
-                if not sfx_fetched:
-                    sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", "pop.wav"))
-            if os.path.exists(sfx_path):
+            sfx_path = None
+            if sfx_source_url:
+                if os.path.exists(sfx_source_url):
+                    sfx_path = sfx_source_url
+                else:
+                    base_name = os.path.basename(sfx_source_url)
+                    cand_web = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", base_name))
+                    cand_worker = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sfx", "clips", base_name))
+                    if os.path.exists(cand_web):
+                        sfx_path = cand_web
+                    elif os.path.exists(cand_worker):
+                        sfx_path = cand_worker
+
+            if not sfx_path or not os.path.exists(sfx_path):
+                from services.audio_sfx_synthesizer import resolve_cue_name
+                cue_resolved = resolve_cue_name(sfx_keyword)
+                cached_sfx = os.path.join(sfx_kit_dir, f"{cue_resolved}.wav")
+                if os.path.exists(cached_sfx):
+                    sfx_path = cached_sfx
+                else:
+                    sfx_path = os.path.join(temp_dir, f"sfx_{seg['chunk_id']}.wav")
+                    sfx_fetched = fetch_sfx(sfx_keyword, sfx_path) if sfx_keyword else False
+                    if not sfx_fetched:
+                        sfx_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", "pop.wav"))
+            if sfx_path and os.path.exists(sfx_path):
                 cmd.extend(["-i", sfx_path])
-                filter_str.append(f"[{input_idx}:a]adelay={sfx_delay_ms}|{sfx_delay_ms}[sfx_a];")
+                vol_filter = f"volume={sfx_volume / 100.0:.2f}," if sfx_volume != 100 else ""
+                filter_str.append(f"[{input_idx}:a]{vol_filter}adelay={sfx_delay_ms}|{sfx_delay_ms}[sfx_a];")
                 filter_str.append(f"{current_a}[sfx_a]amix=inputs=2:duration=first:dropout_transition=2[a_out_sfx];")
                 current_a = "[a_out_sfx]"
                 input_idx += 1
                 
+        # Boundary transition smoothing across cut boundaries
+        if seg.get("transition_out"):
+            t_out = seg["transition_out"]
+            dur_out = min(float(t_out.get("duration", 0.5) or 0.5) / 2.0, duration / 2.0)
+            if dur_out > 0.05:
+                st_out = max(0.0, duration - dur_out)
+                filter_str.append(f"{current_v}fade=t=out:st={st_out:.3f}:d={dur_out:.3f}[v_out_fade];")
+                current_v = "[v_out_fade]"
+                filter_str.append(f"{current_a}afade=t=out:st={st_out:.3f}:d={dur_out:.3f}[a_out_fade];")
+                current_a = "[a_out_fade]"
+
+        if seg.get("transition_in"):
+            t_in = seg["transition_in"]
+            dur_in = min(float(t_in.get("duration", 0.5) or 0.5) / 2.0, duration / 2.0)
+            if dur_in > 0.05:
+                filter_str.append(f"{current_v}fade=t=in:st=0:d={dur_in:.3f}[v_in_fade];")
+                current_v = "[v_in_fade]"
+                filter_str.append(f"{current_a}afade=t=in:st=0:d={dur_in:.3f}[a_in_fade];")
+                current_a = "[a_in_fade]"
+
         filter_str.append(f"{current_v}format=yuv420p[vout]")
         
         filter_complex = "".join(filter_str)
@@ -995,13 +1187,58 @@ def render_video_pipeline(
             segment_mp4
         ])
 
-        _log("FFMPEG", f"Rendering segment {seg_idx+1}/{len(kept_segments)}")
+        # Incremental Segment Caching
+        segment_cache_dir = (
+            settings.get("segment_cache_dir")
+            or os.environ.get("SEGMENT_CACHE_DIR")
+            or os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "media_temp", "segment_cache"))
+        )
+        enable_cache = settings.get("enable_segment_cache", settings.get("ENABLE_SEGMENT_CACHE", True))
+
+        extra_inputs = []
+        for i_arg, val in enumerate(cmd):
+            if val == "-i" and i_arg + 1 < len(cmd):
+                inp_file = cmd[i_arg + 1]
+                if inp_file != raw_video_path and os.path.exists(inp_file):
+                    extra_inputs.append(inp_file)
+
+        codec_str = _get_video_codec(ffmpeg_bin)
+        seg_hash = compute_segment_cache_key(
+            raw_video_path=raw_video_path,
+            start_t=start_t,
+            end_t=end_t,
+            filter_complex=filter_complex,
+            extra_inputs=extra_inputs,
+            codec=codec_str,
+            fps=source_fps,
+            target_w=target_w,
+            target_h=target_h,
+        )
+        cached_segment_path = os.path.join(segment_cache_dir, f"seg_{seg_hash}.mp4")
+
+        if enable_cache and os.path.exists(cached_segment_path) and os.path.getsize(cached_segment_path) > 1024:
+            _log("CACHE_HIT", f"Reusing cached segment {seg_idx+1}/{len(kept_segments)} (hash: {seg_hash})")
+            shutil.copy2(cached_segment_path, segment_mp4)
+            segment_files.append(segment_mp4)
+            continue
+
+        _log("FFMPEG", f"Rendering segment {seg_idx+1}/{len(kept_segments)} (hash: {seg_hash})")
         try:
             _run_ffmpeg(cmd, f"render_segment_{seg_idx}")
             segment_files.append(segment_mp4)
+            if enable_cache and os.path.exists(segment_mp4) and os.path.getsize(segment_mp4) > 1024:
+                try:
+                    os.makedirs(segment_cache_dir, exist_ok=True)
+                    tmp_cache = os.path.join(segment_cache_dir, f"tmp_{seg_hash}.mp4")
+                    shutil.copy2(segment_mp4, tmp_cache)
+                    os.replace(tmp_cache, cached_segment_path)
+                    _log("CACHE_SAVE", f"Cached segment {seg_idx+1} -> {cached_segment_path}")
+                except Exception as cache_err:
+                    _log("CACHE_WARN", f"Segment caching warning: {cache_err}")
         except RuntimeError as e:
             _log("ERROR", f"Rendering segment {seg_idx} failed: {e}")
             raise
+
 
     _log("FFMPEG", "Concatenating segments...")
     concat_txt_path = os.path.join(temp_dir, "concat.txt")
@@ -1038,6 +1275,49 @@ def render_video_pipeline(
     except RuntimeError as e:
         _log("ERROR", f"Concatenation failed: {e}")
         raise
+
+    # Apply Background Music (BGM) & Speech Ducking if present
+    bgm_edits = [e for e in edits if e.get("isBgm") or (e.get("action") == "audio" and e.get("isBgm"))]
+    if bgm_edits and os.path.exists(output_mp4_path):
+        bgm_edit = bgm_edits[0]
+        bgm_url = bgm_edit.get("sourceUrl") or bgm_edit.get("source_url") or "chill-bgm.mp3"
+        bgm_file = None
+        if os.path.exists(bgm_url):
+            bgm_file = bgm_url
+        else:
+            base_name = os.path.basename(bgm_url)
+            web_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", base_name))
+            worker_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sfx", "clips", base_name))
+            default_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sfx", "clips", "chill-bgm.mp3"))
+            if os.path.exists(web_cand):
+                bgm_file = web_cand
+            elif os.path.exists(worker_cand):
+                bgm_file = worker_cand
+            elif os.path.exists(default_cand):
+                bgm_file = default_cand
+
+        if bgm_file and os.path.exists(bgm_file):
+            _log("BGM", f"Applying background music with ducking from {bgm_file}")
+            bgm_output = os.path.join(temp_dir, "final_with_bgm.mp4")
+            bgm_vol = float(bgm_edit.get("volume", 35) or 35) / 100.0
+            ducking = bool(bgm_edit.get("ducking", True))
+            ducking_db = float(bgm_edit.get("ducking_db", bgm_edit.get("duckingDb", -14.0)))
+            fade_in = float(bgm_edit.get("fade_in", bgm_edit.get("fadeIn", 1.0)))
+            fade_out = float(bgm_edit.get("fade_out", bgm_edit.get("fadeOut", 1.5)))
+
+            success = apply_bgm_and_ducking(
+                video_path=output_mp4_path,
+                output_path=bgm_output,
+                bgm_path=bgm_file,
+                bgm_volume=bgm_vol,
+                ducking=ducking,
+                ducking_db=ducking_db,
+                fade_in=fade_in,
+                fade_out=fade_out,
+                ffmpeg_bin=ffmpeg_bin,
+            )
+            if success and os.path.exists(bgm_output) and os.path.getsize(bgm_output) > 1024:
+                shutil.move(bgm_output, output_mp4_path)
 
     _validate_rendered_output(ffmpeg_bin, output_mp4_path, source_has_audio)
 
@@ -1163,8 +1443,13 @@ def build_faceless_background_video(
     if not valid_clips:
         return False
 
-    # Repeat list of clips if needed to ensure total footage duration >= total_duration
-    expanded_clips = valid_clips * max(1, int(math.ceil(total_duration / max(10.0, len(valid_clips) * 5.0))))
+    # Each B-roll clip in the background should rotate every ~3.5 to 4.0 seconds so no single clip hijacks the background
+    clip_slice_dur = 3.5
+    num_slices_needed = max(len(valid_clips), int(math.ceil(total_duration / clip_slice_dur)))
+    expanded_clips = []
+    while len(expanded_clips) < num_slices_needed:
+        expanded_clips.extend(valid_clips)
+    expanded_clips = expanded_clips[:num_slices_needed]
 
     inputs = []
     filter_parts = []
@@ -1172,11 +1457,11 @@ def build_faceless_background_video(
         inputs.extend(["-i", c])
         filter_parts.append(
             f"[{i}:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
-            f"crop={target_w}:{target_h},fps=30,setsar=1[v{i}];"
+            f"crop={target_w}:{target_h},fps=30,setsar=1,trim=duration={clip_slice_dur:.2f},setpts=PTS-STARTPTS[v{i}];"
         )
 
     concat_inputs = "".join(f"[v{i}]" for i in range(len(expanded_clips)))
-    filter_parts.append(f"{concat_inputs}concat=n={len(expanded_clips)}:v=1:a=0,eq=brightness=-0.05:contrast=1.05[vout]")
+    filter_parts.append(f"{concat_inputs}concat=n={len(expanded_clips)}:v=1:a=0,eq=brightness=-0.1:contrast=1.1[vout]")
 
     tmp_out = output_path + ".tmp_base.mp4"
     cmd = [
@@ -1208,4 +1493,183 @@ def build_faceless_background_video(
         if os.path.exists(tmp_out):
             os.remove(tmp_out)
         return False
+
+
+def build_sidechain_ducking_filter(
+    bgm_volume: float = 0.35,
+    ducking: bool = True,
+    ducking_db: float = -14.0,
+    fade_in: float = 1.0,
+    fade_out: float = 1.5,
+    total_duration: float = 30.0,
+) -> str:
+    """
+    Builds the FFmpeg audio filtergraph for mixing BGM with narration speech.
+    When ducking is True, speech on [0:a] acts as the sidechain control signal,
+    attenuating the BGM on [1:a] via the sidechaincompress filter with ~ -14dB attenuation.
+    """
+    fade_parts = []
+    if fade_in > 0:
+        fade_parts.append(f"afade=t=in:st=0:d={fade_in:.2f}")
+    if fade_out > 0 and total_duration > fade_out:
+        fade_parts.append(f"afade=t=out:st={total_duration - fade_out:.2f}:d={fade_out:.2f}")
+
+    fade_str = ("," + ",".join(fade_parts)) if fade_parts else ""
+    bgm_prep = f"[1:a]volume={bgm_volume:.3f}{fade_str}[bgm_prep];"
+
+    if ducking:
+        # threshold=0.03 (~ -30 dBFS speech threshold), ratio=8 (8:1 compression -> ~14dB ducking)
+        comp_str = f"[bgm_prep][0:a]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=350:makeup=1[ducked_bgm];"
+        mix_str = f"[0:a][ducked_bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+        return f"{bgm_prep}{comp_str}{mix_str}"
+    else:
+        mix_str = f"[0:a][bgm_prep]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+        return f"{bgm_prep}{mix_str}"
+
+
+def apply_bgm_and_ducking(
+    video_path: str,
+    output_path: str,
+    bgm_path: str,
+    bgm_volume: float = 0.35,
+    ducking: bool = True,
+    ducking_db: float = -14.0,
+    fade_in: float = 1.0,
+    fade_out: float = 1.5,
+    ffmpeg_bin: Optional[str] = None,
+) -> bool:
+    """
+    Applies background music to a video file with automatic speech ducking.
+    Uses lossless video copy (-c:v copy) and re-encodes only audio (-c:a aac).
+    """
+    ffmpeg_bin = ffmpeg_bin or get_ffmpeg_binary_path()
+    if not os.path.exists(video_path) or not os.path.exists(bgm_path):
+        _log("WARN", f"Cannot apply BGM: video ({video_path}) or BGM ({bgm_path}) missing")
+        return False
+
+    dur = _probe_duration(ffmpeg_bin, video_path)
+    if dur <= 0:
+        dur = 30.0
+
+    filter_graph = build_sidechain_ducking_filter(
+        bgm_volume=bgm_volume,
+        ducking=ducking,
+        ducking_db=ducking_db,
+        fade_in=fade_in,
+        fade_out=fade_out,
+        total_duration=dur,
+    )
+
+    cmd = [
+        ffmpeg_bin, "-y",
+        "-i", video_path,
+        "-stream_loop", "-1",
+        "-i", bgm_path,
+        "-filter_complex", filter_graph,
+        "-map", "0:v",
+        "-map", "[aout]",
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        "-shortest",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
+    try:
+        _run_ffmpeg(cmd, "apply_bgm_and_ducking")
+        return os.path.exists(output_path) and os.path.getsize(output_path) > 1024
+    except Exception as e:
+        _log("WARN", f"Failed to apply BGM with ducking: {e}")
+        return False
+
+
+FFMPEG_XFADE_MAP: Dict[str, str] = {
+    "crossfade": "fade",
+    "fade_to_black": "fadeblack",
+    "wipe_left": "wipeleft",
+    "wipe_right": "wiperight",
+    "slide_up": "slideup",
+    "zoom_in": "zoomin",
+    "whip_pan": "smoothleft",
+}
+
+
+def build_segment_xfade_filter(
+    preset: str = "crossfade",
+    duration: float = 0.5,
+    offset: float = 0.0,
+    has_audio: bool = True,
+) -> str:
+    """
+    Builds FFmpeg filtergraph for dual-stream xfade and acrossfade.
+    """
+    xfade_filter = FFMPEG_XFADE_MAP.get(preset, "fade")
+    v_filter = f"[0:v][1:v]xfade=transition={xfade_filter}:duration={duration:.3f}:offset={offset:.3f}[vout]"
+    if has_audio:
+        a_filter = f"[0:a][1:a]acrossfade=d={duration:.3f}[aout]"
+        return f"{v_filter};{a_filter}"
+    return v_filter
+
+
+def apply_segment_xfade(
+    seg_a_path: str,
+    seg_b_path: str,
+    output_path: str,
+    preset: str = "crossfade",
+    duration: float = 0.5,
+    ffmpeg_bin: Optional[str] = None,
+) -> bool:
+    """
+    Applies FFmpeg xfade transition between two video segments.
+    Maps canonical transition presets (crossfade, fade_to_black, wipe_left, wipe_right,
+    slide_up, zoom_in, whip_pan) to FFmpeg xfade filters with audio acrossfade.
+    """
+    ffmpeg_bin = ffmpeg_bin or get_ffmpeg_binary_path()
+    if not os.path.exists(seg_a_path) or not os.path.exists(seg_b_path):
+        _log("WARN", f"Cannot apply xfade: seg_a ({seg_a_path}) or seg_b ({seg_b_path}) missing")
+        return False
+
+    dur_a = _probe_duration(ffmpeg_bin, seg_a_path)
+    if dur_a <= 0:
+        dur_a = 5.0
+
+    dur = min(duration, max(0.1, dur_a * 0.5))
+    offset = max(0.01, dur_a - dur)
+
+    streams_a = _probe_streams(ffmpeg_bin, seg_a_path)
+    streams_b = _probe_streams(ffmpeg_bin, seg_b_path)
+    has_audio = streams_a.get("has_audio", False) and streams_b.get("has_audio", False)
+
+    filter_graph = build_segment_xfade_filter(
+        preset=preset,
+        duration=dur,
+        offset=offset,
+        has_audio=has_audio,
+    )
+
+    cmd = [
+        ffmpeg_bin, "-y",
+        "-i", seg_a_path,
+        "-i", seg_b_path,
+        "-filter_complex", filter_graph,
+        "-map", "[vout]",
+    ]
+    if has_audio:
+        cmd.extend(["-map", "[aout]", "-c:a", "aac", "-b:a", "192k"])
+    cmd.extend([
+        "-c:v", _get_video_codec(ffmpeg_bin),
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        output_path,
+    ])
+
+    try:
+        _run_ffmpeg(cmd, "apply_segment_xfade")
+        return os.path.exists(output_path) and os.path.getsize(output_path) > 1024
+    except Exception as e:
+        _log("WARN", f"Failed to apply xfade transition: {e}")
+        return False
+
 

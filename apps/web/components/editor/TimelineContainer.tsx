@@ -18,6 +18,7 @@ import {
   projectPointerToTimelineTimestamp,
   createAddElementOperationFromDrop,
 } from "@/lib/editor/drag-drop-types";
+import { isEffectGraphic } from "@/lib/editor/video-effects";
 
 const KeyframeDiamond = ({
   time,
@@ -182,6 +183,55 @@ export function TimelineContainer() {
       zoomLevel,
       scrollLeft
     );
+
+    if (payload.type === "transition") {
+      const videoClips = project.tracks.videoTrack || [];
+      if (videoClips.length >= 2) {
+        let closestCutIndex = 0;
+        let minDistance = Infinity;
+        for (let i = 0; i < videoClips.length - 1; i++) {
+          const cutTime = videoClips[i].end;
+          const dist = Math.abs(dropTimestamp - cutTime);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestCutIndex = i;
+          }
+        }
+        const fromClip = videoClips[closestCutIndex];
+        const toClip = videoClips[closestCutIndex + 1];
+        const transId = `trans-${Date.now()}`;
+        dispatchOperation({
+          type: "add_transition",
+          id: transId,
+          track: "video",
+          fromClipId: fromClip.id,
+          toClipId: toClip.id,
+          preset: payload.preset,
+          duration: payload.duration || 0.5,
+          alignment: "center",
+        });
+        setSelectedItem({ type: "transition", id: transId });
+      }
+      return;
+    }
+
+    if (payload.type === "caption") {
+      const textClips = project.tracks.textTrack || [];
+      const targetCaption = textClips.find(
+        (c) => dropTimestamp >= c.start && dropTimestamp <= c.end
+      );
+      if (targetCaption) {
+        dispatchOperation({
+          type: "update_properties",
+          targetType: "caption",
+          targetId: targetCaption.id,
+          properties: { stylePreset: payload.stylePreset },
+        });
+        setSelectedItem({ type: "caption", id: targetCaption.id });
+        setPlayheadTime(dropTimestamp);
+        return;
+      }
+    }
 
     const operation = createAddElementOperationFromDrop(payload, {
       timestamp: dropTimestamp,
@@ -366,6 +416,9 @@ export function TimelineContainer() {
           } else if (selectedItem.type === "audio") {
             const item = project.tracks.audioTrack.find((t) => t.id === selectedItem.id);
             if (item) store.addAudioClip({ ...item, start: item.end, end: item.end + (item.end - item.start) });
+          } else if (selectedItem.type === "graphic") {
+            const item = (project.tracks.graphicsTrack || []).find((t) => t.id === selectedItem.id);
+            if (item) store.addGraphicElement({ ...item, start: item.end, end: item.end + (item.end - item.start) });
           }
         }
       }
@@ -555,12 +608,12 @@ export function TimelineContainer() {
           >
             <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-purple-400 font-semibold shadow">
               <Sparkles className="w-3 h-3" />
-              <span>Graphics</span>
+              <span>Graphics & FX</span>
             </div>
 
             {(project.tracks.graphicsTrack || []).length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center text-[10px] text-neutral-600 pointer-events-none italic">
-                Drag motion cards here
+                Drag motion cards & visual effects here
               </div>
             )}
 
@@ -571,6 +624,7 @@ export function TimelineContainer() {
                 const left = timeToPixels(tempStart) + deltaX;
                 const width = Math.max(20, timeToPixels(tempEnd - tempStart));
                 const isSelected = selectedItem?.id === graphic.id;
+                const isEffect = isEffectGraphic(graphic);
 
                 return (
                   <div
@@ -591,13 +645,24 @@ export function TimelineContainer() {
                     className={cn(
                       "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
                       isSelected
-                        ? "bg-purple-600/40 border-purple-400 text-purple-200 ring-2 ring-purple-400/40 z-10"
-                        : "bg-purple-900/30 border-purple-500/30 text-purple-300 hover:bg-purple-800/30",
+                        ? isEffect
+                          ? "bg-emerald-600/50 border-emerald-400 text-emerald-100 ring-2 ring-emerald-400/50 z-10 shadow-[0_0_12px_rgba(52,211,153,0.3)]"
+                          : "bg-purple-600/40 border-purple-400 text-purple-200 ring-2 ring-purple-400/40 z-10"
+                        : isEffect
+                          ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/50"
+                          : "bg-purple-900/30 border-purple-500/30 text-purple-300 hover:bg-purple-800/30",
                       isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
                     )}
                     style={{ left: `${left}px`, width: `${width}px` }}
                   >
-                    <span className="truncate flex-1 text-center px-3 pointer-events-none">{graphic.name || graphic.compositionId}</span>
+                    {isEffect && (
+                      <span className="px-1 py-0.2 mr-1 rounded bg-emerald-500/25 border border-emerald-400/40 text-[9px] font-mono text-emerald-300 font-bold shrink-0">
+                        FX
+                      </span>
+                    )}
+                    <span className="truncate flex-1 text-center px-1 pointer-events-none">
+                      {graphic.name || (isEffect ? `FX: ${graphic.props?.effectType || "Overlay"}` : graphic.compositionId)}
+                    </span>
                   </div>
                 );
               })}
@@ -707,7 +772,21 @@ export function TimelineContainer() {
           </div>
 
           {/* TRACK 3: Main Video Track (Primary Footage) */}
-          <div className="mb-2 relative h-14 border-y border-neutral-900 bg-neutral-950/80 flex items-center">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTargetTrack("video");
+            }}
+            onDragLeave={() => setDropTargetTrack(null)}
+            onDrop={(e) => handleTrackDrop(e, "video")}
+            className={cn(
+              "mb-2 relative h-14 border-y bg-neutral-950/80 flex items-center transition-colors",
+              dropTargetTrack === "video"
+                ? "border-amber-400 bg-amber-500/10 ring-1 ring-amber-400/50"
+                : "border-neutral-900"
+            )}
+          >
             <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
               <Video className="w-3 h-3 text-neutral-400" />
               <span>Main Video</span>
@@ -794,6 +873,50 @@ export function TimelineContainer() {
                     title="Drag to trim end"
                   >
                     <div className="w-0.5 h-4 bg-white/70 rounded-full" />
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Visual Transitions between Adjacent Clips */}
+            {(project.transitions || []).map((trans) => {
+              const fromClip = project.tracks.videoTrack.find((c) => c.id === trans.fromClipId);
+              const toClip = project.tracks.videoTrack.find((c) => c.id === trans.toClipId);
+              if (!fromClip || !toClip) return null;
+
+              const cutTime = fromClip.end;
+              const duration = trans.duration || 0.5;
+              const isSelected = selectedItem?.type === "transition" && selectedItem?.id === trans.id;
+
+              let startWindow = cutTime - duration / 2;
+              if (trans.alignment === "start") startWindow = cutTime;
+              else if (trans.alignment === "end") startWindow = cutTime - duration;
+
+              const left = timeToPixels(startWindow);
+              const width = Math.max(36, timeToPixels(duration));
+
+              return (
+                <div
+                  key={trans.id}
+                  data-testid={`transition-badge-${trans.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedItem({ type: "transition", id: trans.id });
+                  }}
+                  className={cn(
+                    "absolute top-1.5 bottom-1.5 z-30 rounded-md border flex items-center justify-center px-1.5 cursor-pointer transition-all shadow-md backdrop-blur-sm group select-none",
+                    isSelected
+                      ? "bg-amber-500/85 border-amber-300 text-black ring-2 ring-amber-400 font-bold"
+                      : "bg-neutral-900/90 border-amber-500/60 text-amber-300 hover:bg-amber-950/90 hover:border-amber-400"
+                  )}
+                  style={{ left: `${left}px`, width: `${width}px` }}
+                  title={`Transition: ${trans.preset} (${duration}s)`}
+                >
+                  <div className="flex items-center gap-1 text-[10px] pointer-events-none truncate">
+                    <Sparkles className={cn("w-3 h-3 shrink-0", isSelected ? "text-black" : "text-amber-400")} />
+                    <span className="truncate uppercase font-mono tracking-tighter text-[9px]">
+                      {trans.preset.replace(/_/g, " ")}
+                    </span>
                   </div>
                 </div>
               );

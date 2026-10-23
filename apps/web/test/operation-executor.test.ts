@@ -269,6 +269,33 @@ describe("operation-executor: Atomic Execution & Inverse Verification", () => {
     expect(reverted.tracks.graphicsTrack?.[0].id).toBe("g1");
   });
 
+  it("executes add_element on broll and sets volume to 0 and muted to true to preserve narration", () => {
+    const op: EditOperation = {
+      type: "add_element",
+      track: "broll",
+      element: {
+        id: "b-new",
+        name: "Coding B-Roll",
+        src: "https://example.com/coding.mp4",
+        start: 30.0,
+        end: 35.0,
+        opacity: 100,
+        fitMode: "cover",
+      },
+    };
+
+    const { nextProject, inverse } = executeOperation(project, op);
+    const addedBroll = nextProject.tracks.brollTrack.find((b) => b.id === "b-new");
+    expect(addedBroll).toBeDefined();
+    expect(addedBroll?.volume).toBe(0);
+    expect(addedBroll?.muted).toBe(true);
+    expect(addedBroll?.sourceUrl).toBe("https://example.com/coding.mp4");
+
+    // Inverse execution cleanly removes the broll
+    const reverted = executeOperation(nextProject, inverse).nextProject;
+    expect(reverted.tracks.brollTrack.find((b) => b.id === "b-new")).toBeUndefined();
+  });
+
   it("executes update_properties and inverts it cleanly", () => {
     const op: EditOperation = {
       type: "update_properties",

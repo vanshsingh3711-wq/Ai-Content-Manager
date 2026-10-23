@@ -452,11 +452,66 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
         
         from services.ai_director import EditDecision
 
-        # Choose template and build correct targets based on the beat's role
+        # Choose template and build correct targets based on suggested_template and role
         role = chosen.get("role", "").lower()
         focus = chosen.get("focus_phrase") or chosen["text"]
+        suggested = chosen.get("suggested_template")
 
-        if role in ("hook", "reveal", "punchline", "emotional"):
+        if suggested == "compound_formula":
+            mg_type = "compound_formula"
+            mg_targets = {
+                "title": "RULE OF 72 FORMULA",
+                "autoAmount": focus[:25] or "$10,000",
+                "compoundTotal": chosen["text"][:35] or "$160,000",
+            }
+        elif suggested == "battle_chart":
+            mg_type = "battle_chart"
+            mg_targets = {
+                "title": "GROWTH COMPARISON",
+                "subtitle": focus[:30] or "ANNUAL RETURN",
+                "sp500Label": "S&P 500 Index (8%)",
+                "sp500Return": 126,
+                "hedgeLabel": "Bank Account (0.5%)",
+                "hedgeReturn": 14,
+                "deltaLabel": "+112% Outperformance",
+            }
+        elif suggested == "urgency_dial_gauge":
+            mg_type = "urgency_dial_gauge"
+            mg_targets = {
+                "title": "CAPITAL DRAIN",
+                "badge": "RISK ALERT",
+                "value": "85",
+                "unit": "%",
+                "zoneLabel": "DANGER ZONE",
+                "subtext": focus[:45],
+            }
+        elif suggested == "stat_card_highlight":
+            mg_type = "stat_card_highlight"
+            mg_targets = {
+                "label": role.upper() if role else "KEY MILESTONE",
+                "stat": focus[:25],
+                "delta": chosen.get("focus_phrase", "")[:25] or "3x Doublings",
+            }
+        elif suggested == "split_slider_comparison":
+            mg_type = "split_slider_comparison"
+            mg_targets = {
+                "title": "THE PARADIGM SHIFT",
+                "badge": "COMPARISON",
+                "leftTag": "OLD WAY",
+                "leftTitle": "Bank Savings",
+                "leftMetric": "0.5%",
+                "leftDetail": "Silently Draining",
+                "leftIcon": "alert",
+                "rightTag": "NEW WAY",
+                "rightTitle": "Index Investing",
+                "rightMetric": "8.0%",
+                "rightDetail": "Doubles Every 9 Yrs",
+                "rightIcon": "rocket",
+                "sliderStart": 25,
+                "sliderEnd": 75,
+                "synthesis": focus[:50],
+            }
+        elif role in ("hook", "reveal", "punchline", "emotional", "cta"):
             mg_type = "kinetic_text"
             mg_targets = {"text": focus[:80]}
         elif role in ("statistic", "data", "metric", "kpi"):
@@ -467,13 +522,21 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
                 "delta":  "",
             }
         else:
-            # Default: hero_reveal with correct required keys
-            mg_type = "hero_reveal"
-            mg_targets = {
-                "label":      role.upper() if role else "INSIGHT",
-                "headline":   focus[:55],
-                "supporting": chosen["text"][:90],
-            }
+            # Dynamic fallback rotation instead of pure hero_reveal
+            mg_type = "stat_card_highlight" if (chosen["id"] % 2 == 0) else "hero_reveal"
+            if mg_type == "stat_card_highlight":
+                mg_targets = {
+                    "label": role.upper() if role else "KEY INSIGHT",
+                    "stat": focus[:25],
+                    "delta": "Proven Strategy",
+                }
+            else:
+                mg_type = "hero_reveal"
+                mg_targets = {
+                    "label":      role.upper() if role else "INSIGHT",
+                    "headline":   focus[:55],
+                    "supporting": chosen["text"][:90],
+                }
 
         print(f"[{planner_name}] GAP PROMOTION: beat {chosen['id']} ({gap_start:.1f}–{gap_end:.1f}) → {mg_type!r}")
         is_mg = (planner_name == "MOTION GRAPHICS PLANNER")

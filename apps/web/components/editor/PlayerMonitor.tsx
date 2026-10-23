@@ -29,6 +29,8 @@ import {
   projectPointerToCanvasCoordinates,
   createAddElementOperationFromDrop,
 } from "@/lib/editor/drag-drop-types";
+import { getVideoEffectStyle, isEffectGraphic } from "@/lib/editor/video-effects";
+import { getCaptionTemplate } from "@/lib/editor/caption-templates";
 
 export function PlayerMonitor() {
   const {
@@ -64,6 +66,8 @@ export function PlayerMonitor() {
   })));
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const outgoingVideoRef = useRef<HTMLVideoElement | null>(null);
+  const incomingVideoRef = useRef<HTMLVideoElement | null>(null);
   const brollVideoRef = useRef<HTMLVideoElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -80,14 +84,35 @@ export function PlayerMonitor() {
   ) || null;
 
   // Derive active Caption block directly
-  const activeCaption = project.tracks.textTrack.find(
-    (t) => playheadTime >= t.start && playheadTime < t.end
-  ) || null;
+  const activeCaption =
+    (project.tracks.textTrack || []).find((t) => playheadTime >= t.start && playheadTime < t.end) ||
+    (project.tracks.captionTrack || []).find((t) => playheadTime >= t.start && playheadTime < t.end) ||
+    null;
 
-  // Derive active Graphic element directly
-  const activeGraphic = (project.tracks.graphicsTrack || []).find(
-    (g) => playheadTime >= g.start && playheadTime < g.end
-  ) || null;
+  // Derive active Visual Effect overlay and standard Motion Graphic separately
+  const activeEffect = useMemo(() => {
+    return (
+      (project.tracks.graphicsTrack || []).find(
+        (g) => playheadTime >= g.start && playheadTime < g.end && isEffectGraphic(g)
+      ) || null
+    );
+  }, [project.tracks.graphicsTrack, playheadTime]);
+
+  const activeMotionGraphics = useMemo(() => {
+    return (project.tracks.graphicsTrack || []).filter(
+      (g) => playheadTime >= g.start && playheadTime < g.end && !isEffectGraphic(g)
+    );
+  }, [project.tracks.graphicsTrack, playheadTime]);
+
+  const activeMotionGraphic = activeMotionGraphics[0] || null;
+
+  // Combined reference for backwards compatibility
+  const activeGraphic = activeMotionGraphic || activeEffect;
+
+  // Real-time video shader and motion transform style matching active effect
+  const videoEffectStyle = useMemo(() => {
+    return getVideoEffectStyle(activeEffect, playheadTime);
+  }, [activeEffect, playheadTime]);
 
   // Derive active transition across video cuts (Phase 4)
   const activeTransition = useMemo(() => {
@@ -125,29 +150,88 @@ export function PlayerMonitor() {
     return null;
   }, [project.transitions, project.tracks.videoTrack, playheadTime]);
 
-  const getTransitionStyle = (): React.CSSProperties => {
-    if (!activeTransition) return {};
+  const getDualStreamTransitionStyles = (): {
+    outgoingStyle: React.CSSProperties;
+    incomingStyle: React.CSSProperties;
+  } => {
+    if (!activeTransition) {
+      return { outgoingStyle: {}, incomingStyle: {} };
+    }
     const { preset, progress } = activeTransition;
-    if (preset === "crossfade") {
-      return { opacity: activeVideoClip?.id === activeTransition.fromClip.id ? 1 - progress : progress };
+
+    switch (preset) {
+      case "crossfade":
+        return {
+          outgoingStyle: { opacity: Math.max(0, Math.min(1, 1 - progress)), zIndex: 10 },
+          incomingStyle: { opacity: Math.max(0, Math.min(1, progress)), zIndex: 11 },
+        };
+      case "fade_to_black":
+        return {
+          outgoingStyle: {
+            opacity: progress < 0.5 ? Math.max(0, 1 - progress * 2) : 0,
+            zIndex: 10,
+          },
+          incomingStyle: {
+            opacity: progress >= 0.5 ? Math.max(0, (progress - 0.5) * 2) : 0,
+            zIndex: 11,
+          },
+        };
+      case "wipe_left":
+        return {
+          outgoingStyle: { zIndex: 10 },
+          incomingStyle: {
+            clipPath: `inset(0 0 0 ${(1 - progress) * 100}%)`,
+            zIndex: 11,
+          },
+        };
+      case "wipe_right":
+        return {
+          outgoingStyle: { zIndex: 10 },
+          incomingStyle: {
+            clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)`,
+            zIndex: 11,
+          },
+        };
+      case "slide_up":
+        return {
+          outgoingStyle: { zIndex: 10 },
+          incomingStyle: {
+            transform: `translateY(${(1 - progress) * 100}%)`,
+            zIndex: 11,
+          },
+        };
+      case "zoom_in":
+        return {
+          outgoingStyle: {
+            transform: `scale(${1 + progress * 0.3})`,
+            opacity: Math.max(0, 1 - progress),
+            zIndex: 10,
+          },
+          incomingStyle: {
+            transform: `scale(${0.7 + progress * 0.3})`,
+            opacity: Math.max(0, Math.min(1, progress)),
+            zIndex: 11,
+          },
+        };
+      case "whip_pan":
+        return {
+          outgoingStyle: {
+            transform: `translateX(${-progress * 100}%)`,
+            filter: `blur(${Math.sin(progress * Math.PI) * 8}px)`,
+            zIndex: 10,
+          },
+          incomingStyle: {
+            transform: `translateX(${(1 - progress) * 100}%)`,
+            filter: `blur(${Math.sin(progress * Math.PI) * 8}px)`,
+            zIndex: 11,
+          },
+        };
+      default:
+        return {
+          outgoingStyle: { opacity: 1 - progress, zIndex: 10 },
+          incomingStyle: { opacity: progress, zIndex: 11 },
+        };
     }
-    if (preset === "fade_to_black") {
-      const op = progress < 0.5 ? 1 - progress * 2 : (progress - 0.5) * 2;
-      return { opacity: op };
-    }
-    if (preset === "wipe_left") {
-      return { clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)` };
-    }
-    if (preset === "wipe_right") {
-      return { clipPath: `inset(0 0 0 ${progress * 100}%)` };
-    }
-    if (preset === "slide_up") {
-      return { transform: `translateY(${-(1 - progress) * 100}%)` };
-    }
-    if (preset === "zoom_in") {
-      return { transform: `scale(${1 + progress * 0.25})` };
-    }
-    return {};
   };
 
   // Global keyframe detection and toggling
@@ -184,10 +268,9 @@ export function PlayerMonitor() {
 
   // Sync HTML5 video currentTime with store playheadTime using fast hardware seeking
   useEffect(() => {
+    // 1. Single video element
     const video = videoRef.current;
-    if (!video) return;
-
-    if (activeVideoClip) {
+    if (video && activeVideoClip) {
       // Calculate source time based on clip offset
       const clipOffset = (playheadTime - activeVideoClip.start) * (activeVideoClip.speed || 1);
       const targetSourceTime = Math.max(0, activeVideoClip.sourceStart + clipOffset);
@@ -212,21 +295,105 @@ export function PlayerMonitor() {
       video.playbackRate = activeVideoClip.speed || 1;
       video.volume = currentVolume / 100;
     }
-  }, [playheadTime, activeVideoClip]);
+
+    // 2. Dual-stream transition videos
+    if (activeTransition) {
+      const outVideo = outgoingVideoRef.current;
+      if (outVideo && activeTransition.fromClip) {
+        const fromClip = activeTransition.fromClip;
+        const fromOffset = (playheadTime - fromClip.start) * (fromClip.speed || 1);
+        const targetSourceTime = Math.max(0, fromClip.sourceStart + fromOffset);
+
+        if (Math.abs(outVideo.currentTime - targetSourceTime) > 0.15) {
+          if ("fastSeek" in outVideo && typeof (outVideo as any).fastSeek === "function") {
+            try {
+              (outVideo as any).fastSeek(targetSourceTime);
+            } catch {
+              outVideo.currentTime = targetSourceTime;
+            }
+          } else {
+            outVideo.currentTime = targetSourceTime;
+          }
+        }
+        outVideo.playbackRate = fromClip.speed || 1;
+        const baseVol = (fromClip.volume ?? 100) / 100;
+        const transVol = activeTransition.preset === "fade_to_black"
+          ? (activeTransition.progress < 0.5 ? 1 - activeTransition.progress * 2 : 0)
+          : (1 - activeTransition.progress);
+        outVideo.volume = Math.max(0, Math.min(1, baseVol * transVol));
+      }
+
+      const inVideo = incomingVideoRef.current;
+      if (inVideo && activeTransition.toClip) {
+        const toClip = activeTransition.toClip;
+        const toOffset = (playheadTime - toClip.start) * (toClip.speed || 1);
+        const targetSourceTime = Math.max(0, toClip.sourceStart + toOffset);
+
+        if (Math.abs(inVideo.currentTime - targetSourceTime) > 0.15) {
+          if ("fastSeek" in inVideo && typeof (inVideo as any).fastSeek === "function") {
+            try {
+              (inVideo as any).fastSeek(targetSourceTime);
+            } catch {
+              inVideo.currentTime = targetSourceTime;
+            }
+          } else {
+            inVideo.currentTime = targetSourceTime;
+          }
+        }
+        inVideo.playbackRate = toClip.speed || 1;
+        const baseVol = (toClip.volume ?? 100) / 100;
+        const transVol = activeTransition.preset === "fade_to_black"
+          ? (activeTransition.progress >= 0.5 ? (activeTransition.progress - 0.5) * 2 : 0)
+          : activeTransition.progress;
+        inVideo.volume = Math.max(0, Math.min(1, baseVol * transVol));
+      }
+    }
+
+    // 3. Dual video synchronization for B-roll overlay
+    const broll = brollVideoRef.current;
+    if (broll && activeBroll) {
+      const brollOffset = Math.max(0, playheadTime - activeBroll.start);
+      if (Math.abs(broll.currentTime - brollOffset) > 0.15) {
+        if ("fastSeek" in broll && typeof (broll as any).fastSeek === "function") {
+          try {
+            (broll as any).fastSeek(brollOffset);
+          } catch {
+            broll.currentTime = brollOffset;
+          }
+        } else {
+          broll.currentTime = brollOffset;
+        }
+      }
+      const brollVolume = evaluatePropertyAtTime(
+        activeBroll.animation,
+        "volume",
+        brollOffset,
+        activeBroll.volume ?? 0
+      );
+      broll.volume = Math.max(0, Math.min(1, brollVolume / 100));
+      broll.muted = brollVolume === 0 || activeBroll.muted !== false;
+    }
+  }, [playheadTime, activeVideoClip, activeTransition, activeBroll]);
 
   // Play / Pause handling
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    const outVideo = outgoingVideoRef.current;
+    const inVideo = incomingVideoRef.current;
+    const broll = brollVideoRef.current;
 
     if (isPlaying) {
-      video.play().catch(() => {});
-      if (brollVideoRef.current) brollVideoRef.current.play().catch(() => {});
+      if (video) video.play().catch(() => {});
+      if (outVideo) outVideo.play().catch(() => {});
+      if (inVideo) inVideo.play().catch(() => {});
+      if (broll) broll.play().catch(() => {});
     } else {
-      video.pause();
-      if (brollVideoRef.current) brollVideoRef.current.pause();
+      try { video?.pause(); } catch {}
+      try { outVideo?.pause(); } catch {}
+      try { inVideo?.pause(); } catch {}
+      try { broll?.pause(); } catch {}
     }
-  }, [isPlaying]);
+  }, [isPlaying, !!activeTransition]);
 
   // Handle continuous playback clock driven by native playback
   useEffect(() => {
@@ -238,14 +405,59 @@ export function PlayerMonitor() {
       if (!state.isPlaying) return;
 
       const video = videoRef.current;
+      const outVideo = outgoingVideoRef.current;
+      const inVideo = incomingVideoRef.current;
       const activeClip = state.project.tracks.videoTrack.find(
         (c) => state.playheadTime >= c.start && state.playheadTime < c.end
       );
 
-      if (video && !video.paused && activeClip) {
+      let leadVideo: HTMLVideoElement | null = null;
+      let leadClip: any = null;
+
+      if (activeTransition) {
+        if (activeTransition.progress < 0.5 && outVideo && !outVideo.paused) {
+          leadVideo = outVideo;
+          leadClip = activeTransition.fromClip;
+        } else if (inVideo && !inVideo.paused) {
+          leadVideo = inVideo;
+          leadClip = activeTransition.toClip;
+        } else if (outVideo && !outVideo.paused) {
+          leadVideo = outVideo;
+          leadClip = activeTransition.fromClip;
+        }
+      } else if (video && !video.paused && activeClip) {
+        leadVideo = video;
+        leadClip = activeClip;
+      }
+
+      if (leadVideo && leadClip) {
         // Source time to timeline time
-        const clipOffset = (video.currentTime - activeClip.sourceStart) / (activeClip.speed || 1);
-        const newPlayhead = activeClip.start + clipOffset;
+        const clipOffset = (leadVideo.currentTime - leadClip.sourceStart) / (leadClip.speed || 1);
+        const newPlayhead = leadClip.start + clipOffset;
+
+        // Synchronize secondary transition stream
+        if (activeTransition) {
+          if (leadVideo === outVideo && inVideo && !inVideo.paused) {
+            const expectedInTime = activeTransition.toClip.sourceStart + (newPlayhead - activeTransition.toClip.start) * (activeTransition.toClip.speed || 1);
+            if (Math.abs(inVideo.currentTime - expectedInTime) > 0.25) {
+              inVideo.currentTime = Math.max(0, expectedInTime);
+            }
+          } else if (leadVideo === inVideo && outVideo && !outVideo.paused) {
+            const expectedOutTime = activeTransition.fromClip.sourceStart + (newPlayhead - activeTransition.fromClip.start) * (activeTransition.fromClip.speed || 1);
+            if (Math.abs(outVideo.currentTime - expectedOutTime) > 0.25) {
+              outVideo.currentTime = Math.max(0, expectedOutTime);
+            }
+          }
+        }
+
+        // Synchronize and correct drift for active B-roll overlay
+        const broll = brollVideoRef.current;
+        if (broll && !broll.paused && activeBroll) {
+          const expectedBrollTime = Math.max(0, newPlayhead - activeBroll.start);
+          if (Math.abs(broll.currentTime - expectedBrollTime) > 0.25) {
+            broll.currentTime = expectedBrollTime;
+          }
+        }
 
         if (newPlayhead >= state.project.duration) {
           state.setPlayheadTime(0);
@@ -279,7 +491,7 @@ export function PlayerMonitor() {
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
-  }, [isPlaying]);
+  }, [isPlaying, !!activeTransition, activeBroll]);
 
   // Keyboard shortcut listener: Space to play/pause
   useEffect(() => {
@@ -365,6 +577,23 @@ export function PlayerMonitor() {
             ? projectPointerToCanvasCoordinates(e.clientX, e.clientY, rect)
             : { x: 50, y: 50 };
 
+          if (payload.type === "caption") {
+            const textClips = project.tracks.textTrack || [];
+            const activeCaption = textClips.find(
+              (c) => playheadTime >= c.start && playheadTime <= c.end
+            );
+            if (activeCaption) {
+              dispatchOperation({
+                type: "update_properties",
+                targetType: "caption",
+                targetId: activeCaption.id,
+                properties: { stylePreset: payload.stylePreset },
+              });
+              setSelectedItem({ type: "caption", id: activeCaption.id });
+              return;
+            }
+          }
+
           const operation = createAddElementOperationFromDrop(payload, {
             timestamp: playheadTime,
             position,
@@ -409,8 +638,74 @@ export function PlayerMonitor() {
           </div>
         )}
 
-        {/* Main Video Layer */}
-        {activeVideoClip ? (
+        {/* Active Visual Effect Indicator Badge */}
+        {activeEffect && (
+          <div
+            data-testid="active-effect-indicator"
+            className={cn(
+              "absolute top-3 z-40 px-2.5 py-1 rounded-md bg-neutral-950/85 border border-emerald-400/50 backdrop-blur-md text-[10px] text-emerald-300 font-mono flex items-center gap-1.5 shadow-lg pointer-events-none",
+              activeTransition ? "left-44" : "left-3"
+            )}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="capitalize">
+              FX: {(activeEffect.props?.effectType || activeEffect.name || "Active").replace(/_/g, " ")} ({activeEffect.props?.intensity ?? 80}%)
+            </span>
+          </div>
+        )}
+
+        {/* Main Video Layer (Dual-Stream Transition or Single Video) */}
+        {activeTransition ? (
+          <div
+            data-testid="transition-dual-stream-container"
+            className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none"
+          >
+            {/* Outgoing Stream (Clip A) */}
+            <div
+              data-testid="transition-outgoing-stream"
+              className="absolute inset-0 w-full h-full transition-all duration-75"
+              style={{
+                ...getDualStreamTransitionStyles().outgoingStyle,
+                ...videoEffectStyle,
+              }}
+            >
+              <video
+                ref={outgoingVideoRef}
+                src={activeTransition.fromClip.proxyUrl || activeTransition.fromClip.sourceUrl}
+                muted={isMuted}
+                playsInline
+                preload="auto"
+                autoPlay={isPlaying}
+                onLoadedMetadata={(e) => {
+                  if (isPlaying) (e.target as HTMLVideoElement).play().catch(() => {});
+                }}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            {/* Incoming Stream (Clip B) */}
+            <div
+              data-testid="transition-incoming-stream"
+              className="absolute inset-0 w-full h-full transition-all duration-75"
+              style={{
+                ...getDualStreamTransitionStyles().incomingStyle,
+                ...videoEffectStyle,
+              }}
+            >
+              <video
+                ref={incomingVideoRef}
+                src={activeTransition.toClip.proxyUrl || activeTransition.toClip.sourceUrl}
+                muted={isMuted}
+                playsInline
+                preload="auto"
+                autoPlay={isPlaying}
+                onLoadedMetadata={(e) => {
+                  if (isPlaying) (e.target as HTMLVideoElement).play().catch(() => {});
+                }}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        ) : activeVideoClip ? (
           <TransformableOverlay
             id={activeVideoClip.id}
             type="video"
@@ -421,13 +716,20 @@ export function PlayerMonitor() {
             rotation={activeVideoClip.rotation ?? 0}
             isSelected={selectedItem?.id === activeVideoClip.id}
           >
-            <div className="w-full h-full transition-all duration-75" style={getTransitionStyle()}>
+            <div
+              className="w-full h-full transition-all duration-75 overflow-hidden"
+              style={videoEffectStyle}
+            >
               <video
                 ref={videoRef}
-                src={activeVideoClip.sourceUrl}
+                src={activeVideoClip.proxyUrl || activeVideoClip.sourceUrl}
                 muted={isMuted}
                 playsInline
                 preload="auto"
+                autoPlay={isPlaying}
+                onLoadedMetadata={(e) => {
+                  if (isPlaying) (e.target as HTMLVideoElement).play().catch(() => {});
+                }}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -453,14 +755,15 @@ export function PlayerMonitor() {
           >
             <div
               className="w-full h-full transition-opacity duration-200"
-              style={{ opacity: evaluatePropertyAtTime(activeBroll.animation, "opacity", playheadTime - activeBroll.start, activeBroll.opacity ?? 100) / 100 }}
+              style={{
+                opacity: evaluatePropertyAtTime(activeBroll.animation, "opacity", playheadTime - activeBroll.start, activeBroll.opacity ?? 100) / 100,
+                ...videoEffectStyle,
+              }}
             >
               <video
                 ref={brollVideoRef}
-                src={activeBroll.sourceUrl}
-                muted
-                autoPlay
-                loop
+                src={activeBroll.proxyUrl || activeBroll.sourceUrl}
+                muted={activeBroll.volume === undefined || activeBroll.volume === 0 || activeBroll.muted !== false}
                 playsInline
                 className={cn(
                   "w-full h-full",
@@ -471,58 +774,194 @@ export function PlayerMonitor() {
           </TransformableOverlay>
         )}
 
-        {/* Captions Overlay Layer */}
-        {activeCaption && (
+        {/* Captions Overlay Layer - Suppressed when a Motion Graphic is active to avoid visual collision */}
+        {activeCaption && (!activeMotionGraphics.length || selectedItem?.id === activeCaption.id) && (
           <TransformableOverlay
             id={activeCaption.id}
             type="caption"
             clip={activeCaption}
             positionX={activeCaption.positionX ?? activeCaption.position?.x ?? 50}
-            positionY={activeCaption.positionY ?? activeCaption.position?.y ?? 75}
+            positionY={activeCaption.positionY ?? activeCaption.position?.y ?? ((project as any)?.videoType === "faceless_short" || (project as any)?.isFaceless ? 50 : 75)}
             scale={activeCaption.scale ?? 1.0}
             rotation={activeCaption.rotation ?? 0}
             isSelected={selectedItem?.id === activeCaption.id}
           >
-            <div className="flex justify-center transition-all duration-150">
-              {activeCaption.stylePreset === "tiktok_yellow" && (
-                <span className="font-extrabold uppercase tracking-wide text-center text-xl md:text-2xl text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] px-3 py-1 bg-black/50 backdrop-blur-xs rounded-lg border border-yellow-400/30 whitespace-pre-line">
-                  {activeCaption.text}
-                </span>
-              )}
-              {activeCaption.stylePreset === "hormozi_bold" && (
-                <span className="font-black uppercase tracking-tight text-center text-2xl md:text-3xl text-white drop-shadow-[0_4px_8px_rgba(0,0,0,1)] px-4 py-1.5 bg-red-600 rounded-md border-2 border-white shadow-xl rotate-[-1deg] whitespace-pre-line">
-                  {activeCaption.text}
-                </span>
-              )}
-              {activeCaption.stylePreset === "clean_white" && (
-                <span className="font-semibold text-center text-lg md:text-xl text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] px-3 py-0.5 bg-black/40 rounded-md whitespace-pre-line">
-                  {activeCaption.text}
-                </span>
-              )}
-              {activeCaption.stylePreset === "neon_glow" && (
-                <span className="font-bold text-center text-xl md:text-2xl text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)] px-3 py-1 bg-neutral-950/70 rounded-lg border border-cyan-400/50 whitespace-pre-line">
-                  {activeCaption.text}
-                </span>
-              )}
-            </div>
+            {(() => {
+              const template = getCaptionTemplate(activeCaption.stylePreset);
+              // Split tokens preserving whitespace and newlines for 100% textContent integrity
+              const rawTokens = activeCaption.text.split(/(\s+)/);
+
+              // Precompute word index for each token
+              const tokenWordIndices: (number | null)[] = [];
+              let wordCounter = 0;
+              rawTokens.forEach((tok) => {
+                if (/^\s+$/.test(tok)) {
+                  tokenWordIndices.push(null);
+                } else {
+                  tokenWordIndices.push(wordCounter++);
+                }
+              });
+              const totalWords = wordCounter;
+
+              let activeWordIdx = -1;
+              const captionWords = (activeCaption as any).words;
+              if (Array.isArray(captionWords) && captionWords.length > 0) {
+                // Precise word-level timestamps if available from Whisper
+                activeWordIdx = captionWords.findIndex(
+                  (w: any) =>
+                    playheadTime >= (w.start ?? 0) &&
+                    playheadTime <= (w.end ?? activeCaption.end)
+                );
+                if (activeWordIdx === -1) {
+                  if (
+                    playheadTime >=
+                    (captionWords[captionWords.length - 1]?.end ?? activeCaption.end)
+                  ) {
+                    activeWordIdx = totalWords - 1;
+                  } else {
+                    for (let i = captionWords.length - 1; i >= 0; i--) {
+                      if (playheadTime >= (captionWords[i]?.start ?? 0)) {
+                        activeWordIdx = i;
+                        break;
+                      }
+                    }
+                  }
+                }
+              } else if (totalWords > 0) {
+                // Proportional speech progression synced dynamically to playhead position
+                const capDur = Math.max(0.1, activeCaption.end - activeCaption.start);
+                const elapsed = Math.max(0, playheadTime - activeCaption.start);
+                const progress = Math.min(0.999, Math.max(0, elapsed / capDur));
+                activeWordIdx = Math.floor(progress * totalWords);
+              }
+
+              const wordsPerWindow = (project as any)?.videoType === "faceless_short" || (project as any)?.isFaceless ? 3 : 3;
+
+              // Rolling window matching subtitle_generator.py (3 words per screen)
+              let windowStart = 0;
+              let windowEnd = totalWords;
+              if (totalWords > wordsPerWindow) {
+                const safeActiveIdx = Math.max(0, Math.min(totalWords - 1, activeWordIdx >= 0 ? activeWordIdx : 0));
+                windowStart = Math.floor(safeActiveIdx / wordsPerWindow) * wordsPerWindow;
+                windowEnd = Math.min(totalWords, windowStart + wordsPerWindow);
+              }
+
+              const getActiveWordClasses = (templateId: string, isActive: boolean, isPast: boolean) => {
+                if (isActive) {
+                  switch (templateId) {
+                    case "tiktok_yellow":
+                      return "scale-115 text-yellow-300 drop-shadow-[0_0_16px_rgba(250,204,21,1)] font-black z-10";
+                    case "hormozi_bold":
+                      return "scale-115 text-yellow-300 drop-shadow-[0_0_16px_rgba(253,224,71,1)] bg-neutral-950/70 px-1.5 py-0.5 rounded-md z-10";
+                    case "clean_white":
+                      return "scale-110 text-white font-black drop-shadow-[0_0_12px_rgba(255,255,255,1)] underline decoration-cyan-400 decoration-2 z-10";
+                    case "neon_glow":
+                      return "scale-115 text-cyan-200 drop-shadow-[0_0_20px_rgba(34,211,238,1)] z-10";
+                    case "karaoke_gradient":
+                      return "scale-115 bg-gradient-to-r from-violet-200 via-pink-200 to-amber-200 bg-clip-text text-transparent drop-shadow-[0_0_16px_rgba(244,114,182,1)] font-black z-10";
+                    case "boxed_pill":
+                      return "scale-110 bg-white text-black px-1.5 py-0.5 rounded-full shadow-lg font-black z-10";
+                    case "comic_pop":
+                      return "scale-115 text-yellow-200 drop-shadow-[3px_3px_0px_#000] rotate-[-2deg] z-10";
+                    case "fire_gradient":
+                      return "scale-115 bg-gradient-to-r from-yellow-200 to-amber-400 bg-clip-text text-transparent drop-shadow-[0_0_16px_rgba(245,158,11,1)] font-black z-10";
+                    case "minimal_boxed":
+                      return "scale-110 text-emerald-200 drop-shadow-[0_0_12px_rgba(52,211,153,1)] font-black z-10";
+                    default:
+                      return "scale-115 text-yellow-300 drop-shadow-[0_0_16px_rgba(250,204,21,1)] z-10";
+                  }
+                }
+                if (isPast) {
+                  return "text-white opacity-90";
+                }
+                // Inactive words in the visible window
+                return "text-white/85";
+              };
+
+              return (
+                <div
+                  key={`${activeCaption.id}-${activeCaption.text}`}
+                  className="flex justify-center transition-all duration-150 animate-caption-pop"
+                >
+                  <span
+                    data-testid={`active-caption-rendered-${template.id}`}
+                    className={cn(template.renderClass, "inline-block max-w-[92%]")}
+                    style={template.textStyle}
+                  >
+                    {rawTokens.map((tok, i) => {
+                      const wIdx = tokenWordIndices[i];
+                      if (wIdx === null) {
+                        const prevWIdx = i > 0 ? tokenWordIndices[i - 1] : null;
+                        const nextWIdx = i < tokenWordIndices.length - 1 ? tokenWordIndices[i + 1] : null;
+                        const isVisibleSpace =
+                          prevWIdx !== null &&
+                          nextWIdx !== null &&
+                          prevWIdx >= windowStart &&
+                          prevWIdx < windowEnd &&
+                          nextWIdx >= windowStart &&
+                          nextWIdx < windowEnd;
+                        if (isVisibleSpace) {
+                          return <span key={i}>{" "}</span>;
+                        }
+                        return <span key={i} className="hidden">{tok}</span>;
+                      }
+
+                      const isVisibleWord = wIdx >= windowStart && wIdx < windowEnd;
+                      if (!isVisibleWord) {
+                        return <span key={i} className="hidden">{tok}</span>;
+                      }
+
+                      const isActive = wIdx === activeWordIdx;
+                      const isPast = wIdx < activeWordIdx;
+                      return (
+                        <span
+                          key={i}
+                          className={cn(
+                            "inline-block mx-0.5 sm:mx-1 transition-all duration-100 ease-out origin-center",
+                            getActiveWordClasses(template.id, isActive, isPast)
+                          )}
+                        >
+                          {tok}
+                        </span>
+                      );
+                    })}
+                  </span>
+                </div>
+              );
+            })()}
           </TransformableOverlay>
         )}
 
-        {/* Graphics Overlay Layer */}
-        {activeGraphic && (
-          <TransformableOverlay
-            id={activeGraphic.id}
-            type="graphic"
-            clip={activeGraphic}
-            positionX={activeGraphic.positionX ?? activeGraphic.position?.x ?? 50}
-            positionY={activeGraphic.positionY ?? activeGraphic.position?.y ?? 50}
-            scale={activeGraphic.scale ?? 1.0}
-            rotation={activeGraphic.rotation ?? 0}
-            isSelected={selectedItem?.id === activeGraphic.id}
+        {/* Visual Video Effect Overlay Layer (Full-screen, non-interfering) */}
+        {activeEffect && (
+          <div
+            data-testid={`active-effect-layer-${activeEffect.id}`}
+            className={cn(
+              "absolute inset-0 w-full h-full pointer-events-none z-20 overflow-hidden",
+              selectedItem?.id === activeEffect.id &&
+                "ring-2 ring-emerald-400 ring-inset shadow-[inset_0_0_24px_rgba(52,211,153,0.35)]"
+            )}
           >
-            <GraphicCanvasRenderer graphic={activeGraphic} playheadTime={playheadTime} />
-          </TransformableOverlay>
+            <GraphicCanvasRenderer graphic={activeEffect} playheadTime={playheadTime} />
+          </div>
         )}
+
+        {/* Standard Motion Graphics Layer (Draggable cards, shapes, counters, lower thirds) */}
+        {activeMotionGraphics.map((graphic) => (
+          <TransformableOverlay
+            key={graphic.id}
+            id={graphic.id}
+            type="graphic"
+            clip={graphic}
+            positionX={graphic.positionX ?? graphic.position?.x ?? 50}
+            positionY={graphic.positionY ?? graphic.position?.y ?? 50}
+            scale={graphic.scale ?? 1.0}
+            rotation={graphic.rotation ?? 0}
+            isSelected={selectedItem?.id === graphic.id}
+          >
+            <GraphicCanvasRenderer graphic={graphic} playheadTime={playheadTime} />
+          </TransformableOverlay>
+        ))}
 
         {/* Dynamic Safe Zone Overlay */}
         {safeZoneVisible && (() => {

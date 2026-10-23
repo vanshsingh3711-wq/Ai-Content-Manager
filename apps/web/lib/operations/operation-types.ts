@@ -155,6 +155,9 @@ export const AddTransitionOperationSchema = z.object({
   preset: TransitionPresetSchema,
   duration: z.number().positive().default(0.5),
   alignment: z.enum(["center", "start", "end"]).default("center"),
+  validateHandles: z.boolean().optional().default(false),
+  autoClamp: z.boolean().optional().default(false),
+  enforceFallback: z.boolean().optional().default(false),
 });
 export type AddTransitionOperation = z.infer<typeof AddTransitionOperationSchema>;
 

@@ -256,4 +256,33 @@ describe("local-command-parser: Natural Language Intent Parsing", () => {
     expect(result.isCloudCandidate).toBe(true);
     expect(result.operation).toBeUndefined();
   });
+
+  it("parses 'add vignette effect at 2s' into effect_overlay", () => {
+    const context = assembleEditorContext(mockProject, 1.0, null);
+    const result = parseLocalCommand("add vignette effect at 2s", context);
+
+    expect(result.matched).toBe(true);
+    expect(result.operation?.type).toBe("add_element");
+    const op = result.operation as any;
+    expect(op.track).toBe("graphic");
+    expect(op.element.compositionId).toBe("effect_overlay");
+    expect(op.element.name).toBe("Cinematic Vignette");
+    expect(op.element.start).toBe(2.0);
+    expect(op.element.props.effectType).toBe("vignette");
+  });
+
+  it("parses 'add golden hour effect from 3s to 7s' into effect_overlay", () => {
+    const context = assembleEditorContext(mockProject, 0, null);
+    const result = parseLocalCommand("add golden hour effect from 3s to 7s", context);
+
+    expect(result.matched).toBe(true);
+    expect(result.operation?.type).toBe("add_element");
+    const op = result.operation as any;
+    expect(op.track).toBe("graphic");
+    expect(op.element.compositionId).toBe("effect_overlay");
+    expect(op.element.name).toBe("Golden Hour Glow");
+    expect(op.element.start).toBe(3.0);
+    expect(op.element.end).toBe(7.0);
+    expect(op.element.props.effectType).toBe("golden_hour");
+  });
 });

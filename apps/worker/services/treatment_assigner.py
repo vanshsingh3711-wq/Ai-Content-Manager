@@ -1,6 +1,54 @@
 import math
 from typing import List, Dict, Any, Tuple
 
+def infer_suggested_template(beat: Dict[str, Any]) -> str:
+    """
+    Infers the optimal high-impact Remotion motion graphic template
+    based on the semantic theme, vocabulary, numbers, and role of the beat.
+    """
+    text = (beat.get("text") or "").lower()
+    focus = (beat.get("focus_phrase") or "").lower()
+    combined = f"{text} {focus}"
+    role = beat.get("role", "").lower()
+
+    # 1. Compounding, Formulas & Math Systems (Rule of 72, growth formulas, doubling calculations)
+    if any(k in combined for k in ["rule of 72", "formula", "compound", "divide it by", "rate of return", "doubling", "years to double", "exponential"]):
+        return "compound_formula"
+
+    # 2. Performance Battles & Head-to-Head Comparisons (Bank vs Index, vs, versus, compared to)
+    if (("vs" in combined or "versus" in combined or "unlike" in combined or "compared" in combined) and any(k in combined for k in ["bank", "index", "fund", "rate", "percent", "%"])) \
+       or ("bank" in combined and any(k in combined for k in ["index fund", "s&p", "market", "stocks"])) \
+       or (role == "comparison" and any(k in combined for k in ["%", "return", "gain", "double", "bank", "invest"])):
+        return "battle_chart"
+
+    # 3. Contrast transformation / Split slider (Before vs After, safe vs broke, paradigm shifts)
+    if any(k in combined for k in ["feels safe", "guaranteeing you stay broke", "stop saving", "start investing", "before and after", "instead of"]):
+        return "split_slider_comparison"
+
+    # 4. Urgency, Inflation, Capital Destruction & Risk Meters
+    if any(k in combined for k in ["inflation", "drain", "drained", "silently drained", "losing money", "purchasing power", "bleeding", "danger", "broke", "dead", "destroy"]):
+        return "urgency_dial_gauge"
+
+    # 5. Big Milestone Metrics & Wealth Transformation ($20k -> $160k, massive multiples)
+    if ("turn" in combined or "transform" in combined or "into $" in combined or "doublings" in combined) and ("$" in combined or "k" in combined):
+        return "stat_card_highlight"
+
+    # 6. Checklists, Step Sequences, Multi-stage processes
+    if role in ["list", "process"] or any(k in combined for k in ["step 1", "step 2", "three rules", "checklist"]):
+        return "step_sequence"
+
+    # 7. Exact statistics / KPI metrics
+    if role in ["statistic", "data", "metric"] or "%" in combined or "$" in combined:
+        return "metric_reveal"
+
+    # 8. Hook / CTA
+    if role in ["hook", "cta"]:
+        return "kinetic_text"
+
+    # 9. Fallback for insights
+    return "stat_card_highlight" if role in ["insight", "claim"] else "hero_reveal"
+
+
 def assign_visual_treatments(
     beat_sheet: Dict[str, Any],
     total_duration_sec: float,
@@ -28,9 +76,6 @@ def assign_visual_treatments(
         concreteness = beat.get("concreteness", "abstract")
         
         # Emphasis window derivation
-        # (In a real implementation with word timings available in the beat or via timestamp_map,
-        # we would map emphasis_words back to their timestamps. Since they are strings here, 
-        # we use the beat's start/end as a fallback.)
         start = beat["start"]
         end = beat["end"]
             
@@ -71,6 +116,9 @@ def assign_visual_treatments(
             else:
                 beat["treatment"] = "motion_graphic"
                 beat["treatment_reason"] = "Concreteness: abstract -> motion_graphic"
+
+        if beat["treatment"] in ["motion_graphic", "kinetic_text"]:
+            beat["suggested_template"] = infer_suggested_template(beat)
 
     # Pass 2: Enforce max consecutive treated beats (demote lowest importance in the run)
     is_faceless = settings.get("is_faceless", False)

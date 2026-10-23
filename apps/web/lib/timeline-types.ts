@@ -26,6 +26,7 @@ export interface ClipTransformState {
 export interface VideoClip {
   id: string;
   sourceUrl: string;
+  proxyUrl?: string;
   name: string;
   start: number;          // Position on project timeline (seconds)
   end: number;            // End position on project timeline (seconds)
@@ -47,12 +48,17 @@ export interface VideoClip {
 export interface BRollClip {
   id: string;
   sourceUrl: string;
+  proxyUrl?: string;
   thumbnailUrl?: string;
+  localPath?: string;
   name: string;
   start: number;          // Start timestamp on timeline (seconds)
   end: number;            // End timestamp on timeline (seconds)
   opacity: number;        // 0 to 100 (default: 100)
+  volume?: number;        // 0 to 100 (default: 0 - keeps narration audible)
+  muted?: boolean;        // default: true
   fitMode: "cover" | "contain";
+
   position?: { x: number, y: number }; // defaults to {x: 50, y: 50}
   positionX?: number;
   positionY?: number;
@@ -62,7 +68,18 @@ export interface BRollClip {
   animation?: ClipTransformState;
 }
 
-export type CaptionPreset = "tiktok_yellow" | "hormozi_bold" | "clean_white" | "neon_glow";
+export type CaptionPreset =
+  | "tiktok_yellow"
+  | "hormozi_bold"
+  | "clean_white"
+  | "neon_glow"
+  | "karaoke_gradient"
+  | "boxed_pill"
+  | "comic_pop"
+  | "fire_gradient"
+  | "minimal_boxed"
+  | "neon_cyber"
+  | "modern_clean";
 
 export interface CaptionBlock {
   id: string;
@@ -92,6 +109,8 @@ export interface AudioClip {
   fadeIn: number;         // Duration in seconds
   fadeOut: number;
   isBgm: boolean;         // If true, audio ducking is applied
+  ducking?: boolean | { enabled: boolean; thresholdDb?: number; attenuationDb?: number };
+  duckingDb?: number;     // e.g. -14 dB
   animation?: ClipTransformState;
 }
 
@@ -173,13 +192,15 @@ export interface TransitionItem {
   alignment: "center" | "start" | "end";
 }
 
-export type TrackItemType = "video" | "broll" | "caption" | "audio" | "graphic";
+export type TrackItemType = "video" | "broll" | "caption" | "audio" | "graphic" | "transition" | "constraint";
 
 export interface TimelineProject {
   id: string;
   videoId?: string;
   title: string;
   aspectRatio: AspectRatio;
+  videoType?: "talking_head" | "faceless_short";
+  isFaceless?: boolean;
   duration: number;       // Total project duration in seconds
   fps: number;            // Default: 30
   tracks: {

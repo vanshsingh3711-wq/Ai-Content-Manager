@@ -2,11 +2,24 @@ import React from 'react';
 import { AbsoluteFill, useVideoConfig } from 'remotion';
 import { COLORS, FONT, useFadeUp, useExitFade } from '../shared';
 
-interface Props { beforeLabel: string; before: string; afterLabel: string; after: string; personality?: string; }
+interface Props {
+  beforeLabel?: string;
+  before?: string;
+  beforeText?: string;
+  afterLabel?: string;
+  after?: string;
+  afterText?: string;
+  personality?: string;
+}
 
-export const BeforeAfter: React.FC<Props> = ({ beforeLabel, before, afterLabel, after }) => {
+export const BeforeAfter: React.FC<Props> = (props) => {
   const { durationInFrames } = useVideoConfig();
   const exit = useExitFade(durationInFrames);
+
+  const beforeLabel = props.beforeLabel || 'BEFORE';
+  const before = props.before || props.beforeText || 'Old method';
+  const afterLabel = props.afterLabel || 'AFTER';
+  const after = props.after || props.afterText || 'New method';
 
   const cardBase: React.CSSProperties = { borderRadius: 28, padding: '48px 44px', width: '100%' };
 

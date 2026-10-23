@@ -31,6 +31,7 @@ import {
   Loader2,
   Ratio,
   Type,
+  Scissors,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { VideoUploadModal } from "@/components/VideoUploadModal";
@@ -853,11 +854,21 @@ export default function VideosPage() {
               <div className="col-span-2 text-xs text-neutral-600 font-mono">
                 {formatDate(video.created_at)}
               </div>
-              <div className="col-span-2 flex justify-end gap-1">
+              <div className="col-span-2 flex items-center justify-end gap-1.5">
+                <Link
+                  href={`/dashboard/editor/${video.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                  title="Open and edit this video in Studio"
+                >
+                  <Scissors className="w-3 h-3 text-yellow-400" />
+                  <span>Edit</span>
+                </Link>
+
                 {video.status === "FAILED" && (
                   <button
                     onClick={e => handleRetry(e, video.id)}
-                    className="p-2 rounded-lg text-neutral-700 hover:text-white hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-1.5 rounded-lg text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100"
                     title="Retry"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -865,7 +876,7 @@ export default function VideosPage() {
                 )}
                 <button
                   onClick={e => handleDelete(e, video.id)}
-                  className="p-2 rounded-lg text-neutral-700 hover:text-white hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1.5 rounded-lg text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100"
                   title="Delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

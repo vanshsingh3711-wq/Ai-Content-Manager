@@ -158,7 +158,12 @@ function drawHeroReveal(ctx, w, h, p, progress, scale) {
     const alpha = Math.min(1, progress * 4);
     ctx.fillStyle = 'rgb(10,10,20)';
     ctx.fillRect(-w/2, -h/2, w, h);
-    ctx.fillStyle = '#6366f1';
+    const colorTheme = (p.colorTheme || '').toLowerCase();
+    const accentColor = colorTheme === 'blue' || colorTheme === 'cyan' ? '#38bdf8' :
+                        colorTheme === 'emerald' || colorTheme === 'green' ? '#34d399' :
+                        colorTheme === 'amber' || colorTheme === 'yellow' ? '#f59e0b' :
+                        '#6366f1';
+    ctx.fillStyle = accentColor;
     ctx.fillRect(-w/2, -30, w * Math.min(1, progress * 5), 8);
     const headline = p.headline || p.quote || p.text || '';
     ctx.font = `bold ${Math.round(68 * scale)}px sans-serif`;
@@ -172,7 +177,61 @@ function drawHeroReveal(ctx, w, h, p, progress, scale) {
     }
     if (line) lines.push(line);
     lines.forEach((l, i) => ctx.fillText(l, 0, (i - (lines.length-1)/2) * 82));
-    if (p.supporting) { ctx.font = '38px sans-serif'; ctx.fillStyle = '#c4b5fd'; ctx.fillText(p.supporting, 0, h * 0.14); }
+    if (p.supporting) { ctx.font = '38px sans-serif'; ctx.fillStyle = accentColor === '#6366f1' ? '#c4b5fd' : '#e0f2fe'; ctx.fillText(p.supporting, 0, h * 0.14); }
+}
+
+function drawAnimatedCounter(ctx, w, h, p, progress, scale) {
+    const fromN = Number(p.from ?? 0);
+    const toN = Number(p.to ?? p.count ?? 50000);
+    const current = Math.round(fromN + Math.min(1, progress * 1.5) * (toN - fromN));
+    const label = p.label || 'SUBSCRIBERS';
+    const prefix = p.prefix || '';
+    const suffix = p.suffix || '';
+
+    const cardW = Math.min(w * 0.85, 760);
+    const cardH = 340;
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 10, 20, 0.95)';
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, [28]);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(-cardW / 2 + 40, -cardH / 2, cardW - 80, 4);
+
+    ctx.font = 'bold 28px monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label.toUpperCase(), 0, -cardH * 0.22);
+
+    let numText = current.toLocaleString();
+    if (toN >= 1000 && (suffix === 'k' || (!suffix && toN % 1000 === 0))) {
+        numText = (current >= 1000 ? (current / 1000).toFixed(current % 1000 === 0 ? 0 : 1) + 'k' : current.toString());
+    }
+    const valText = `${prefix}${numText}${suffix && !numText.endsWith(suffix) ? suffix : ''}`;
+
+    ctx.font = `900 ${Math.round(84 * scale)}px sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(valText, 0, 15);
+
+    const barW = cardW - 120;
+    const barH = 12;
+    const barY = cardH * 0.26;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.beginPath();
+    ctx.roundRect(-barW / 2, barY, barW, barH, [6]);
+    ctx.fill();
+
+    const fillW = barW * Math.min(1, Math.max(0, progress * 1.5));
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.roundRect(-barW / 2, barY, fillW, barH, [6]);
+    ctx.fill();
+    ctx.restore();
 }
 
 function drawQuoteReveal(ctx, w, h, p, progress) {
@@ -226,14 +285,22 @@ async function renderTemplate(frame, time, progress) {
     ctx.translate(width/2, height/2);
     const sc = getSpringScale(frame, fps);
     switch (componentId) {
-        case 'before_after':   drawBeforeAfter(ctx, width, height, props, progress); break;
-        case 'hero_reveal':    drawHeroReveal(ctx, width, height, props, progress, sc); break;
-        case 'quote_reveal':   drawQuoteReveal(ctx, width, height, props, progress); break;
-        case 'step_sequence':  drawStepSequence(ctx, width, height, props, progress); break;
+        case 'before_after':
+        case 'before-after':      drawBeforeAfter(ctx, width, height, props, progress); break;
+        case 'hero_reveal':
+        case 'hero-reveal':       drawHeroReveal(ctx, width, height, props, progress, sc); break;
+        case 'animated_counter':
+        case 'animated-counter':
+        case 'metric_reveal':
+        case 'metric-reveal':     drawAnimatedCounter(ctx, width, height, props, progress, sc); break;
+        case 'quote_reveal':
+        case 'quote-reveal':      drawQuoteReveal(ctx, width, height, props, progress); break;
+        case 'step_sequence':
+        case 'step-sequence':     drawStepSequence(ctx, width, height, props, progress); break;
         default:
             ctx.restore();
             // Unknown template — fail loudly so callers know to add a draw function
-            console.error(`[CanvasRenderer] ERROR: No draw function for componentId='${componentId}'. Add a draw function to render_canvas.js. Known templates: before_after, hero_reveal, quote_reveal, step_sequence.`);
+            console.error(`[CanvasRenderer] ERROR: No draw function for componentId='${componentId}'. Add a draw function to render_canvas.js. Known templates: before_after, hero_reveal, animated_counter, quote_reveal, step_sequence.`);
             process.exit(1);
     }
     ctx.restore();

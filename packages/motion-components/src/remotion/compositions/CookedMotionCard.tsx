@@ -18,9 +18,9 @@ function normalizeCookedProps(type: string, inputProps: Record<string, any> = {}
 
   switch (type) {
     case 'likes': {
-      if (!p.counts && (p.to !== undefined || p.count !== undefined || p.metric !== undefined)) {
-        const fromN = Number(p.from ?? 0);
-        const toN = Number(String(p.to ?? p.count ?? p.metric ?? 1000).replace(/[^\d.-]/g, '')) || 1000;
+      if (!p.counts && (p.to !== undefined || p.count !== undefined || p.metric !== undefined || p.endValue !== undefined || p.value !== undefined)) {
+        const fromN = Number(p.from ?? p.startValue ?? 0);
+        const toN = Number(String(p.to ?? p.endValue ?? p.count ?? p.metric ?? p.value ?? 1000).replace(/[^\d.-]/g, '')) || 1000;
         p.counts = [{ n: fromN }, { n: toN }];
       } else if (!p.counts) {
         p.counts = [{ n: 0 }, { n: 10000 }];
@@ -66,8 +66,8 @@ function normalizeCookedProps(type: string, inputProps: Record<string, any> = {}
       break;
     }
     case 'notes': {
-      if (!p.lines && (p.items || p.steps)) {
-        const items = p.items || p.steps;
+      if (!p.lines && (p.items || p.steps || p.item1)) {
+        const items = p.items || p.steps || [p.item1, p.item2, p.item3, p.item4].filter(Boolean);
         p.lines = (Array.isArray(items) ? items : [items]).map((item: any) =>
           typeof item === 'string' ? { text: item } : item
         );
@@ -80,8 +80,8 @@ function normalizeCookedProps(type: string, inputProps: Record<string, any> = {}
       break;
     }
     case 'progress': {
-      if (p.to === undefined && (p.progress !== undefined || p.value !== undefined)) {
-        const val = Number(String(p.progress ?? p.value ?? 100).replace(/[^\d.-]/g, ''));
+      if (p.to === undefined && (p.progress !== undefined || p.value !== undefined || p.targetProgress !== undefined)) {
+        const val = Number(String(p.progress ?? p.value ?? p.targetProgress ?? 100).replace(/[^\d.-]/g, ''));
         p.to = isNaN(val) ? 100 : val;
       }
       if (!p.label) p.label = 'Progress';

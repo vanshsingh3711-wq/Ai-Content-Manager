@@ -11,17 +11,19 @@ settings = get_worker_settings()
 
 
 class CopilotIntentProposal(BaseModel):
-    intent: Literal["add_broll", "add_graphic", "capture_web_evidence", "split_clip", "clarification_needed"]
+    intent: Literal["add_broll", "add_graphic", "capture_web_evidence", "split_clip", "add_audio", "clarification_needed"]
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
     start_time: float = Field(..., description="Normalized start in seconds")
     end_time: float = Field(..., description="Normalized end in seconds")
-    action_type: Optional[Literal["broll", "graphic", "caption", "cut", "sfx"]] = Field(default=None, description="Timeline track action type")
+    action_type: Optional[Literal["broll", "graphic", "caption", "cut", "sfx", "audio"]] = Field(default=None, description="Timeline track action type")
     summary: str = Field(..., description="Concise explanation of proposed change")
     graphic_template: Optional[Literal[
         "app_screen_upload",
         "browser_walkthrough",
         "chart_reveal",
         "metric_reveal",
+        "animated_counter",
+        "animated-counter",
         "cooked_terminal",
         "cooked_social_post",
         "hero_reveal",
@@ -43,10 +45,11 @@ Available Actions:
    - `app_screen_upload`: Interactive software window showing video/file upload progress and status.
    - `browser_walkthrough`: Dark macOS browser frame presenting a live web URL or website screenshot.
    - `chart_reveal`: Rising growth chart / trend lines / data points (ONLY when user asks for charts, graphs, metrics trends).
-   - `metric_reveal`: Animated KPI counter, percentages, dollar amounts, subscriber count.
+   - `metric_reveal`: Animated KPI counter, percentages, dollar amounts.
+   - `animated_counter`: Animated subscriber/follower/metric counter counting to a target number (e.g. counting to 50k).
    - `cooked_terminal`: Hacker / developer dark terminal showing commands and output.
    - `cooked_social_post`: X/Twitter or social media comment card.
-   - `hero_reveal`: Bold headline card with key takeaway.
+   - `hero_reveal`: Bold headline card with key takeaway or animated title (e.g. blue animated title saying 'The Solution').
    - `quote_reveal`: Notable quote card with author attribution.
 3. `capture_web_evidence`: User wants to show a live webpage, article, GitHub repo, or social post from a URL.
 4. `split_clip`: Cut or split the video at the given timestamp.
@@ -163,9 +166,39 @@ def reason_copilot_intent(
             start_raw = parsed.get("start_time")
             start = round(max(0.0, float(start_raw if start_raw is not None else playhead)), 2)
             end_raw = parsed.get("end_time")
-            end = round(min(duration, max(start + 0.5, float(end_raw if end_raw is not None else (start + 3.5)))), 2)
+            effective_duration = max(duration, float(end_raw if end_raw is not None else (start + 3.5)))
+            end = round(min(effective_duration, max(start + 0.5, float(end_raw if end_raw is not None else (start + 3.5)))), 2)
             parsed["start_time"] = start
             parsed["end_time"] = end
+
+            if parsed.get("graphic_props"):
+                props = parsed["graphic_props"]
+                if "title" in props and "label" not in props:
+                    props["label"] = str(props["title"]).upper()
+                if "label" in props and "title" not in props:
+                    props["title"] = str(props["label"]).upper()
+                if "title" in props and "headline" not in props:
+                    props["headline"] = props["title"]
+                if "color" in props and "colorTheme" not in props:
+                    props["colorTheme"] = props["color"]
+                if "label" in props and isinstance(props["label"], str):
+                    props["label"] = props["label"].upper()
+                if "to" not in props:
+                    val_str = str(props.get("targetValue") or props.get("target") or props.get("endValue") or "")
+                    if val_str:
+                        m = re.search(r"(\d+(?:\.\d+)?)\s*([kmb])?", val_str, re.I)
+                        if m:
+                            num = float(m.group(1))
+                            unit = (m.group(2) or "").lower()
+                            if unit == "k":
+                                num *= 1000
+                            elif unit == "m":
+                                num *= 1000000
+                            elif unit == "b":
+                                num *= 1000000000
+                            props["to"] = int(num)
+                if "to" in props and "from" not in props:
+                    props["from"] = 0
 
             if parsed.get("intent") == "capture_web_evidence":
                 parsed["action_type"] = "graphic"
@@ -180,6 +213,17 @@ def reason_copilot_intent(
     return _semantic_heuristic_fallback(prompt, playhead, duration)
 
 
+def _parse_time_token(token: str) -> float:
+    t = re.sub(r"(?:s|sec|seconds)$", "", token.strip(), flags=re.I)
+    if ":" in t:
+        parts = t.split(":")
+        if len(parts) == 2:
+            return float(parts[0]) * 60 + float(parts[1])
+        elif len(parts) == 3:
+            return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+    return float(t)
+
+
 def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) -> CopilotIntentProposal:
     """Deterministic semantic fallback when LLM is offline or times out."""
     lower = prompt.lower()
@@ -190,27 +234,120 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
     from_to = re.search(r"\b(?:from|between)\s+([0-9:.]+(?:s|sec|seconds)?)\s*(?:to|and)\s+([0-9:.]+(?:s|sec|seconds)?)\b", lower)
     if from_to:
         try:
-            t1 = float(re.sub(r"[^\d.]", "", from_to.group(1)))
-            t2 = float(re.sub(r"[^\d.]", "", from_to.group(2)))
+            t1 = _parse_time_token(from_to.group(1))
+            t2 = _parse_time_token(from_to.group(2))
             if t1 < t2:
                 start_time = round(t1, 2)
-                end_time = min(duration, round(t2, 2))
+                effective_duration = max(duration, t2)
+                end_time = min(effective_duration, round(t2, 2))
         except Exception:
             pass
+    else:
+        bare_range = re.search(r"\b([0-9:.]+(?:s|sec|seconds)?)\s*(?:to|-)\s*([0-9:.]+(?:s|sec|seconds)?)\b", lower)
+        if bare_range:
+            try:
+                t1 = _parse_time_token(bare_range.group(1))
+                t2 = _parse_time_token(bare_range.group(2))
+                if t1 < t2:
+                    start_time = round(t1, 2)
+                    effective_duration = max(duration, t2)
+                    end_time = min(effective_duration, round(t2, 2))
+            except Exception:
+                pass
 
-    # Web URL
-    url_match = re.search(r'https?://[^\s]+', prompt)
+    # Animated Title / Hero Reveal (e.g., "Add a blue animated title saying 'The Solution' from 01:23 to 01:26")
+    if (
+        re.search(r"\b(?:animated\s+title|title\s+saying|animated\s+headline|hero\s+reveal|title\s+card|text\s+card)\b", lower)
+        or (re.search(r"\b(?:animat\w*|motion\s*graphics?)\b", lower) and re.search(r"\b(?:title|headline)\b", lower))
+        or (re.search(r"\b(?:blue|cyan|emerald|green|amber|purple)\s+animated\b", lower))
+    ) and not re.search(r"\b(?:upload|screen|browser|terminal|counter|metric|kpi)\b", lower):
+        headline_match = re.search(r'(?:saying|titled|reading|with text)?\s*[\'"]([^\'"]+)[\'"]', prompt, re.I)
+        headline = headline_match.group(1).strip() if headline_match else ""
+        if not headline:
+            saying_match = re.search(r'\bsaying\s+([^,.;\n]+?)(?:\s+(?:from|between|at|to|for)\b|$)', prompt, re.I)
+            if saying_match:
+                headline = saying_match.group(1).strip()
+        if not headline:
+            headline = "The Solution" if "solution" in lower else "Essential Insight"
+
+        color_theme = "blue" if "blue" in lower else "cyan" if "cyan" in lower else "emerald" if "green" in lower or "emerald" in lower else "amber" if "amber" in lower or "yellow" in lower else "purple"
+        return CopilotIntentProposal(
+            intent="add_graphic",
+            confidence=0.95,
+            start_time=start_time,
+            end_time=end_time,
+            action_type="graphic",
+            summary=f"{color_theme.title()} animated title saying '{headline}' from {start_time:.1f}s to {end_time:.1f}s",
+            graphic_template="hero_reveal",
+            graphic_props={
+                "headline": headline,
+                "title": headline,
+                "label": "KEY INSIGHT",
+                "supporting": "Accelerating workflow execution",
+                "colorTheme": color_theme,
+            },
+            suggested_actions=["Customize title text", "Change color theme"],
+        )
+
+    # Animated Counter (e.g., "Add an animated subscriber counter from 00:12 to 00:16 counting to 50k")
+    if (
+        re.search(r"\b(?:counter|counting|subscribers?|followers?|views?)\b", lower)
+        and re.search(r"\b(?:animat\w*|motion|card|graphic|kpi|ticker)\b", lower)
+    ) or re.search(r"\b(?:animated\s+counter|subscriber\s+counter|follower\s+counter)\b", lower):
+        count_match = re.search(r"\b(?:to|counting\s+to|reach(?:ing)?\s+to|at)?\s*([0-9]+(?:\.[0-9]+)?)\s*([kmb])?\b", lower)
+        to_val = 50000
+        suffix = "k"
+        if count_match:
+            base_num = float(count_match.group(1))
+            unit = (count_match.group(2) or "").lower()
+            if unit == "k":
+                to_val = int(base_num * 1000)
+                suffix = "k"
+            elif unit == "m":
+                to_val = int(base_num * 1000000)
+                suffix = "M"
+            elif unit == "b":
+                to_val = int(base_num * 1000000000)
+                suffix = "B"
+            else:
+                to_val = int(base_num)
+                suffix = ""
+
+        label = "SUBSCRIBERS" if "sub" in lower else "FOLLOWERS" if "follow" in lower else "METRIC COUNTER"
+        return CopilotIntentProposal(
+            intent="add_graphic",
+            confidence=0.95,
+            start_time=start_time,
+            end_time=end_time,
+            action_type="graphic",
+            summary=f"Animated subscriber counter from {start_time:.1f}s to {end_time:.1f}s counting to {count_match.group(0).strip() if count_match else to_val}",
+            graphic_template="animated_counter",
+            graphic_props={
+                "from": 0,
+                "to": to_val,
+                "label": label,
+                "prefix": "",
+                "suffix": suffix,
+            },
+            suggested_actions=["Adjust counter target", "Change count duration"],
+        )
+
+    # Web URL / Web evidence capture
+    url_match = re.search(r'(?:https?://|www\.)[^\s\"\'<>]+|(?:[a-zA-Z0-9-]+\.)+(?:com|org|io|dev|net|ai|co|app)(?:/[^\s\"\'<>]*)?', prompt, re.I)
     if url_match:
-        url = url_match.group(0)
+        url = url_match.group(0).rstrip(".,;)")
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = f"https://{url}"
+        is_explicit_broll = bool(re.search(r"\b(?:b-?roll|broll|recording|footage|clip|video)\b", lower)) and not bool(re.search(r"\b(?:graphic|card|mockup)\b", lower))
         return CopilotIntentProposal(
             intent="capture_web_evidence",
             confidence=0.95,
             start_time=start_time,
             end_time=end_time,
-            action_type="graphic",
-            summary=f"Web walkthrough for {url}",
+            action_type="broll" if is_explicit_broll else "graphic",
+            summary=f"Web recording for {url}",
             graphic_template="browser_walkthrough",
-            graphic_props={"url": url, "title": "Web Source"},
+            graphic_props={"url": url, "title": "Web Source", "is_broll": is_explicit_broll},
         )
 
     # App Screen Upload
@@ -245,19 +382,30 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
                 suggested_actions=["Add stock video footage", "Add animated app upload graphic"],
             )
 
-    # Web URL
-    url_match = re.search(r'https?://[^\s]+', prompt)
-    if url_match:
-        url = url_match.group(0)
+    # B-Roll / Stock Footage / Coding / Technology
+    if (
+        re.search(r"\b(?:b-?roll|broll|footage|stock\s*(?:video|footage)?|cutaway)\b", lower)
+        or re.search(r"\b(?:laptop\s*coding|coding|programming|developer|technology|typing|working|nature|city|drone\s*shot)\b", lower)
+    ):
+        clean_query = re.sub(
+            r"\b(?:add|relevant|insert|put|overlay|b-?roll|broll|footage|video|clip|showing|of|i want|want|a screen in which|a screen showing|screen showing|screen|user is|on screen|from|between|at|to|and|keep|my|our|the|narration|audible|audio|clear|uninterrupted)\b",
+            "",
+            prompt,
+            flags=re.I
+        ).strip()
+        clean_query = re.sub(r"\s+", " ", clean_query).strip()
+        if not clean_query or len(clean_query) < 3:
+            clean_query = "laptop coding developer" if "coding" in lower else "cinematic technology footage"
+
         return CopilotIntentProposal(
-            intent="capture_web_evidence",
-            confidence=0.95,
+            intent="add_broll",
+            confidence=0.92,
             start_time=start_time,
             end_time=end_time,
-            action_type="graphic",
-            summary=f"Web walkthrough for {url}",
-            graphic_template="browser_walkthrough",
-            graphic_props={"url": url, "title": "Web Source"},
+            action_type="broll",
+            summary=f"Add B-roll footage of {clean_query} from {start_time:.1f}s to {end_time:.1f}s with speech audio preserved",
+            search_query=clean_query,
+            suggested_actions=["Add stock video footage", "Adjust B-roll timing"],
         )
 
     # Chart / Graph
@@ -271,6 +419,25 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
             summary=f"Growth chart reveal from {start_time:.1f}s to {end_time:.1f}s",
             graphic_template="chart_reveal",
             graphic_props={"title": "GROWTH TREND", "dataPoint1": "Stage 1", "dataPoint2": "+85%"},
+        )
+
+    # Generic Motion Graphics request without specific subtype
+    if re.search(r"\b(?:motion\s*graphics?|moton\s*graphicss?|motion\s*card|animated\s*card|graphic\s*card)\b", lower):
+        return CopilotIntentProposal(
+            intent="add_graphic",
+            confidence=0.91,
+            start_time=start_time,
+            end_time=end_time,
+            action_type="graphic",
+            summary=f"Animated motion graphic card from {start_time:.1f}s to {end_time:.1f}s",
+            graphic_template="hero_reveal",
+            graphic_props={
+                "headline": "KEY MOMENT",
+                "label": "FEATURED",
+                "supporting": "Dynamic Motion Graphics",
+                "personality": "premium",
+            },
+            suggested_actions=["Customize headline", "Change motion style"],
         )
 
     # Ambiguous / Subjective

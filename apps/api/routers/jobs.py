@@ -91,6 +91,38 @@ def dispatch_job_to_celery(job_id: uuid.UUID) -> str:
         return sim_id
 
 
+def dispatch_timeline_render_to_celery(job_id: uuid.UUID, project_data: Optional[dict] = None) -> str:
+    """Dispatches a timeline render task to Celery or runs in a background thread fallback."""
+    print(f"[API: CELERY] 📤 Sending task 'tasks.render_timeline_pipeline' for Job {job_id}...")
+    try:
+        client = get_celery_client()
+        task = client.send_task(
+            "tasks.render_timeline_pipeline",
+            args=[str(job_id), project_data or {}],
+            queue=settings.CELERY_TASK_DEFAULT_QUEUE,
+        )
+        print(f"[API: CELERY] ✅ Timeline render task enqueued! Celery Task ID: {task.id}")
+        return task.id
+    except Exception as e:
+        sim_id = f"worker_fallback_{uuid.uuid4().hex[:8]}"
+        print(f"[API: CELERY] ⚠️ Celery dispatch failed ({e}). Starting direct background worker execution...")
+        import threading
+        def _bg_worker():
+            try:
+                worker_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "worker"))
+                if worker_path not in sys.path:
+                    sys.path.insert(0, worker_path)
+                from tasks.video_pipeline import render_timeline_pipeline
+                render_timeline_pipeline(None, str(job_id), project_data or {})
+            except Exception as bg_err:
+                print(f"[API: BG_WORKER_ERR] Render execution error: {bg_err}")
+                traceback.print_exc()
+
+        th = threading.Thread(target=_bg_worker, daemon=True)
+        th.start()
+        return sim_id
+
+
 @router.post("/{job_id}/dispatch", response_model=DispatchJobResponse)
 def dispatch_job(
     job_id: uuid.UUID,

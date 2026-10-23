@@ -8,6 +8,7 @@ import {
   AudioClip,
   GraphicElement,
   TrackItemType,
+  TransitionItem,
   AspectRatio,
   HistoryState,
   InterpolationType,
@@ -75,6 +76,10 @@ interface TimelineState {
   addGraphicElement: (element: Omit<GraphicElement, "id">) => void;
   updateGraphicElement: (id: string, updates: Partial<GraphicElement>, saveHistory?: boolean) => void;
 
+  // Transition actions
+  deleteTransition: (id: string) => void;
+  updateTransition: (id: string, updates: Partial<TransitionItem>) => void;
+
   // Undo / Redo
   undo: () => void;
   redo: () => void;
@@ -95,6 +100,9 @@ interface TimelineState {
 
   // Transcript & Story Beats
   setTranscript: (transcript: TranscriptData) => void;
+
+  // Server Sync
+  saveToServer: (videoId?: string) => Promise<boolean>;
 }
 
 const DEFAULT_PROJECT: TimelineProject = {
@@ -118,6 +126,7 @@ const createHistorySnapshot = (project: TimelineProject): HistoryState => ({
   tracks: JSON.parse(JSON.stringify(project.tracks)),
   duration: project.duration,
   aspectRatio: project.aspectRatio,
+  transitions: project.transitions ? JSON.parse(JSON.stringify(project.transitions)) : [],
   constraints: project.constraints ? JSON.parse(JSON.stringify(project.constraints)) : [],
   safeZones: project.safeZones ? JSON.parse(JSON.stringify(project.safeZones)) : [],
   transcript: project.transcript ? JSON.parse(JSON.stringify(project.transcript)) : undefined,
@@ -351,6 +360,7 @@ export const useTimelineStore = create<TimelineState>()(
     const { project, past, selectedItem } = get();
     const snapshot = createHistorySnapshot(project);
     const tracks = { ...project.tracks };
+    let transitions = [...(project.transitions || [])];
 
     if (type === "video") {
       const index = tracks.videoTrack.findIndex((c) => c.id === id);
@@ -370,9 +380,15 @@ export const useTimelineStore = create<TimelineState>()(
           }
           return c;
         });
+
+        // Prune any transitions referencing this video clip
+        transitions = transitions.filter((t) => t.fromClipId !== id && t.toClipId !== id);
       }
+    } else if (type === "transition") {
+      transitions = transitions.filter((t) => t.id !== id);
     } else if (type === "broll") {
       tracks.brollTrack = tracks.brollTrack.filter((b) => b.id !== id);
+      transitions = transitions.filter((t) => t.fromClipId !== id && t.toClipId !== id);
     } else if (type === "caption") {
       tracks.textTrack = tracks.textTrack.filter((t) => t.id !== id);
     } else if (type === "audio") {
@@ -391,8 +407,34 @@ export const useTimelineStore = create<TimelineState>()(
         ...project,
         duration: newDuration,
         tracks,
+        transitions,
       },
       selectedItem: selectedItem?.id === id ? null : selectedItem,
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
+  deleteTransition: (id: string) => {
+    const { project, past, selectedItem } = get();
+    const snapshot = createHistorySnapshot(project);
+    const transitions = (project.transitions || []).filter((t) => t.id !== id);
+    set({
+      project: { ...project, transitions },
+      selectedItem: selectedItem?.id === id ? null : selectedItem,
+      past: [...past.slice(-29), snapshot],
+      future: [],
+    });
+  },
+
+  updateTransition: (id: string, updates: Partial<TransitionItem>) => {
+    const { project, past } = get();
+    const snapshot = createHistorySnapshot(project);
+    const transitions = (project.transitions || []).map((t) =>
+      t.id === id ? { ...t, ...updates } : t
+    );
+    set({
+      project: { ...project, transitions },
       past: [...past.slice(-29), snapshot],
       future: [],
     });
@@ -468,16 +510,19 @@ export const useTimelineStore = create<TimelineState>()(
   addBRollClip: (clipData) => {
     const { project, playheadTime, past } = get();
     const snapshot = createHistorySnapshot(project);
-    const duration = clipData.end > clipData.start ? clipData.end - clipData.start : 3.0;
+    const start = clipData.start !== undefined ? clipData.start : playheadTime;
+    const duration = clipData.end !== undefined && clipData.end > start ? clipData.end - start : 3.0;
+    const end = clipData.end !== undefined ? clipData.end : start + duration;
 
     const newClip: BRollClip = {
       ...clipData,
       id: `broll-${Date.now()}`,
-      start: playheadTime,
-      end: playheadTime + duration,
+      start,
+      end,
       opacity: clipData.opacity ?? 100,
       fitMode: clipData.fitMode ?? "cover",
     };
+
 
     set({
       project: {
@@ -520,12 +565,14 @@ export const useTimelineStore = create<TimelineState>()(
   addCaption: (caption) => {
     const { project, playheadTime, past } = get();
     const snapshot = createHistorySnapshot(project);
+    const start = caption?.start !== undefined ? caption.start : playheadTime;
+    const end = caption?.end !== undefined ? caption.end : start + 2.5;
 
     const newCaption: CaptionBlock = {
       id: `caption-${Date.now()}`,
       text: caption?.text || "Add caption here...",
-      start: playheadTime,
-      end: playheadTime + 2.5,
+      start,
+      end,
       stylePreset: caption?.stylePreset || "tiktok_yellow",
       fontSize: caption?.fontSize || 28,
       textColor: caption?.textColor || "#FFFFFF",
@@ -574,12 +621,15 @@ export const useTimelineStore = create<TimelineState>()(
   addAudioClip: (audioData) => {
     const { project, playheadTime, past } = get();
     const snapshot = createHistorySnapshot(project);
+    const start = audioData.start !== undefined ? audioData.start : playheadTime;
+    const end = audioData.end !== undefined ? audioData.end : start + (audioData.end - audioData.start || 15);
     const newAudio: AudioClip = {
       ...audioData,
       id: `audio-${Date.now()}`,
-      start: playheadTime,
-      end: playheadTime + (audioData.end - audioData.start || 15),
+      start,
+      end,
     };
+
 
     set({
       project: {
@@ -746,6 +796,7 @@ export const useTimelineStore = create<TimelineState>()(
         tracks: previous.tracks,
         duration: previous.duration,
         aspectRatio: previous.aspectRatio,
+        transitions: previous.transitions || [],
         constraints: previous.constraints || [],
         safeZones: previous.safeZones || [],
       },
@@ -768,6 +819,7 @@ export const useTimelineStore = create<TimelineState>()(
         tracks: next.tracks,
         duration: next.duration,
         aspectRatio: next.aspectRatio,
+        transitions: next.transitions || [],
         constraints: next.constraints || [],
         safeZones: next.safeZones || [],
       },
@@ -878,26 +930,70 @@ export const useTimelineStore = create<TimelineState>()(
     }));
   },
 
+  saveToServer: async (videoId?: string) => {
+    const proj = get().project;
+    const targetId = videoId || proj.videoId || proj.id;
+    if (!targetId || targetId === "default-project" || targetId === "new") return false;
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiBase}/api/v1/videos/${targetId}/timeline`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: proj }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
     }),
     {
       name: "video-editor-draft",
-      partialize: (state) => ({ project: state.project }),
+      partialize: (state) => ({
+        project: state.project,
+        playheadTime: state.playheadTime,
+      }),
       onRehydrateStorage: () => (state, error) => {
         if (error || !state) return;
         
-        // Asynchronously restore expired blob: URLs from IndexedDB
+        // Asynchronously restore expired blob: URLs from IndexedDB across tracks
         (async () => {
           try {
             const { getMediaFromIDB } = await import("@/lib/idb");
-            const videoTrack = [...state.project.tracks.videoTrack];
+            const videoTrack = [...(state.project.tracks.videoTrack || [])];
+            const brollTrack = [...(state.project.tracks.brollTrack || [])];
+            const audioTrack = [...(state.project.tracks.audioTrack || [])];
             let changed = false;
             
             for (let i = 0; i < videoTrack.length; i++) {
               const clip = videoTrack[i];
-              if (clip.sourceUrl.startsWith("blob:")) {
+              if (clip.sourceUrl?.startsWith("blob:")) {
                 const blob = await getMediaFromIDB(clip.id);
                 if (blob) {
                   videoTrack[i] = { ...clip, sourceUrl: URL.createObjectURL(blob) };
+                  changed = true;
+                }
+              }
+            }
+
+            for (let i = 0; i < brollTrack.length; i++) {
+              const clip = brollTrack[i];
+              if (clip.sourceUrl?.startsWith("blob:")) {
+                const blob = await getMediaFromIDB(clip.id);
+                if (blob) {
+                  brollTrack[i] = { ...clip, sourceUrl: URL.createObjectURL(blob) };
+                  changed = true;
+                }
+              }
+            }
+
+            for (let i = 0; i < audioTrack.length; i++) {
+              const clip = audioTrack[i];
+              if (clip.sourceUrl?.startsWith("blob:")) {
+                const blob = await getMediaFromIDB(clip.id);
+                if (blob) {
+                  audioTrack[i] = { ...clip, sourceUrl: URL.createObjectURL(blob) };
                   changed = true;
                 }
               }
@@ -910,6 +1006,8 @@ export const useTimelineStore = create<TimelineState>()(
                   tracks: {
                     ...s.project.tracks,
                     videoTrack,
+                    brollTrack,
+                    audioTrack,
                   },
                 },
               }));
@@ -920,5 +1018,6 @@ export const useTimelineStore = create<TimelineState>()(
         })();
       },
     }
+
   )
 );

@@ -177,3 +177,51 @@ class VideoJob(SQLModel, table=True):
 
     # Relationships
     user: Optional[User] = Relationship(back_populates="video_jobs")
+    snapshots: List["ProjectSnapshot"] = Relationship(
+        back_populates="video_job",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
+
+class ProjectSnapshot(SQLModel, table=True):
+    __tablename__ = "project_snapshots"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        index=True,
+        nullable=False,
+    )
+    video_id: uuid.UUID = Field(
+        foreign_key="video_jobs.id",
+        index=True,
+        nullable=False,
+    )
+    version: int = Field(
+        default=1,
+        index=True,
+        nullable=False,
+        description="Monotonically increasing version checkpoint",
+    )
+    label: str = Field(
+        sa_column=Column(String(255), nullable=False),
+        description="Snapshot title or description (e.g., 'Initial Draft', 'Added Intro B-Roll')",
+    )
+    description: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Optional extended notes",
+    )
+    timeline_project: Dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+        description="Full serialized TimelineProject state snapshot",
+    )
+    created_at: datetime = Field(
+        default_factory=get_utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+        description="Snapshot timestamp",
+    )
+
+    # Relationships
+    video_job: Optional[VideoJob] = Relationship(back_populates="snapshots")

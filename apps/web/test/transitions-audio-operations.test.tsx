@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import {
   AddTransitionOperationSchema,
   SetAudioMixOperationSchema,
@@ -16,6 +16,8 @@ import { assembleEditorContext } from "../lib/ai/editor-context";
 import { TimelineProject } from "../lib/timeline-types";
 import { PlayerMonitor } from "../components/editor/PlayerMonitor";
 import { useTimelineStore } from "../lib/stores/useTimelineStore";
+import { TimelineContainer } from "../components/editor/TimelineContainer";
+import { InspectorPanel } from "../components/editor/InspectorPanel";
 
 describe("Phase 4: Semantic Audio Accents & First-Class Transitions", () => {
   const initialProject: TimelineProject = {
@@ -251,6 +253,142 @@ describe("Phase 4: Semantic Audio Accents & First-Class Transitions", () => {
       useTimelineStore.getState().setPlayheadTime(2.0);
       rerender(<PlayerMonitor />);
       expect(screen.queryByTestId("active-transition-indicator")).toBeNull();
+    });
+  });
+
+  describe("5. Boundary Replacement, Orphan Cleanup, Timeline Badges & Inspector", () => {
+    it("replaces existing transition at the same cut boundary instead of creating duplicate", () => {
+      const p0: TimelineProject = {
+        ...initialProject,
+        transitions: [
+          {
+            id: "tr-old",
+            track: "video",
+            fromClipId: "vid-1",
+            toClipId: "vid-2",
+            preset: "crossfade",
+            duration: 0.5,
+            alignment: "center",
+          },
+        ],
+      };
+
+      const newOp: EditOperation = {
+        type: "add_transition",
+        id: "tr-new",
+        track: "video",
+        fromClipId: "vid-1",
+        toClipId: "vid-2",
+        preset: "wipe_left",
+        duration: 1.0,
+        alignment: "center",
+      };
+
+      const result = executeOperation(p0, newOp);
+      expect(result.nextProject.transitions).toHaveLength(1);
+      expect(result.nextProject.transitions?.[0].preset).toBe("wipe_left");
+      expect(result.nextProject.transitions?.[0].duration).toBe(1.0);
+    });
+
+    it("cleans up orphaned transitions when a video clip is deleted in executeOperation and store", () => {
+      const pWithTrans: TimelineProject = {
+        ...initialProject,
+        transitions: [
+          {
+            id: "tr-test-cleanup",
+            track: "video",
+            fromClipId: "vid-1",
+            toClipId: "vid-2",
+            preset: "crossfade",
+            duration: 0.5,
+            alignment: "center",
+          },
+        ],
+      };
+
+      // In executeOperation
+      const deleteOp: EditOperation = {
+        type: "delete_element",
+        targetId: "vid-1",
+        targetType: "video",
+      };
+      const opResult = executeOperation(pWithTrans, deleteOp);
+      expect(opResult.nextProject.transitions).toHaveLength(0);
+
+      // In store deleteClip
+      useTimelineStore.getState().initProject(pWithTrans);
+      expect(useTimelineStore.getState().project.transitions).toHaveLength(1);
+      useTimelineStore.getState().deleteClip("video", "vid-2");
+      expect(useTimelineStore.getState().project.transitions).toHaveLength(0);
+    });
+
+    it("renders interactive transition badge on the timeline and selects it on click", () => {
+      const projectWithTransition: TimelineProject = {
+        ...initialProject,
+        transitions: [
+          {
+            id: "tr-badge-1",
+            track: "video",
+            fromClipId: "vid-1",
+            toClipId: "vid-2",
+            preset: "whip_pan",
+            duration: 0.8,
+            alignment: "center",
+          },
+        ],
+      };
+
+      useTimelineStore.getState().initProject(projectWithTransition);
+      useTimelineStore.getState().setSelectedItem(null);
+
+      render(<TimelineContainer />);
+
+      const badge = screen.getByTestId("transition-badge-tr-badge-1");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent(/whip pan/i);
+
+      // Click to select
+      fireEvent.click(badge);
+      expect(useTimelineStore.getState().selectedItem).toEqual({
+        type: "transition",
+        id: "tr-badge-1",
+      });
+    });
+
+    it("allows inspecting, changing preset/duration, and deleting transition in InspectorPanel", () => {
+      const projectWithTransition: TimelineProject = {
+        ...initialProject,
+        transitions: [
+          {
+            id: "tr-insp-1",
+            track: "video",
+            fromClipId: "vid-1",
+            toClipId: "vid-2",
+            preset: "crossfade",
+            duration: 0.5,
+            alignment: "center",
+          },
+        ],
+      };
+
+      useTimelineStore.getState().initProject(projectWithTransition);
+      useTimelineStore.getState().setSelectedItem({ type: "transition", id: "tr-insp-1" });
+
+      const { rerender } = render(<InspectorPanel />);
+
+      expect(screen.getByText("Video Transition")).toBeInTheDocument();
+      expect(screen.getByText("Crossfade (Dissolve)")).toBeInTheDocument();
+
+      // Change preset
+      const select = screen.getByRole("combobox");
+      fireEvent.change(select, { target: { value: "fade_to_black" } });
+      expect(useTimelineStore.getState().project.transitions?.[0].preset).toBe("fade_to_black");
+
+      // Click Delete Transition
+      const deleteBtn = screen.getByText("Delete Transition");
+      fireEvent.click(deleteBtn);
+      expect(useTimelineStore.getState().project.transitions).toHaveLength(0);
+      expect(useTimelineStore.getState().selectedItem).toBeNull();
     });
   });
 });

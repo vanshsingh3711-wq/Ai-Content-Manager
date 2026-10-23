@@ -14,18 +14,19 @@ import {
   Loader2,
   FileVideo,
   Circle,
+  Scissors,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TimelineProject } from "@/lib/timeline-types";
 
-// Mock data for recent videos — in production this comes from your API
-const MOCK_RECENT_VIDEOS = [
-  { id: "v1", title: "Why Compound Interest Grows Fast", status: "COMPLETED" as const, duration: 32, createdAt: "2026-09-21T14:30:00Z" },
-  { id: "v2", title: "Honey Never Spoils — Fun Facts", status: "COMPLETED" as const, duration: 28, createdAt: "2026-09-20T09:15:00Z" },
-  { id: "v3", title: "Top 5 Productivity Hacks", status: "RENDERING" as const, duration: 45, createdAt: "2026-09-22T08:00:00Z" },
-];
-
 type VideoStatus = "QUEUED" | "DOWNLOADING" | "TRANSCRIBING" | "AI_DIRECTING" | "RENDERING" | "COMPLETED" | "FAILED";
+
+// Mock data for recent videos — in production this comes from your API
+const MOCK_RECENT_VIDEOS: Array<{ id: string; title: string; status: VideoStatus; duration: number; createdAt: string }> = [
+  { id: "v1", title: "Why Compound Interest Grows Fast", status: "COMPLETED", duration: 32, createdAt: "2026-09-21T14:30:00Z" },
+  { id: "v2", title: "Honey Never Spoils — Fun Facts", status: "COMPLETED", duration: 28, createdAt: "2026-09-20T09:15:00Z" },
+  { id: "v3", title: "Top 5 Productivity Hacks", status: "RENDERING", duration: 45, createdAt: "2026-09-22T08:00:00Z" },
+];
 
 function formatRelativeTime(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -265,10 +266,11 @@ export default function DashboardOverviewPage() {
           <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800">
             {/* Table Header */}
             <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-neutral-900/50 text-xs text-neutral-500 font-medium uppercase tracking-wider">
-              <div className="col-span-5">Title</div>
+              <div className="col-span-4">Title</div>
               <div className="col-span-2">Status</div>
               <div className="col-span-2">Duration</div>
-              <div className="col-span-3 text-right">Created</div>
+              <div className="col-span-2">Created</div>
+              <div className="col-span-2 text-right">Action</div>
             </div>
 
             {/* Table Rows */}
@@ -277,7 +279,7 @@ export default function DashboardOverviewPage() {
                 key={video.id}
                 className="grid grid-cols-12 gap-4 px-5 py-4 items-center bg-neutral-950 hover:bg-neutral-900/50 transition-colors cursor-pointer group"
               >
-                <div className="col-span-5 text-sm font-medium text-white group-hover:text-neutral-200 truncate">
+                <div className="col-span-4 text-sm font-medium text-white group-hover:text-neutral-200 truncate">
                   {video.title}
                 </div>
                 <div className="col-span-2 flex items-center gap-2">
@@ -289,8 +291,19 @@ export default function DashboardOverviewPage() {
                 <div className="col-span-2 text-sm text-neutral-400 tabular-nums font-mono">
                   {video.duration}s
                 </div>
-                <div className="col-span-3 text-sm text-neutral-500 text-right">
+                <div className="col-span-2 text-sm text-neutral-500">
                   {formatRelativeTime(video.createdAt)}
+                </div>
+                <div className="col-span-2 flex justify-end">
+                  <Link
+                    href={`/dashboard/editor/${video.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                    title="Edit in Studio"
+                  >
+                    <Scissors className="w-3 h-3 text-yellow-400" />
+                    <span>Edit</span>
+                  </Link>
                 </div>
               </div>
             ))}

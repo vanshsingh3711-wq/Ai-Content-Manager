@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   X,
   Play,
@@ -28,6 +29,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
+import { getCaptionTemplate } from "@/lib/editor/caption-templates";
 
 interface VideoJob {
   id: string;
@@ -89,10 +91,21 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
     transitionSfx: true,
   };
 
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const s3StreamUrl = video.rendered_url?.trim() || null;
+  const localStreamUrl = video.status === "COMPLETED" ? `${apiUrl}/api/v1/videos/${video.id}/rendered-file` : null;
+  const sourceFallbackUrl = video.source_url?.trim() || null;
+  
+  // Prefer direct cloud URL if available, fallback to local stream endpoint or source
+  const playableUrl = (s3StreamUrl && s3StreamUrl.startsWith("http")) ? s3StreamUrl : (localStreamUrl || sourceFallbackUrl || null);
+  const exportedUrl = s3StreamUrl || localStreamUrl || sourceFallbackUrl || "";
+
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(video.rendered_url || video.source_url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (exportedUrl) {
+      navigator.clipboard.writeText(exportedUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const getActionIcon = (action: string) => {
@@ -156,13 +169,23 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
               ID: {video.id} • Processed: {formatDate(video.updated_at)}
             </div>
           </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/editor/${video.id}`}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-neutral-200 transition-all shadow-sm inline-flex items-center gap-1.5 shrink-0"
+              title="Open video in multi-track studio editor"
+            >
+              <Scissors className="w-3.5 h-3.5 text-neutral-900" />
+              <span>Edit in Studio</span>
+            </Link>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -379,15 +402,12 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                       <Type className="w-4 h-4 text-neutral-500" />
                       Subtitle Preset
                     </span>
-                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 capitalize">
-                      {captionPreset.replace("_", " ")}
+                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
+                      {getCaptionTemplate(captionPreset).name}
                     </span>
                   </div>
                   <div className="text-xs text-neutral-400">
-                    {captionPreset === "tiktok_yellow" && "White bold sans-serif with vibrant TikTok Yellow karaoke word highlighting"}
-                    {captionPreset === "neon_cyber" && "Cyberpunk glowing cyan highlights with modern tech aesthetics"}
-                    {captionPreset === "modern_clean" && "Minimalist clean typography with subtle contrast drop shadows"}
-                    {captionPreset === "boxed_pill" && "Rounded badge highlight boxes wrapping the key spoken phrases"}
+                    {getCaptionTemplate(captionPreset).description}
                   </div>
                 </div>
 
@@ -438,39 +458,77 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
           )}
 
           {/* Tab 4: Video & Storage URL */}
-          {activeTab === "player" && (
-            <div className="space-y-4">
-              <div className={cn(
-                "rounded-xl bg-black border border-neutral-800 overflow-hidden flex items-center justify-center shadow-lg mx-auto",
-                aspectRatio === "9:16" ? "max-w-xs aspect-[9/16] max-h-72" : "w-full aspect-video max-h-64"
-              )}>
+          <div className={cn("space-y-4", activeTab === "player" ? "block" : "hidden")}>
+            <div className={cn(
+              "rounded-xl bg-black border border-neutral-800 overflow-hidden flex items-center justify-center shadow-lg mx-auto relative",
+              aspectRatio === "9:16" ? "max-w-xs aspect-[9/16] max-h-72" : "w-full aspect-video max-h-64"
+            )}>
+              {playableUrl ? (
                 <video
                   controls
+                  playsInline
+                  preload="metadata"
                   className="w-full h-full object-contain"
-                  src={video.rendered_url || video.source_url}
+                  src={playableUrl}
                 >
                   Your browser does not support HTML5 video streaming.
                 </video>
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-6 text-center text-neutral-500 space-y-2">
+                  <Film className="w-8 h-8 text-neutral-600 animate-pulse" />
+                  <span className="text-xs">No media stream ready yet. Video is processing or queued.</span>
+                </div>
+              )}
+            </div>
 
-              <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
-                <div className="text-xs font-semibold text-white">Exported Storage Stream URL:</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={video.rendered_url || video.source_url}
-                    className="flex-1 px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-mono text-neutral-300 select-all"
-                  />
-                  <button
-                    onClick={handleCopyLink}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 inline-flex items-center gap-1.5 transition-colors shadow-sm"
-                  >
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    <span>{copied ? "Copied" : "Copy"}</span>
-                  </button>
+            {/* Studio Editor Jump Card */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-950 border border-neutral-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Scissors className="w-3.5 h-3.5 text-yellow-400" />
+                  <span>Interactive Studio Multi-Track Editor</span>
+                </div>
+                <p className="text-[11px] text-neutral-400">
+                  Customize titles, move subtitles, tweak motion graphics text and colors, or replace B-roll footage.
+                </p>
+              </div>
+              <Link
+                href={`/dashboard/editor/${video.id}`}
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-yellow-400 hover:bg-yellow-300 text-black inline-flex items-center gap-1.5 transition-all shadow-sm shrink-0"
+              >
+                <Scissors className="w-3.5 h-3.5 text-black" />
+                <span>Open in Studio Editor →</span>
+              </Link>
+            </div>
+
+            <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-white">Stream & Storage Source:</div>
+                {localStreamUrl && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 font-medium">
+                    Local SSD Accelerated
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={exportedUrl}
+                  placeholder="No active stream URL available"
+                  className="flex-1 px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-mono text-neutral-300 select-all"
+                />
+                <button
+                  onClick={handleCopyLink}
+                  disabled={!exportedUrl}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? "Copied" : "Copy"}</span>
+                </button>
+                {exportedUrl && (
                   <a
-                    href={video.rendered_url || video.source_url}
+                    href={exportedUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-sm font-medium inline-flex items-center gap-1.5 transition-colors border border-neutral-700"
@@ -478,10 +536,10 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
                     <Download className="w-4 h-4" />
                     <span>Open in Tab</span>
                   </a>
-                </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
 
           {/* Tab 5: Raw JSON */}
           {activeTab === "raw" && (
@@ -503,13 +561,23 @@ export function VideoDetailModal({ video, isOpen, onClose }: VideoDetailModalPro
             Close
           </button>
 
-          <button
-            onClick={handleCopyLink}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-white hover:bg-neutral-200 text-black shadow-md inline-flex items-center gap-1.5 transition-all"
-          >
-            <Copy className="w-4 h-4" />
-            <span>Copy Export URL</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyLink}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-neutral-300 inline-flex items-center gap-1.5 transition-all"
+            >
+              <Copy className="w-4 h-4" />
+              <span>Copy Export URL</span>
+            </button>
+
+            <Link
+              href={`/dashboard/editor/${video.id}`}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-white hover:bg-neutral-200 text-black shadow-md inline-flex items-center gap-1.5 transition-all"
+            >
+              <Scissors className="w-4 h-4 text-black" />
+              <span>Edit Video in Studio</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

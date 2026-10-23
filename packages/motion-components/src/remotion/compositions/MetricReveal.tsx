@@ -2,12 +2,25 @@ import React from 'react';
 import { AbsoluteFill, useVideoConfig, spring, useCurrentFrame } from 'remotion';
 import { COLORS, FONT, glassStyle, useFadeUp, useExitFade } from '../shared';
 
-interface Props { label: string; metric: string; delta?: string; personality?: string; }
+interface Props {
+  label?: string;
+  title?: string;
+  metric?: string;
+  value?: string;
+  delta?: string;
+  change?: string;
+  personality?: string;
+}
 
-export const MetricReveal: React.FC<Props> = ({ label, metric, delta }) => {
+export const MetricReveal: React.FC<Props> = (props) => {
   const { durationInFrames, fps } = useVideoConfig();
   const frame = useCurrentFrame();
   const exit = useExitFade(durationInFrames);
+
+  const label = props.label || props.title || 'KEY METRIC';
+  const metric = props.metric || props.value || '100';
+  const delta = props.delta || props.change;
+
   const deltaIsPositive = delta && (delta.startsWith('+') || (!delta.startsWith('-') && delta !== '0'));
   const deltaColor = deltaIsPositive ? COLORS.green : COLORS.red;
   // Animated number scale punch

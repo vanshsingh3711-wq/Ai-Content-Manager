@@ -29,6 +29,9 @@ LOCAL_SFX_MAP = {
     "sparkle": "sparkle-soft.mp3",
     "shimmer": "warm-shimmer.mp3",
     "camera": "camera-shutter.mp3",
+    "bgm": "chill-bgm.mp3",
+    "chill": "chill-bgm.mp3",
+    "music": "chill-bgm.mp3",
 }
 
 

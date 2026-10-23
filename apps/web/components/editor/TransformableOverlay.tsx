@@ -268,6 +268,7 @@ export function TransformableOverlay({
         top: `${currentPos.y}%`,
         width: isVideoType ? "100%" : "auto",
         height: isVideoType ? "100%" : "auto",
+        maxWidth: isVideoType ? "100%" : "92%",
         transform: `translate(-50%, -50%) scale(${currentScale}) rotate(${currentRotation}deg)`,
       }}
       onPointerDown={handlePointerDown}

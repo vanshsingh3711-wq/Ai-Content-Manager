@@ -10,6 +10,7 @@ import { EditOperation } from "../operations/operation-types";
 import { EditorContext } from "./editor-context";
 import { findNonOverlappingPlacement } from "../layout/subject-avoidance";
 import { findPhraseTimestamp, findBeatByRoleOrKeyword } from "./transcript-matcher";
+import { CaptionPreset } from "../timeline-types";
 
 export interface LocalParseResult {
   matched: boolean;
@@ -378,9 +379,10 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
   // "add a title from 01:20 to 01:25"
   // "add a title 'Welcome' from 01:20 to 01:25"
   const promptToTest = timeRange.cleanedPrompt || prompt;
+  const isMotionOrCounter = /\b(?:animated|motion|counter|reveal|kpi|badge|ticker)\b/i.test(promptToTest) || /\b(?:animated|motion|counter|reveal|kpi|badge|ticker)\b/i.test(prompt);
   const titleRegex = /add (?:a )?(?:title|caption|text)(?: that says| saying| with text)?(?:\s+["']?([^"']+)["']?)?$/i;
   const titleMatch = promptToTest.match(titleRegex) || prompt.match(titleRegex);
-  if (titleMatch) {
+  if (!isMotionOrCounter && titleMatch) {
     const rawText = titleMatch[1]?.replace(/["']/g, "").trim().replace(/[.!?]+$/, "");
     const textContent = rawText && rawText.length > 0 ? rawText : "Title";
 
@@ -688,10 +690,10 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
       },
     },
     {
-      triggers: ["animated counter", "counter", "ticker", "growth counter"],
+      triggers: ["animated counter", "counter", "ticker", "growth counter", "subscriber counter", "subscribers counter", "subscriber count"],
       compositionId: "animated_counter",
       name: "COUNTER",
-      props: { startValue: 0, endValue: 100, prefix: "+", suffix: "%" },
+      props: { from: 0, to: 50000, label: "SUBSCRIBERS", prefix: "", suffix: "" },
     },
     {
       triggers: ["animated kpi", "metric reveal", "kpi", "metric", "revenue", "subscribers"],
@@ -712,13 +714,55 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
       props: { command: "npm run deploy", output: "Server running: 100% production ready" },
     },
     {
-      triggers: ["social post", "tweet", "social", "x.com post"],
+      triggers: ["social post", "tweet", "x.com post"],
       compositionId: "cooked-social-post",
       name: "SOCIAL POST",
       props: { name: "Creator Pro", handle: "@creator_pro", text: "Scaling to the next level 🚀", likes: "18.4K" },
     },
     {
-      triggers: ["quote reveal", "quote", "saying", "wisdom"],
+      triggers: ["lower third", "lower-third", "speaker badge", "speaker name", "speaker title", "interview badge", "host tag", "name tag"],
+      compositionId: "lower-third",
+      name: "LOWER THIRD",
+      props: { name: "Alex Rivera", title: "Lead Product Architect", handle: "@alexrivera", accentColor: "#38bdf8" },
+    },
+    {
+      triggers: ["subscribe badge", "subscribe button", "subscribe callout", "sub button", "bell callout", "subscribe and bell", "subscribe"],
+      compositionId: "subscribe-badge",
+      name: "SUBSCRIBE CALLOUT",
+      props: { channelName: "Creator Studio", subCount: "1.25M", buttonText: "SUBSCRIBE", buttonColor: "#dc2626", showBell: true },
+    },
+    {
+      triggers: ["before after", "before and after", "comparison card", "versus card", "before vs after", "split comparison"],
+      compositionId: "before-after",
+      name: "BEFORE & AFTER",
+      props: { beforeLabel: "BEFORE", beforeText: "6 hrs manual editing", afterLabel: "AFTER", afterText: "60s AI automation", accentColor: "#10b981" },
+    },
+    {
+      triggers: ["countdown timer", "countdown", "timer widget", "timer", "seconds remaining", "clock timer"],
+      compositionId: "countdown-timer",
+      name: "COUNTDOWN TIMER",
+      props: { seconds: 5, label: "TIME REMAINING", accentColor: "#f59e0b" },
+    },
+    {
+      triggers: ["review card", "review", "testimonial", "5 star review", "stars card", "rating card"],
+      compositionId: "review-card",
+      name: "REVIEW CARD",
+      props: { author: "Sarah Jenkins", role: "Verified Creator", rating: 5, review: "Saved our team 20+ hours a week. Absolute game changer!", accentColor: "#fbbf24" },
+    },
+    {
+      triggers: ["social handles", "social badge", "follow badge", "instagram handle", "youtube handle", "tiktok handle", "twitter handle"],
+      compositionId: "social-handles",
+      name: "SOCIAL HANDLES",
+      props: { platform: "youtube", handle: "@contentmaster", actionText: "Follow for daily tips", accentColor: "#a855f7" },
+    },
+    {
+      triggers: ["animated title", "title saying", "animated headline", "hero reveal", "title card", "stat card", "card", "headline"],
+      compositionId: "hero_reveal",
+      name: "HERO REVEAL",
+      props: { headline: "The Solution", label: "KEY TAKEAWAY", colorTheme: "blue" },
+    },
+    {
+      triggers: ["quote reveal", "quote", "famous quote", "inspirational quote", "wisdom"],
       compositionId: "quote-reveal",
       name: "QUOTE",
       props: { quote: "Consistency is what transforms average into excellence.", author: "Key Takeaway", personality: "premium" },
@@ -741,12 +785,6 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
       name: "NOTIFICATION",
       props: { title: "Alert", message: "Key milestone reached!" },
     },
-    {
-      triggers: ["stat card", "card", "hero reveal", "headline", "title card"],
-      compositionId: "hero_reveal",
-      name: "HERO REVEAL",
-      props: { title: "ESSENTIAL INSIGHT", label: "KEY TAKEAWAY" },
-    },
   ];
 
   const testGraphicPrompt = (timeRange.cleanedPrompt || prompt).toLowerCase().trim();
@@ -757,16 +795,92 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
     for (const config of graphicConfigs) {
       const matchedTrigger = config.triggers.find((t) => {
         const regex = new RegExp(
-          `\\b(?:add|insert|overlay|place|put|create)\\s+(?:(?:a|an|the)\\s+)?(?:(?:motion\\s*graphic(?:s)?(?:\\s+(?:for|of)(?:\\s+(?:a|an|the))?)?|animated|visual)\\s+)?${t}\\b`,
+          `\\b(?:add|insert|overlay|place|put|create)\\s+(?:(?:a|an|the)\\s+)?(?:(?:motion\\s*graphic(?:s)?(?:\\s+(?:for|of)(?:\\s+(?:a|an|the))?)?|animated|visual|[a-z]+)\\s+)?\\b${t}\\b`,
           "i"
         );
-        return regex.test(testGraphicPrompt) || (testGraphicPrompt.includes(t) && /\b(?:motion\s*graphic|animation)\b/i.test(testGraphicPrompt));
+        const wordRegex = new RegExp(`\\b${t}\\b`, "i");
+        return (
+          regex.test(testGraphicPrompt) ||
+          (wordRegex.test(testGraphicPrompt) && /\b(?:motion\s*graphic|animation|animat\w*)\b/i.test(testGraphicPrompt))
+        );
       });
 
       if (matchedTrigger) {
         const start = timeRange.start ?? context.playheadTime;
         const defaultEnd = Number((start + 4.0).toFixed(2));
-        const end = timeRange.end ?? Math.min(context.duration, defaultEnd);
+        const effectiveDuration = Math.max(context.duration, timeRange.end ?? 0);
+        const end = timeRange.end ?? (effectiveDuration > 0 ? Math.min(effectiveDuration, defaultEnd) : defaultEnd);
+
+        const finalProps = { ...config.props };
+        let defaultPos = { x: 50, y: 50 };
+
+        if (config.compositionId === "hero_reveal") {
+          const sayingMatch =
+            prompt.match(/(?:saying|titled|with text)\s+['"]([^'"]+)['"]/i) ||
+            prompt.match(/(?:saying|titled|with text)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:from|to|between|at)|$)/i);
+          if (sayingMatch) {
+            finalProps.headline = sayingMatch[1].trim();
+          }
+          const colorMatch = prompt.match(/\b(blue|cyan|emerald|green|amber|yellow|rose|red|purple|indigo)\b/i);
+          if (colorMatch) {
+            finalProps.colorTheme = colorMatch[1].toLowerCase();
+          }
+        } else if (config.compositionId === "animated_counter") {
+          const searchPrompt = timeRange.cleanedPrompt || prompt;
+          const countMatch =
+            searchPrompt.match(/(?:counting\s+to|reach(?:ing)?(?:\s+to)?)\s+(\d+(?:\.\d+)?)\s*(k|m|b)?/i) ||
+            searchPrompt.match(/\bto\s+(\d+(?:\.\d+)?)\s*(k|m|b)\b/i) ||
+            searchPrompt.match(/\bto\s+(\d+(?:\.\d+)?)\b/i);
+          if (countMatch) {
+            let num = parseFloat(countMatch[1]);
+            const mult = (countMatch[2] || "").toLowerCase();
+            if (mult === "k") num *= 1000;
+            else if (mult === "m") num *= 1000000;
+            else if (mult === "b") num *= 1000000000;
+            finalProps.to = Math.round(num);
+            finalProps.from = 0;
+          }
+          if (/subscriber/i.test(prompt)) {
+            finalProps.label = "SUBSCRIBERS";
+          } else if (/follower/i.test(prompt)) {
+            finalProps.label = "FOLLOWERS";
+          }
+        } else if (config.compositionId === "lower-third") {
+          defaultPos = { x: 50, y: 82 };
+          const nameMatch =
+            prompt.match(/(?:for|named|speaker|name)\s+['"]([^'"]+)['"]/i) ||
+            prompt.match(/(?:for|named|speaker|name)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
+          if (nameMatch) {
+            finalProps.name = nameMatch[1].trim();
+          }
+          const handleMatch = prompt.match(/(@[a-zA-Z0-9_]+)/);
+          if (handleMatch) {
+            finalProps.handle = handleMatch[1].trim();
+          }
+        } else if (config.compositionId === "countdown-timer") {
+          const secMatch = prompt.match(/\b(\d+)\s*(?:seconds|second|secs|sec|s)\b/i);
+          if (secMatch) {
+            finalProps.seconds = Math.max(1, Math.min(60, parseInt(secMatch[1], 10)));
+          }
+        } else if (config.compositionId === "review-card") {
+          const ratingMatch = prompt.match(/(\d+)\s*star/i);
+          if (ratingMatch) {
+            finalProps.rating = Math.max(1, Math.min(5, parseInt(ratingMatch[1], 10)));
+          }
+        } else if (config.compositionId === "subscribe-badge") {
+          defaultPos = { x: 50, y: 80 };
+        }
+
+        let position = defaultPos;
+        if (context.safeZones && context.safeZones.length > 0) {
+          const placement = findNonOverlappingPlacement({
+            elementSize: { width: 50, height: 16 },
+            safeZones: context.safeZones,
+            playheadTime: start,
+            defaultPosition: defaultPos,
+          });
+          position = placement.position;
+        }
 
         const operation: EditOperation = {
           type: "add_element",
@@ -775,10 +889,12 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
             id: `graphic-${Date.now()}`,
             name: config.name,
             compositionId: config.compositionId,
-            props: { ...config.props },
+            props: finalProps,
             start,
             end: end <= start ? start + 4.0 : end,
-            position: { x: 50, y: 50 },
+            position,
+            positionX: position.x,
+            positionY: position.y,
             scale: 1.0,
             rotation: 0,
           },
@@ -795,6 +911,230 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
         };
       }
     }
+  }
+
+  // 7.4.5. ADD VISUAL EFFECTS & COLOR FILTERS
+  // Patterns:
+  // "Add vignette effect at 2s"
+  // "Add golden hour effect from 3s to 8s"
+  // "Add lens flare effect at 5s"
+  // "Add night vision effect"
+  // "Add flash burst effect"
+  const isAudioPrompt = /\b(?:sound\s*effect|sfx|audio\s*cue|audio|whoosh|swoosh|pop|ding|chime|click|tap|riser|impact|thump)\b/i.test(cleanPrompt);
+  const visualFxRegex = /\b(?:add|insert|apply|overlay)\s+(?:a\s+)?(?:cinematic\s+|subtle\s+)?(vignette|golden\s*hour|sunset|lens\s*flare|anamorphic|vintage\s*film|8mm|flash(?:\s*burst)?|strobe|zoom\s*blur|radial\s*blur|crt|arcade|halftone|comic(?:\s*pop)?|prism(?:\s*bokeh)?|bokeh|night\s*vision|infrared|tactical|glitch|teal\s*(?:and|&)?\s*orange|vhs|scanlines|neon|noir|bw)(?:\s+(?:visual\s*effect|filter|fx|effect|overlay|look))?\b/i;
+
+  if (!isAudioPrompt && visualFxRegex.test(cleanPrompt)) {
+    const match = cleanPrompt.match(visualFxRegex);
+    const rawKey = (match ? match[1] : "").toLowerCase().replace(/\s+/g, "_");
+
+    const FX_MAP: Record<string, { id: string; name: string; effectType: string; duration: number }> = {
+      vignette: { id: "fx-cinematic-vignette", name: "Cinematic Vignette", effectType: "vignette", duration: 5.0 },
+      golden_hour: { id: "fx-golden-hour-glow", name: "Golden Hour Glow", effectType: "golden_hour", duration: 4.5 },
+      sunset: { id: "fx-golden-hour-glow", name: "Golden Hour Glow", effectType: "golden_hour", duration: 4.5 },
+      lens_flare: { id: "fx-anamorphic-lens-flare", name: "Anamorphic Lens Flare", effectType: "lens_flare", duration: 3.0 },
+      anamorphic: { id: "fx-anamorphic-lens-flare", name: "Anamorphic Lens Flare", effectType: "lens_flare", duration: 3.0 },
+      vintage_film: { id: "fx-8mm-vintage-film", name: "8mm Vintage Film Burn", effectType: "vintage_film", duration: 4.0 },
+      "8mm": { id: "fx-8mm-vintage-film", name: "8mm Vintage Film Burn", effectType: "vintage_film", duration: 4.0 },
+      flash: { id: "fx-strobe-flash-burst", name: "Strobe Flash Burst", effectType: "flash_burst", duration: 1.2 },
+      flash_burst: { id: "fx-strobe-flash-burst", name: "Strobe Flash Burst", effectType: "flash_burst", duration: 1.2 },
+      strobe: { id: "fx-strobe-flash-burst", name: "Strobe Flash Burst", effectType: "flash_burst", duration: 1.2 },
+      zoom_blur: { id: "fx-radial-zoom-blur", name: "Radial Zoom Blur", effectType: "zoom_blur", duration: 2.0 },
+      radial_blur: { id: "fx-radial-zoom-blur", name: "Radial Zoom Blur", effectType: "zoom_blur", duration: 2.0 },
+      crt: { id: "fx-crt-arcade-retro", name: "CRT Arcade Phosphor", effectType: "crt_arcade", duration: 4.0 },
+      arcade: { id: "fx-crt-arcade-retro", name: "CRT Arcade Phosphor", effectType: "crt_arcade", duration: 4.0 },
+      halftone: { id: "fx-halftone-comic-pop", name: "Comic Pop Halftone", effectType: "halftone_comic", duration: 3.0 },
+      comic: { id: "fx-halftone-comic-pop", name: "Comic Pop Halftone", effectType: "halftone_comic", duration: 3.0 },
+      comic_pop: { id: "fx-halftone-comic-pop", name: "Comic Pop Halftone", effectType: "halftone_comic", duration: 3.0 },
+      prism: { id: "fx-prism-bokeh-rainbow", name: "Prismatic Rainbow Bokeh", effectType: "prism_bokeh", duration: 4.5 },
+      prism_bokeh: { id: "fx-prism-bokeh-rainbow", name: "Prismatic Rainbow Bokeh", effectType: "prism_bokeh", duration: 4.5 },
+      bokeh: { id: "fx-prism-bokeh-rainbow", name: "Prismatic Rainbow Bokeh", effectType: "prism_bokeh", duration: 4.5 },
+      night_vision: { id: "fx-night-vision-tactical", name: "Tactical Night Vision", effectType: "night_vision", duration: 5.0 },
+      infrared: { id: "fx-night-vision-tactical", name: "Tactical Night Vision", effectType: "night_vision", duration: 5.0 },
+      tactical: { id: "fx-night-vision-tactical", name: "Tactical Night Vision", effectType: "night_vision", duration: 5.0 },
+      glitch: { id: "fx-rgb-glitch", name: "RGB Glitch Split", effectType: "rgb_glitch", duration: 2.5 },
+      teal_orange: { id: "fx-cinematic-teal-orange", name: "Teal & Orange Grade", effectType: "teal_orange", duration: 5.0 },
+      vhs: { id: "fx-vhs-scanlines", name: "Retro VHS Scanlines", effectType: "vhs_scanlines", duration: 4.0 },
+      scanlines: { id: "fx-vhs-scanlines", name: "Retro VHS Scanlines", effectType: "vhs_scanlines", duration: 4.0 },
+      neon: { id: "fx-cyberpunk-neon", name: "Cyberpunk Neon Glow", effectType: "cyberpunk_neon", duration: 3.5 },
+      noir: { id: "fx-bw-noir", name: "Black & White Noir", effectType: "bw_noir", duration: 5.0 },
+      bw: { id: "fx-bw-noir", name: "Black & White Noir", effectType: "bw_noir", duration: 5.0 },
+    };
+
+    const fxKey = Object.keys(FX_MAP).find((k) => rawKey.includes(k)) || "vignette";
+    const fxItem = FX_MAP[fxKey] || FX_MAP.vignette;
+
+    const timeRange = extractTimeRangeFromPrompt(cleanPrompt, context.fps || 30);
+    const start = timeRange.start !== undefined ? Math.max(0, timeRange.start) : context.playheadTime;
+    const end = timeRange.end !== undefined && timeRange.end > start
+      ? timeRange.end
+      : Number((start + fxItem.duration).toFixed(3));
+
+    const operation: EditOperation = {
+      type: "add_element",
+      track: "graphic",
+      element: {
+        id: `fx-${Date.now()}`,
+        name: fxItem.name,
+        compositionId: "effect_overlay",
+        props: {
+          effectType: fxItem.effectType,
+          intensity: 80,
+        },
+        start,
+        end,
+        position: { x: 50, y: 50 },
+        positionX: 50,
+        positionY: 50,
+        scale: 1.0,
+        rotation: 0,
+      },
+    };
+
+    return {
+      matched: true,
+      operation,
+      description: `Add effect ${fxItem.name} from ${start.toFixed(1)}s to ${end.toFixed(1)}s`,
+    };
+  }
+
+  // 7.5. ADD AUDIO SFX / SOUND ACCENTS
+  // Patterns:
+  // "Add a subtle whoosh sound when the headline enters between 00:12 and 00:13"
+  // "Add a subtle whoosh when the headline enters between 00:12 and 00:13"
+  // "Add whoosh sound effect at 12s"
+  // "Add pop sfx between 1.0 and 1.5"
+  // "Add chime sound effect"
+  const sfxKeywords = "whoosh|swoosh|pop|ding|chime|click|tap|riser|impact|thump|glitch|zap|camera|shutter";
+  const sfxRegex = new RegExp(
+    `\\b(?:add|insert|put|play)\\s+(?:a\\s+)?(?:subtle\\s+|soft\\s+|loud\\s+|quick\\s+)?(${sfxKeywords})(?:\\s+(?:sound\\s*effect|sound|effect|sfx|cue))?\\b`,
+    "i"
+  );
+  const genericSfxRegex = /\b(?:add|insert|put|play)\s+(?:a\s+)?(?:sound\s*effect|sfx|audio\s*cue)\s*(?:named|called)?\s*([a-zA-Z_-]+)?\b/i;
+
+  const isBgmPrompt = /\b(?:background\s*music|bgm|soundtrack|chill\s*music|lofi\s*music|ambient\s*music)\b/i.test(cleanPrompt);
+
+  if (!isBgmPrompt && (sfxRegex.test(cleanPrompt) || genericSfxRegex.test(cleanPrompt))) {
+    const sfxMatch = cleanPrompt.match(sfxRegex);
+    const genericMatch = cleanPrompt.match(genericSfxRegex);
+    const rawSoundName = (sfxMatch ? sfxMatch[1] : (genericMatch ? genericMatch[1] : "pop"))?.toLowerCase() || "pop";
+
+    const SFX_ASSET_MAP: Record<string, { name: string; url: string; duration: number }> = {
+      whoosh: { name: "Whoosh SFX", url: "/assets/audio/whoosh.mp3", duration: 1.0 },
+      swoosh: { name: "Whoosh SFX", url: "/assets/audio/whoosh.mp3", duration: 1.0 },
+      pop: { name: "Pop SFX", url: "/assets/audio/pop.mp3", duration: 0.5 },
+      ding: { name: "Chime SFX", url: "/assets/audio/chime.mp3", duration: 0.8 },
+      chime: { name: "Chime SFX", url: "/assets/audio/chime.mp3", duration: 0.8 },
+      click: { name: "Click SFX", url: "/assets/audio/click.mp3", duration: 0.3 },
+      tap: { name: "Click SFX", url: "/assets/audio/click.mp3", duration: 0.3 },
+      riser: { name: "Riser SFX", url: "/assets/audio/riser.mp3", duration: 1.5 },
+      impact: { name: "Impact SFX", url: "/assets/audio/impact.mp3", duration: 1.0 },
+      thump: { name: "Impact SFX", url: "/assets/audio/impact.mp3", duration: 0.8 },
+      glitch: { name: "Glitch Zap SFX", url: "/assets/audio/whoosh.mp3", duration: 0.6 },
+      zap: { name: "Glitch Zap SFX", url: "/assets/audio/whoosh.mp3", duration: 0.6 },
+      camera: { name: "Camera Shutter SFX", url: "/assets/audio/click.mp3", duration: 0.5 },
+      shutter: { name: "Camera Shutter SFX", url: "/assets/audio/click.mp3", duration: 0.5 },
+    };
+
+    const sfxKey = Object.keys(SFX_ASSET_MAP).find((k) => rawSoundName.includes(k)) || "pop";
+    const sfxItem = SFX_ASSET_MAP[sfxKey] || { name: "Pop SFX", url: "/assets/audio/pop.mp3", duration: 0.5 };
+
+    const timeRange = extractTimeRangeFromPrompt(cleanPrompt, context.fps || 30);
+    let start = context.playheadTime;
+    let end = start + sfxItem.duration;
+
+    if (timeRange.start !== undefined && timeRange.end !== undefined) {
+      start = timeRange.start;
+      end = timeRange.end;
+    } else if (timeRange.start !== undefined) {
+      start = timeRange.start;
+      end = Number((start + sfxItem.duration).toFixed(3));
+    } else {
+      // Check if prompt refers to headline/title entrance ("when the headline enters", etc.)
+      const headlineMatch = /(?:headline|title|badge|card|intro)/i.test(cleanPrompt);
+      if (headlineMatch && context.graphicsElements && context.graphicsElements.length > 0) {
+        const targetGraphic = context.graphicsElements.find((g: any) =>
+          /(?:headline|title|hero|card|intro)/i.test(g.compositionId || g.name || "")
+        ) || context.graphicsElements[0];
+        if (targetGraphic && typeof targetGraphic.start === "number") {
+          start = targetGraphic.start;
+          end = Number((start + sfxItem.duration).toFixed(3));
+        }
+      }
+    }
+
+    start = Math.max(0, Number(start.toFixed(3)));
+    end = Math.max(start + 0.1, Number(end.toFixed(3)));
+
+    const isSubtle = /\b(?:subtle|soft|quiet)\b/i.test(cleanPrompt);
+    const volume = isSubtle ? 65 : 80;
+
+    const operation: EditOperation = {
+      type: "add_element",
+      track: "audio",
+      element: {
+        id: `audio-sfx-${Date.now()}`,
+        name: isSubtle ? `Subtle ${sfxItem.name}` : sfxItem.name,
+        start,
+        end,
+        sourceUrl: sfxItem.url,
+        volume,
+        fadeIn: 0,
+        fadeOut: 0.05,
+        isBgm: false,
+      },
+    };
+
+    return {
+      matched: true,
+      operation,
+      description: `Add ${isSubtle ? "subtle " : ""}${sfxItem.name} from ${start.toFixed(1)}s to ${end.toFixed(1)}s`,
+    };
+  }
+
+  // 7.6. ADD BACKGROUND MUSIC / BGM WITH DUCKING
+  // Patterns:
+  // "Add chill background music and duck it whenever I speak"
+  // "Add background music and duck it"
+  // "Add chill bgm ducked under speech"
+  // "Add background music"
+  // "Add chill background music"
+  const bgmRegex = /\b(?:add|insert|put|play)\s+(?:a\s+)?(?:(chill|lofi|ambient|calm|soft|upbeat|acoustic)\s+)?(?:background\s*music|bgm|soundtrack|music)\b/i;
+  if (bgmRegex.test(cleanPrompt)) {
+    const timeRange = extractTimeRangeFromPrompt(cleanPrompt, context.fps || 30);
+    const start = timeRange.start !== undefined ? Math.max(0, timeRange.start) : 0;
+    const end = timeRange.end !== undefined && timeRange.end > start
+      ? timeRange.end
+      : Math.max(10.0, context.duration || 30.0);
+
+    const hasDucking = /\b(?:duck(?:ing)?(?:\s+it)?(?:\s+(?:whenever|when)\s+(?:i|someone|speaker)\s+speaks?)?|with\s+(?:speech\s+|narration\s+)?ducking|duck\s+under\s+speech)\b/i.test(cleanPrompt);
+
+    const matchRes = cleanPrompt.match(bgmRegex);
+    const mood = (matchRes ? matchRes[1] : "chill")?.toLowerCase() || "chill";
+    const titleMood = mood.charAt(0).toUpperCase() + mood.slice(1);
+
+    const operation: EditOperation = {
+      type: "add_element",
+      track: "audio",
+      element: {
+        id: `audio-bgm-${Date.now()}`,
+        name: `${titleMood} Background Music`,
+        start,
+        end,
+        sourceUrl: "/assets/audio/chill-bgm.mp3",
+        volume: hasDucking ? 35 : 50,
+        fadeIn: 1.0,
+        fadeOut: 1.5,
+        isBgm: true,
+        ducking: hasDucking,
+        duckingDb: hasDucking ? -14.0 : undefined,
+      },
+    };
+
+    return {
+      matched: true,
+      operation,
+      description: `Add ${mood} background music${hasDucking ? " with -14dB narration ducking" : ""} from ${start.toFixed(1)}s to ${end.toFixed(1)}s`,
+    };
   }
 
   // 8. ADD TRANSITION
@@ -910,6 +1250,121 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
       operation,
       description: `Set volume of ${targetType} clip (${targetClipId}) to ${volume}%`,
     };
+  }
+
+  // 10. KINETIC CAPTIONS STYLER (Phase 6)
+  // Supports:
+  // "apply tiktok caption style"
+  // "change caption style to tiktok_yellow"
+  // "switch subtitles to hormozi bold"
+  // "apply hormozi caption style"
+  // "style captions clean white"
+  // "switch captions to neon glow"
+  // "apply neon glow caption style"
+  const isCaptionStyleIntent =
+    (/\b(?:caption|captions|subtitle|subtitles)\b/i.test(cleanPrompt) &&
+      /\b(?:tiktok|hormozi|clean|neon|yellow|bold|white|glow|cyber|style|preset|look|theme|karaoke|gradient|boxed|pill|comic|pop|fire|blaze|minimal)\b/i.test(cleanPrompt)) ||
+    /\b(?:apply|change|switch|set|use)\s+.*?\b(tiktok|hormozi|clean|neon|karaoke|gradient|boxed|pill|comic|pop|fire|blaze|minimal)\b/i.test(cleanPrompt);
+
+  if (isCaptionStyleIntent) {
+    let preset: CaptionPreset | null = null;
+    if (/\btik\s*tok/i.test(cleanPrompt) || /tiktok_yellow/i.test(cleanPrompt) || /yellow/i.test(cleanPrompt)) {
+      preset = "tiktok_yellow";
+    } else if (/\bhormozi/i.test(cleanPrompt) || /hormozi_bold/i.test(cleanPrompt)) {
+      preset = "hormozi_bold";
+    } else if (/\bclean/i.test(cleanPrompt) || /clean_white/i.test(cleanPrompt) || /\bminimal_white/i.test(cleanPrompt)) {
+      preset = "clean_white";
+    } else if (/\bneon/i.test(cleanPrompt) || /neon_glow/i.test(cleanPrompt) || /\bcyber/i.test(cleanPrompt) || /\bglow/i.test(cleanPrompt)) {
+      preset = "neon_glow";
+    } else if (/\bkaraoke/i.test(cleanPrompt) || /karaoke_gradient/i.test(cleanPrompt)) {
+      preset = "karaoke_gradient";
+    } else if (/\b(minimal_boxed|minimal\s+boxed|podcast)\b/i.test(cleanPrompt)) {
+      preset = "minimal_boxed";
+    } else if (/\b(boxed_pill|boxed\s+pill|pill)\b/i.test(cleanPrompt) || (/\bboxed\b/i.test(cleanPrompt) && !/minimal/i.test(cleanPrompt))) {
+      preset = "boxed_pill";
+    } else if (/\b(comic_pop|comic|pop)\b/i.test(cleanPrompt)) {
+      preset = "comic_pop";
+    } else if (/\b(fire_gradient|fire|blaze)\b/i.test(cleanPrompt)) {
+      preset = "fire_gradient";
+    }
+
+    if (preset) {
+      // 1. If a single caption is currently selected, update only that caption
+      if (context.selectedItem && context.selectedItem.type === "caption") {
+        const operation: EditOperation = {
+          type: "update_properties",
+          targetId: context.selectedItem.id,
+          targetType: "caption",
+          properties: { stylePreset: preset },
+        };
+        return {
+          matched: true,
+          operation,
+          description: `Applied ${preset.replace(/_/g, " ")} style to selected caption (${context.selectedItem.id})`,
+        };
+      }
+
+      // 2. Otherwise update all captions in the text track
+      const existingCaptions = context.textTrack || (context.trackSummary?.captionsList as any[]) || [];
+      if (existingCaptions.length > 0) {
+        const subOps: EditOperation[] = existingCaptions.map((c) => ({
+          type: "update_properties",
+          targetId: c.id,
+          targetType: "caption",
+          properties: { stylePreset: preset },
+        }));
+
+        const operation: EditOperation = {
+          type: "batch",
+          operations: subOps,
+          description: `Apply ${preset.replace(/_/g, " ")} caption style across timeline`,
+        };
+
+        return {
+          matched: true,
+          operation,
+          description: `Applied ${preset.replace(/_/g, " ")} style across ${subOps.length} captions`,
+        };
+      }
+
+      // 3. If no captions exist but transcript words exist, generate kinetic captions from transcript
+      const words = context.transcriptWords || [];
+      if (words.length > 0) {
+        const subOps: EditOperation[] = [];
+        const chunkSize = 4;
+        for (let i = 0; i < words.length; i += chunkSize) {
+          const chunk = words.slice(i, i + chunkSize);
+          const phrase = chunk.map((w) => w.word).join(" ");
+          const start = chunk[0].start;
+          const end = chunk[chunk.length - 1].end;
+          subOps.push({
+            type: "add_element",
+            track: "caption",
+            element: {
+              id: `caption-gen-${Date.now()}-${i}`,
+              text: phrase,
+              start,
+              end,
+              stylePreset: preset,
+              position: { x: 50, y: 75 },
+              scale: 1.0,
+            },
+          });
+        }
+
+        const operation: EditOperation = {
+          type: "batch",
+          operations: subOps,
+          description: `Generate ${preset.replace(/_/g, " ")} captions from transcript across video`,
+        };
+
+        return {
+          matched: true,
+          operation,
+          description: `Generated ${subOps.length} ${preset.replace(/_/g, " ")} captions from transcript`,
+        };
+      }
+    }
   }
 
   // Fallback: Candidate for Tier-2 Cloud LLM Copilot

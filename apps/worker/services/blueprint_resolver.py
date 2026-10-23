@@ -12,6 +12,10 @@ TEMPLATE_VARIETY_CYCLE = [
     "cooked_terminal",
     "cooked_notes",
     "step_sequence",
+    "showdown_duel",
+    "battle_chart",
+    "compound_formula",
+    "wall_street_failure_hook",
 ]
 
 
@@ -28,17 +32,24 @@ def enforce_density_budgeting(
     min_visual_spacing: float = 2.5,
     min_broll_spacing: float = 8.0,
     min_mg_spacing: float = 10.0,
+    min_mg_gap: float = 4.0,
     min_sfx_spacing: float = 2.0,
+    max_broll_ratio: float = 0.30,
+    is_faceless: bool = False,
 ) -> List[EditDecision]:
     """
     Applies density budget caps and narrative pacing constraints:
     1. Visual pacing: Visual changes (b_roll, motion_graphics) spaced cleanly.
-    2. B-Roll count & interval: Starts spaced >= 8.0s apart, clips never overlap.
-    3. Motion Graphics interval: Starts spaced >= 10.0s apart, cards never overlap.
-    4. Variety Enforcement: Consecutive motion cards NEVER share the same composition ID.
-    5. SFX density: Sounds spaced >= 2.0s apart.
-    6. All timestamps bounded cleanly within [0.0, total_duration].
+    2. B-Roll count & interval: Starts spaced >= 8.0s apart for talking head (or >= 3.0s for faceless).
+    3. B-Roll coverage cap: Total B-roll runtime <= 30% for talking head (100% for faceless).
+    4. Motion Graphics interval: Starts spaced >= 10.0s apart, cards never overlap, gap >= 4.0s.
+    5. Variety Enforcement: Consecutive motion cards NEVER share the same composition ID.
+    6. SFX density: Sounds spaced >= 2.0s apart.
+    7. All timestamps bounded cleanly within [0.0, total_duration].
     """
+    if is_faceless:
+        max_broll_ratio = 1.0
+        min_broll_spacing = 3.0
     clean_edits: List[EditDecision] = []
     for e in edits:
         if isinstance(e, dict):
@@ -53,6 +64,9 @@ def enforce_density_budgeting(
     result: List[EditDecision] = []
     last_broll_start = -999.0
     last_broll_end = -999.0
+    total_broll_duration = 0.0
+    max_broll_duration = total_duration * max_broll_ratio
+
     last_mg_start = -999.0
     last_mg_end = -999.0
     last_mg_type: Optional[str] = None
@@ -78,13 +92,26 @@ def enforce_density_budgeting(
             # Cap B-roll spacing >= 8.0s and ensure no overlap with previous B-roll
             if (start - last_broll_start < min_broll_spacing) or (start < last_broll_end):
                 continue
+
+            # Enforce 30% total B-roll duration budget cap
+            dur = end - start
+            if total_broll_duration + dur > max_broll_duration + 0.5:
+                remaining = max_broll_duration - total_broll_duration
+                if remaining >= 2.0:
+                    end = round(start + remaining, 2)
+                    edit.end = end
+                    dur = end - start
+                else:
+                    continue
+
+            total_broll_duration += dur
             last_broll_start = start
             last_broll_end = end
             result.append(edit)
 
         elif action == "motion_graphics":
-            # Cap Motion Graphic spacing >= 10.0s and ensure no overlap
-            if (start - last_mg_start < min_mg_spacing) or (start < last_mg_end):
+            # Cap Motion Graphic spacing >= 10.0s, ensure no overlap, and enforce >= 4.0s gap from last graphic
+            if (start - last_mg_start < min_mg_spacing) or (start < last_mg_end + min_mg_gap):
                 continue
 
             # Variety Enforcement: No consecutive duplicate compositions
@@ -130,6 +157,7 @@ def coordinate_whole_video_plan(
     Generates a coordinated macro-level editing plan across the entire video.
     Balances B-roll footage, motion graphics cards, transitions, and audio SFX
     strictly respecting density budgets and narrative pacing.
+    Leverages transcript_beats if available to anchor visuals to storytelling milestones.
     Returns 6-12 non-conflicting edits.
     """
     duration = max(15.0, total_duration)
@@ -147,59 +175,112 @@ def coordinate_whole_video_plan(
 
     raw_candidates: List[EditDecision] = []
 
-    # 1. B-Roll distribution: 1 every ~12-16 seconds (capped at 1 per 8 seconds)
-    num_broll = max(2, min(4, int(duration // 14)))
-    broll_interval = duration / (num_broll + 1)
-    for i in range(num_broll):
-        b_start = round(broll_interval * (i + 0.5) + (i * 0.4), 2)
-        b_dur = min(3.5, round(broll_interval * 0.45, 2))
-        b_end = min(round(duration - 0.5, 2), round(b_start + b_dur, 2))
-        if b_start < duration - 2.0:
-            query = topics[i % len(topics)]
-            raw_candidates.append(
-                EditDecision(
-                    action="b_roll",
-                    trigger_id=f"whole_broll_{i+1}",
-                    start=b_start,
-                    end=b_end,
-                    search_query=query,
-                    reason=f"Coordinated visual B-roll pacing beat {i+1} reinforcing narrative engagement",
-                )
-            )
+    # If transcript beats are available, align initial candidates to script milestones
+    if transcript_beats and len(transcript_beats) >= 2:
+        sorted_beats = sorted(transcript_beats, key=lambda b: float(b.get("start", 0.0)))
+        mg_templates = ["hero_reveal", "metric_reveal", "cooked_social_post", "stat_card_highlight", "quote_reveal"]
+        for idx, beat in enumerate(sorted_beats):
+            b_start = round(float(beat.get("start", 0.0)), 2)
+            b_end = round(float(beat.get("end", b_start + 3.5)), 2)
+            role = str(beat.get("role", "story")).lower()
+            text = str(beat.get("text", "")).strip()
 
-    # 2. Motion Graphics distribution: 1 every ~14-18 seconds, offset from B-roll
-    num_mg = max(2, min(3, int(duration // 18)))
-    mg_interval = duration / (num_mg + 1)
-    mg_templates = ["hero_reveal", "metric_reveal", "cooked_social_post", "stat_card_highlight", "quote_reveal"]
-    for i in range(num_mg):
-        mg_start = round(mg_interval * (i + 0.85), 2)
-        mg_end = min(round(duration - 0.2, 2), round(mg_start + 3.5, 2))
-        if mg_start < duration - 2.0:
-            comp = mg_templates[i % len(mg_templates)]
-            targets = {}
-            if comp == "hero_reveal":
-                targets = {"label": "KEY TAKEAWAY", "headline": "Essential Strategy", "supporting": "Accelerating workflow execution"}
-            elif comp == "metric_reveal":
-                targets = {"label": "EFFICIENCY GAIN", "metric": "+140%", "delta": "Target Exceeded"}
-            elif comp == "cooked_social_post":
-                targets = {"name": "Industry Leader", "handle": "@creator_insights", "text": "This completely transformed our editing flow.", "likes": "14.2K"}
-            elif comp == "stat_card_highlight":
-                targets = {"label": "PRODUCTIVITY", "stat": "3.5x Faster", "delta": "+250% output"}
+            if b_start >= duration - 2.0:
+                continue
+
+            if role in ("hook", "cta", "solution", "metric", "stat"):
+                comp = mg_templates[idx % len(mg_templates)]
+                targets = {}
+                if comp == "hero_reveal":
+                    targets = {"label": "KEY INSIGHT", "headline": text[:40] if text else "Essential Strategy", "supporting": "Accelerating workflow execution"}
+                elif comp == "metric_reveal":
+                    targets = {"label": "METRIC IMPACT", "metric": "+140%", "delta": "Target Exceeded"}
+                elif comp == "cooked_social_post":
+                    targets = {"name": "Industry Leader", "handle": "@creator_insights", "text": text[:60] if text else "Game-changing workflow.", "likes": "18.4K"}
+                elif comp == "stat_card_highlight":
+                    targets = {"label": "PRODUCTIVITY", "stat": "3.5x Faster", "delta": "+250% output"}
+                else:
+                    targets = {"quote": text[:60] if text else "Focus on high-leverage creative work.", "author": "Creative Director"}
+
+                raw_candidates.append(
+                    EditDecision(
+                        action="motion_graphics",
+                        trigger_id=f"beat_mg_{idx+1}",
+                        start=b_start,
+                        end=min(round(duration - 0.2, 2), round(b_start + 3.5, 2)),
+                        motion_graphics_type=comp,
+                        motion_graphics_targets=targets,
+                        motion_graphics_personality="premium",
+                        reason=f"Transcript beat '{role}' motion card emphasizing key narrative point",
+                    )
+                )
             else:
-                targets = {"quote": "Focus on high-leverage creative work.", "author": "Creative Director"}
-
-            raw_candidates.append(
-                EditDecision(
-                    action="motion_graphics",
-                    trigger_id=f"whole_mg_{i+1}",
-                    start=mg_start,
-                    end=mg_end,
-                    motion_graphics_type=comp,
-                    motion_graphics_targets=targets,
-                    motion_graphics_personality="premium",
-                    reason=f"Coordinated motion graphic card {i+1} highlighting key milestone",
+                query = text[:30] if text else topics[idx % len(topics)]
+                raw_candidates.append(
+                    EditDecision(
+                        action="b_roll",
+                        trigger_id=f"beat_broll_{idx+1}",
+                        start=b_start,
+                        end=min(round(duration - 0.5, 2), round(b_start + min(3.5, max(2.0, b_end - b_start)), 2)),
+                        search_query=query,
+                        reason=f"Transcript narrative beat '{role}' visualized with relevant B-roll",
+                    )
                 )
-            )
+    else:
+        # Standard coordinated interval distribution
+        # 1. B-Roll distribution: 1 every ~12-16 seconds (capped at 1 per 8 seconds)
+        num_broll = max(2, min(4, int(duration // 14)))
+        broll_interval = duration / (num_broll + 1)
+        for i in range(num_broll):
+            b_start = round(broll_interval * (i + 0.5) + (i * 0.4), 2)
+            b_dur = min(3.5, round(broll_interval * 0.45, 2))
+            b_end = min(round(duration - 0.5, 2), round(b_start + b_dur, 2))
+            if b_start < duration - 2.0:
+                query = topics[i % len(topics)]
+                raw_candidates.append(
+                    EditDecision(
+                        action="b_roll",
+                        trigger_id=f"whole_broll_{i+1}",
+                        start=b_start,
+                        end=b_end,
+                        search_query=query,
+                        reason=f"Coordinated visual B-roll pacing beat {i+1} reinforcing narrative engagement",
+                    )
+                )
+
+        # 2. Motion Graphics distribution: 1 every ~14-18 seconds, offset from B-roll
+        num_mg = max(2, min(3, int(duration // 18)))
+        mg_interval = duration / (num_mg + 1)
+        mg_templates = ["hero_reveal", "metric_reveal", "cooked_social_post", "stat_card_highlight", "quote_reveal"]
+        for i in range(num_mg):
+            mg_start = round(mg_interval * (i + 0.85), 2)
+            mg_end = min(round(duration - 0.2, 2), round(mg_start + 3.5, 2))
+            if mg_start < duration - 2.0:
+                comp = mg_templates[i % len(mg_templates)]
+                targets = {}
+                if comp == "hero_reveal":
+                    targets = {"label": "KEY TAKEAWAY", "headline": "Essential Strategy", "supporting": "Accelerating workflow execution"}
+                elif comp == "metric_reveal":
+                    targets = {"label": "EFFICIENCY GAIN", "metric": "+140%", "delta": "Target Exceeded"}
+                elif comp == "cooked_social_post":
+                    targets = {"name": "Industry Leader", "handle": "@creator_insights", "text": "This completely transformed our editing flow.", "likes": "14.2K"}
+                elif comp == "stat_card_highlight":
+                    targets = {"label": "PRODUCTIVITY", "stat": "3.5x Faster", "delta": "+250% output"}
+                else:
+                    targets = {"quote": "Focus on high-leverage creative work.", "author": "Creative Director"}
+
+                raw_candidates.append(
+                    EditDecision(
+                        action="motion_graphics",
+                        trigger_id=f"whole_mg_{i+1}",
+                        start=mg_start,
+                        end=mg_end,
+                        motion_graphics_type=comp,
+                        motion_graphics_targets=targets,
+                        motion_graphics_personality="premium",
+                        reason=f"Coordinated motion graphic card {i+1} highlighting key milestone",
+                    )
+                )
 
     # 3. Transitions: Place 1-2 transitions at key scene shift boundaries
     num_trans = 1 if duration < 40 else 2
@@ -272,6 +353,7 @@ def resolve_master_blueprint(
     char_plan: EditList,
     ai_model_pref: str = "Claude Opus 5.5",  # Kept for API compatibility
     deterministic_cuts: List[Dict[str, Any]] = None,
+    is_faceless: bool = False,
 ) -> EditList:
     """
     Deterministic conflict resolver — replaces the 4th LLM call.
@@ -283,8 +365,18 @@ def resolve_master_blueprint(
        Motion Graphics wins (more specific on-screen graphic).
     4. Sort all decisions cleanly by start timestamp.
     5. Preserves all carefully validated timestamps and targets with 0 hallucination.
-    6. Enforces density budgeting and variety constraints.
+    6. Enforces density budgeting and variety constraints (adapted for faceless vs talking head).
     """
+    if not is_faceless and unified_analysis_json:
+        try:
+            import json
+            ua = json.loads(unified_analysis_json)
+            vt = str(ua.get("video_type") or ua.get("settings", {}).get("video_type", "")).lower()
+            if "faceless" in vt:
+                is_faceless = True
+        except Exception:
+            pass
+
     all_edits: List[EditDecision] = []
     seen_triggers: Dict[str, EditDecision] = {}
 
@@ -367,7 +459,26 @@ def resolve_master_blueprint(
 
     # Apply density budgeting pass
     max_duration = max([e.end or (e.start or 0.0) + 3.0 for e in all_edits], default=300.0)
-    budgeted = enforce_density_budgeting(all_edits, total_duration=max_duration)
+    budgeted = enforce_density_budgeting(all_edits, total_duration=max_duration, is_faceless=is_faceless)
+
+    if is_faceless:
+        # Gapless snapping for faceless videos: eliminate unwanted flashing gaps between visual cuts
+        broll_edits = [e for e in budgeted if e.action == "b_roll"]
+        broll_edits.sort(key=lambda x: (x.start if x.start is not None else 0.0))
+        for i in range(len(broll_edits) - 1):
+            curr_b = broll_edits[i]
+            next_b = broll_edits[i + 1]
+            if curr_b.end is not None and next_b.start is not None:
+                gap = next_b.start - curr_b.end
+                if 0.0 < gap <= 2.5:
+                    # Extend previous B-roll end to seamlessly meet the next B-roll start (0 gap)
+                    curr_b.end = round(next_b.start, 2)
+
+        # Remove accidental micro-clips (< 1.0s duration) that can cause annoying visual flashes
+        budgeted = [
+            e for e in budgeted
+            if e.action != "b_roll" or ((e.end or 0.0) - (e.start or 0.0)) >= 1.0
+        ]
 
     broll_count = sum(1 for e in budgeted if e.action == "b_roll")
     mg_count = sum(1 for e in budgeted if e.action == "motion_graphics")

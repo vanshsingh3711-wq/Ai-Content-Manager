@@ -59,6 +59,7 @@ export interface EditorContext {
   scriptBeats: ScriptBeat[];
   videoClips?: { id: string; name: string; start: number; end: number }[];
   audioClips?: { id: string; name: string; start: number; end: number; volume?: number }[];
+  textTrack?: CaptionBlock[];
 }
 
 /**
@@ -163,6 +164,7 @@ export function assembleEditorContext(
       end: a.end,
       volume: a.volume,
     })),
+    textTrack: project.tracks.textTrack,
   };
 }
 

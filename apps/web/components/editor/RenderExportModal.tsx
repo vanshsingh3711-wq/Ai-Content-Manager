@@ -27,6 +27,7 @@ export interface RenderExportModalProps {
 
 export type RenderStage =
   | "compiling"
+  | "matting"
   | "rendering"
   | "compositing"
   | "exporting_nle"
@@ -37,11 +38,13 @@ export interface RenderResultData {
   render_id: string;
   video_id: string;
   status: string;
+  stage?: string;
   progress: number;
   message: string;
   aspect_ratio: string;
   duration: number;
   download_url: string;
+  proxy_url?: string;
   nle_exports?: {
     fcpxml?: string;
     premiere_xml?: string;
@@ -101,28 +104,148 @@ export function RenderExportModal({ isOpen, onClose, project }: RenderExportModa
 
         if (response.ok) {
           const data: RenderResultData = await response.json();
-          // Simulate smooth multi-stage progress for visual feedback
-          setProgress(45);
-          setStage("rendering");
 
-          setTimeout(() => {
+          if (data.status === "completed") {
+            setProgress(100);
+            setStage("completed");
+            setRenderData({
+              ...data,
+              download_url: data.download_url?.startsWith("http") ? data.download_url : `${apiBase}${data.download_url}`,
+            });
+            return;
+          }
+
+          // Real-time progress streaming via SSE with polling fallback
+          setProgress(Math.max(15, data.progress || 15));
+          if (data.stage) {
+            setStage(data.stage as RenderStage);
+          } else {
+            setStage("rendering");
+          }
+
+          let eventSource: EventSource | null = null;
+          let pollInterval: NodeJS.Timeout | null = null;
+
+          const handleRenderCompletion = (finalPayload: RenderResultData) => {
             if (isCancelled) return;
-            setProgress(75);
-            setStage("compositing");
+            if (eventSource) {
+              eventSource.close();
+              eventSource = null;
+            }
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+            setProgress(100);
+            setStage("completed");
+            const dl = finalPayload.download_url || `/api/v1/videos/${data.video_id}/rendered-file`;
+            setRenderData({
+              ...data,
+              ...finalPayload,
+              download_url: dl.startsWith("http") ? dl : `${apiBase}${dl}`,
+            });
+          };
 
-            setTimeout(() => {
-              if (isCancelled) return;
-              setProgress(92);
-              setStage("exporting_nle");
+          const handleRenderFailure = (errMsg: string) => {
+            if (isCancelled) return;
+            if (eventSource) {
+              eventSource.close();
+              eventSource = null;
+            }
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+            setStage("error");
+            setErrorMessage(errMsg || "Render failed");
+          };
 
-              setTimeout(() => {
+          const startPollingFallback = () => {
+            if (pollInterval || isCancelled) return;
+            pollInterval = setInterval(async () => {
+              if (isCancelled) {
+                if (pollInterval) clearInterval(pollInterval);
+                return;
+              }
+              try {
+                const pollRes = await fetch(`${apiBase}/api/v1/videos/${data.video_id}/render-status/${data.render_id}`);
+                if (!pollRes.ok) return;
+                const pollData = await pollRes.json();
+                if (pollData.status === "completed") {
+                  handleRenderCompletion(pollData);
+                } else if (pollData.status === "error" || pollData.status === "failed") {
+                  handleRenderFailure(pollData.message);
+                } else {
+                  setProgress((prev) => Math.min(95, Math.max(prev, pollData.progress || 50)));
+                  if (pollData.stage) setStage(pollData.stage as RenderStage);
+                }
+              } catch {
+                // Ignore temporary network glitch while polling
+              }
+            }, 1200);
+          };
+
+          // Attempt SSE connection if EventSource is supported
+          if (typeof window !== "undefined" && "EventSource" in window) {
+            try {
+              const streamUrl = `${apiBase}/api/v1/videos/${data.video_id}/render-stream/${data.render_id}`;
+              eventSource = new EventSource(streamUrl);
+
+              eventSource.addEventListener("progress", (evt: MessageEvent) => {
                 if (isCancelled) return;
-                setProgress(100);
-                setStage("completed");
-                setRenderData(data);
-              }, 400);
-            }, 500);
-          }, 500);
+                try {
+                  const evData = JSON.parse(evt.data);
+                  setProgress((prev) => Math.min(98, Math.max(prev, evData.progress || 20)));
+                  if (evData.stage) {
+                    setStage(evData.stage as RenderStage);
+                  }
+                } catch {
+                  // Ignore JSON parse error
+                }
+              });
+
+              eventSource.addEventListener("completed", (evt: MessageEvent) => {
+                try {
+                  const evData = JSON.parse(evt.data);
+                  handleRenderCompletion(evData);
+                } catch {
+                  handleRenderCompletion(data);
+                }
+              });
+
+              eventSource.addEventListener("error", () => {
+                // SSE error or network close - fallback to polling
+                if (eventSource) {
+                  eventSource.close();
+                  eventSource = null;
+                }
+                startPollingFallback();
+              });
+
+              eventSource.onmessage = (evt: MessageEvent) => {
+                try {
+                  const evData = JSON.parse(evt.data);
+                  if (evData.status === "completed") {
+                    handleRenderCompletion(evData);
+                  } else if (evData.status === "error" || evData.status === "failed") {
+                    handleRenderFailure(evData.message);
+                  } else if (evData.progress) {
+                    setProgress((prev) => Math.min(98, Math.max(prev, evData.progress)));
+                    if (evData.stage) setStage(evData.stage as RenderStage);
+                  }
+                } catch {}
+              };
+            } catch {
+              startPollingFallback();
+            }
+          } else {
+            startPollingFallback();
+          }
+
+          return () => {
+            if (eventSource) eventSource.close();
+            if (pollInterval) clearInterval(pollInterval);
+          };
         } else {
           // Fallback simulation when API server is offline or mock testing
           runMockRenderFallback();
@@ -204,6 +327,8 @@ export function RenderExportModal({ isOpen, onClose, project }: RenderExportModa
     switch (stage) {
       case "compiling":
         return "Compiling timeline cuts, motion layers, and captions...";
+      case "matting":
+        return "Extracting presenter depth cutout for behind-speaker layers...";
       case "rendering":
         return "Rendering Remotion motion graphic overlays with alpha channels...";
       case "compositing":
