@@ -26,8 +26,9 @@ export const IcebergModel: React.FC<Props> = ({
   ],
 }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width = 1080, height = 1920 } = useVideoConfig();
   const exit = useExitFade(durationInFrames, 14);
+  const scale = Math.min(width / 1080, height / 1920);
 
   const headerSpring = spring({ frame, fps, config: { damping: 14, mass: 0.7, stiffness: 140 } });
   const surfaceSpring = spring({ frame: frame - 10, fps, config: { damping: 13, mass: 0.7, stiffness: 130 } });
@@ -45,17 +46,30 @@ export const IcebergModel: React.FC<Props> = ({
     <AbsoluteFill
       style={{
         backgroundColor: '#030712',
-        fontFamily: FONT.display,
-        color: '#FFFFFF',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        padding: '110px 48px',
-        opacity: exit.opacity,
-        position: 'relative',
+        justifyContent: 'center',
         overflow: 'hidden',
+        opacity: exit.opacity,
       }}
     >
+      <div
+        style={{
+          width: 1080,
+          height: 1920,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          fontFamily: FONT.display,
+          color: '#FFFFFF',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '110px 48px',
+          position: 'relative',
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}
+      >
       {/* Underwater Deep Abyss Ambient Lighting */}
       <div
         style={{
@@ -339,6 +353,7 @@ export const IcebergModel: React.FC<Props> = ({
         <span style={{ fontSize: 20, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
           ⚓ You cannot produce the 10% tip without building the massive 90% foundation.
         </span>
+      </div>
       </div>
     </AbsoluteFill>
   );

@@ -26,8 +26,9 @@ export const FeatureCalloutPointer: React.FC<Props> = ({
   accentColor = '#22D3EE',
 }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width = 1080, height = 1920 } = useVideoConfig();
   const exit = useExitFade(durationInFrames, 14);
+  const scale = Math.min(width / 1080, height / 1920);
 
   // Staggered entrances
   const targetSpring = spring({ frame, fps, config: { damping: 12, mass: 0.6, stiffness: 180 } });
@@ -46,13 +47,26 @@ export const FeatureCalloutPointer: React.FC<Props> = ({
     <AbsoluteFill
       style={{
         backgroundColor: '#030712',
-        fontFamily: FONT.display,
-        color: '#FFFFFF',
-        opacity: exit.opacity,
-        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         overflow: 'hidden',
+        opacity: exit.opacity,
       }}
     >
+      <div
+        style={{
+          width: 1080,
+          height: 1920,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          fontFamily: FONT.display,
+          color: '#FFFFFF',
+          position: 'relative',
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}
+      >
       {/* Background ambient lighting */}
       <div
         style={{
@@ -284,6 +298,7 @@ export const FeatureCalloutPointer: React.FC<Props> = ({
           <span>SUBSYSTEM: OPTICAL_CORE_V4</span>
           <span>STATUS: ONLINE • CALIBRATED</span>
         </div>
+      </div>
       </div>
     </AbsoluteFill>
   );

@@ -30,8 +30,9 @@ export const HorizontalProcessFlow: React.FC<Props> = ({
   steps = DEFAULT_STEPS,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width = 1080, height = 1920 } = useVideoConfig();
   const exit = useExitFade(durationInFrames, 14);
+  const scale = Math.min(width / 1080, height / 1920);
 
   const headerSpring = spring({ frame, fps, config: { damping: 14, mass: 0.7, stiffness: 140 } });
   const footerSpring = spring({ frame: frame - 44, fps, config: { damping: 12, mass: 0.6, stiffness: 160 } });
@@ -43,15 +44,29 @@ export const HorizontalProcessFlow: React.FC<Props> = ({
     <AbsoluteFill
       style={{
         backgroundColor: '#030712',
-        fontFamily: FONT.display,
-        color: '#FFFFFF',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        padding: '110px 48px',
+        justifyContent: 'center',
+        overflow: 'hidden',
         opacity: exit.opacity,
       }}
     >
+      <div
+        style={{
+          width: 1080,
+          height: 1920,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          fontFamily: FONT.display,
+          color: '#FFFFFF',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '110px 48px',
+          position: 'relative',
+          flexShrink: 0,
+        }}
+      >
       {/* Background radial glow */}
       <div
         style={{
@@ -281,6 +296,7 @@ export const HorizontalProcessFlow: React.FC<Props> = ({
         <span style={{ fontSize: 20, color: '#34D399', fontWeight: 700 }}>
           ⚡ Fully automated pipeline eliminates 90% of manual execution hours.
         </span>
+      </div>
       </div>
     </AbsoluteFill>
   );

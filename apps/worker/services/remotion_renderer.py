@@ -225,8 +225,15 @@ def render_motion_graphic(
             f"--props={props_file}",          # Props as JSON file
             f"--frames=0-{max(1, duration_frames-1)}",
             f"--fps={fps}",
-            f"--width={width}",
-            f"--height={height}",
+        ]
+
+        if width and height and abs((width / height) - (1080 / 1920)) < 0.02 and width != 1080:
+            scale_val = round(width / 1080.0, 4)
+            cmd.append(f"--scale={scale_val}")
+        else:
+            cmd.extend([f"--width={width}", f"--height={height}"])
+
+        cmd.extend([
             "--codec=prores",
             "--prores-profile=4444",
             "--pixel-format=yuva444p10le",
@@ -234,7 +241,7 @@ def render_motion_graphic(
             "--overwrite",
             "--concurrency=2",               # Limit CPU usage
             f"--timeout={timeout_sec * 1000}", # Prevent 30s puppeteer seek timeout
-        ]
+        ])
 
         print(f"[RemotionRenderer] 🎬 Rendering '{comp_kebab}' ({duration_frames}f @ {fps}fps, {width}x{height})")
         print(f"[RemotionRenderer] Props: {json.dumps(props, indent=2)}")

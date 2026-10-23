@@ -30,8 +30,9 @@ export const VennDiagram: React.FC<Props> = ({
   accentColor = '#38BDF8',
 }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width = 1080, height = 1920 } = useVideoConfig();
   const exit = useExitFade(durationInFrames, 14);
+  const scale = Math.min(width / 1080, height / 1920);
 
   // Staggered entrances
   const headerSpring = spring({ frame, fps, config: { damping: 14, mass: 0.7, stiffness: 140 } });
@@ -67,15 +68,29 @@ export const VennDiagram: React.FC<Props> = ({
     <AbsoluteFill
       style={{
         backgroundColor: '#030712',
-        fontFamily: FONT.display,
-        color: '#FFFFFF',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        padding: '110px 48px',
+        justifyContent: 'center',
+        overflow: 'hidden',
         opacity: exit.opacity,
       }}
     >
+      <div
+        style={{
+          width: 1080,
+          height: 1920,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          fontFamily: FONT.display,
+          color: '#FFFFFF',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '110px 48px',
+          position: 'relative',
+          flexShrink: 0,
+        }}
+      >
       {/* Background radial atmosphere */}
       <div
         style={{
@@ -384,6 +399,7 @@ export const VennDiagram: React.FC<Props> = ({
         <span style={{ fontSize: 20, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
           💡 When all 3 domains align, competition becomes completely irrevelant.
         </span>
+      </div>
       </div>
     </AbsoluteFill>
   );

@@ -30,8 +30,9 @@ export const FunnelAnalysis: React.FC<Props> = ({
   dropoffNote = '99.9% ELIMINATED AT TOP OF FUNNEL',
 }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width = 1080, height = 1920 } = useVideoConfig();
   const exit = useExitFade(durationInFrames, 14);
+  const scale = Math.min(width / 1080, height / 1920);
 
   const headerSpring = spring({ frame, fps, config: { damping: 14, mass: 0.7, stiffness: 140 } });
   const footerSpring = spring({ frame: frame - 40, fps, config: { damping: 12, mass: 0.6, stiffness: 160 } });
@@ -48,15 +49,29 @@ export const FunnelAnalysis: React.FC<Props> = ({
     <AbsoluteFill
       style={{
         backgroundColor: '#030712',
-        fontFamily: FONT.display,
-        color: '#FFFFFF',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        padding: '110px 48px',
+        justifyContent: 'center',
+        overflow: 'hidden',
         opacity: exit.opacity,
       }}
     >
+      <div
+        style={{
+          width: 1080,
+          height: 1920,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          fontFamily: FONT.display,
+          color: '#FFFFFF',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '110px 48px',
+          position: 'relative',
+          flexShrink: 0,
+        }}
+      >
       {/* Background radial atmosphere */}
       <div
         style={{
@@ -285,6 +300,7 @@ export const FunnelAnalysis: React.FC<Props> = ({
         <div style={{ fontSize: 24, fontWeight: 900, color: '#FFFFFF' }}>
           {dropoffNote}
         </div>
+      </div>
       </div>
     </AbsoluteFill>
   );
