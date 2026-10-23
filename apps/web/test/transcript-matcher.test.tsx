@@ -8,6 +8,7 @@ import {
   findPhraseTimestamp,
   findBeatByRoleOrKeyword,
   getActiveWordAtTimestamp,
+  suggestFinanceGraphicForBeat,
 } from "../lib/ai/transcript-matcher";
 import { TranscriptWord, ScriptBeat, TimelineProject } from "../lib/timeline-types";
 import { assembleEditorContext } from "../lib/ai/editor-context";
@@ -320,6 +321,95 @@ describe("Phase 10: Transcript & Beat Timing Synchronization", () => {
       expect(graphics.length).toBeGreaterThan(0);
       expect(graphics[0].name).toBe("WELCOME");
       expect(graphics[0].start).toBe(0.5);
+    });
+  });
+
+  describe("7. Finance Script Beat Detection & Graphic Suggestion", () => {
+    it("suggests candlestick-hud for crypto and trading beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("Watch this Bitcoin crypto breakout on the charts");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("candlestick-hud");
+      expect(suggestion?.props.ticker).toBe("BTC/USDT");
+    });
+
+    it("suggests compound-growth-curve for snowball and compounding beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("The snowball method builds compounding exponential wealth");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("compound-growth-curve");
+      expect(suggestion?.props.multiplier).toBe("17.4x");
+    });
+
+    it("suggests portfolio-donut for asset allocation beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("Your investment portfolio asset allocation needs balance");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("portfolio-donut");
+      expect(suggestion?.props.totalValue).toBe("$250,000");
+    });
+
+    it("suggests inflation-cash-burn for purchasing power loss beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("Inflation is the silent killer burning your cash reserves");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("inflation-cash-burn");
+      expect(suggestion?.props.purchasingPower).toBe("$68,400");
+    });
+
+    it("suggests banking-notification for wire and deposit payout beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("You receive a wire deposit notification cleared");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("banking-notification");
+      expect(suggestion?.props.amount).toBe("+$24,500.00");
+    });
+
+    it("suggests budget-waterfall for 50/30/20 budget beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("Follow the 50 30 20 budget waterfall breakdown");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("budget-waterfall");
+      expect(suggestion?.props.needs).toBe("$5,000 (50%)");
+    });
+
+    it("suggests debt-payoff-tracker for debt payoff beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("Use the debt payoff snowball method to become debt free");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("debt-payoff-tracker");
+      expect(suggestion?.props.progress).toBe(80);
+    });
+
+    it("suggests roi-balance-scale for asymmetric ROI beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("Weighing the asymmetric risk reward with a 10x ROI balance scale");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("roi-balance-scale");
+      expect(suggestion?.props.roiMultiplier).toBe("10x ROI");
+    });
+
+    it("suggests wealth-flywheel for compounding engine beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("The wealth flywheel compounding engine drives financial freedom");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("wealth-flywheel");
+    });
+
+    it("suggests battle-chart for Buffett vs hedge fund challenge beats", () => {
+      const suggestion = suggestFinanceGraphicForBeat("Warren Buffett challenge: S&P 500 index vs top hedge funds battle");
+      expect(suggestion).not.toBeNull();
+      expect(suggestion?.compositionId).toBe("battle-chart");
+    });
+
+    it("matches finance category beat by alias", () => {
+      const beatsWithFinance: ScriptBeat[] = [
+        ...sampleBeats,
+        {
+          id: 4,
+          start: 8.0,
+          end: 10.0,
+          text: "Let's review our investment portfolio strategy",
+          role: "finance",
+          energy: "high",
+          importance: 5,
+        },
+      ];
+
+      const match = findBeatByRoleOrKeyword("trading", beatsWithFinance);
+      expect(match.matched).toBe(true);
+      expect(match.start).toBe(8.0);
     });
   });
 });

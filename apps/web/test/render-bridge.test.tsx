@@ -5,6 +5,7 @@ import { RenderExportModal } from "../components/editor/RenderExportModal";
 import { TimelineProject } from "../lib/timeline-types";
 import {
   timelineProjectToSceneDefinition,
+  sceneDefinitionToTimelineProject,
   timelineProjectToMasterBlueprint,
   getCanvasDimensions,
 } from "../lib/project-adapter";
@@ -237,4 +238,249 @@ describe("Phase 12: Production Render Bridge & Final Hardening", () => {
       expect(onClose).toHaveBeenCalled();
     });
   });
+
+  describe("3. Phase 6: Finance Motion Graphics Render Bridge & Timeline Project Serialization", () => {
+    const createFinanceMockProject = (): TimelineProject => ({
+      id: "proj-finance-pipeline-test",
+      title: "Finance Pipeline Master Reel",
+      aspectRatio: "9:16",
+      duration: 50.0,
+      fps: 30,
+      tracks: {
+        videoTrack: [
+          {
+            id: "vid-1",
+            sourceUrl: "https://example.com/finance-reel.mp4",
+            name: "Finance Creator A-Roll",
+            start: 0,
+            end: 50.0,
+            sourceStart: 0,
+            sourceEnd: 50.0,
+            speed: 1.0,
+            volume: 100,
+            zoomFactor: 1.0,
+          },
+        ],
+        brollTrack: [],
+        textTrack: [
+          {
+            id: "cap-f1",
+            text: "Here is how compound growth builds real wealth",
+            start: 0.5,
+            end: 4.5,
+            stylePreset: "hormozi_bold",
+          },
+        ],
+        audioTrack: [
+          {
+            id: "bgm-f1",
+            sourceUrl: "/assets/audio/chill-bgm.mp3",
+            name: "Finance Chill BGM",
+            start: 0,
+            end: 50.0,
+            volume: 35,
+            isBgm: true,
+            ducking: true,
+            duckingDb: -14.0,
+          },
+        ],
+        graphicsTrack: [
+          {
+            id: "fg-1",
+            name: "Candlestick Breakout",
+            compositionId: "candlestick-hud",
+            props: { ticker: "BTC/USD", currentPrice: 94500, changePercent: "+12.4%" },
+            start: 1.0,
+            end: 5.5,
+            position: { x: 50, y: 35 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-2",
+            name: "Compound Growth Curve",
+            compositionId: "compound-growth-curve",
+            props: { initialDeposit: 10000, monthlyContribution: 500, years: 25 },
+            start: 6.0,
+            end: 10.5,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-3",
+            name: "Asset Allocation Donut",
+            compositionId: "portfolio-donut",
+            props: { totalValue: 250000, currency: "$" },
+            start: 11.0,
+            end: 15.0,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-4",
+            name: "Purchasing Power Cash Burn",
+            compositionId: "inflation-cash-burn",
+            props: { initialAmount: 100000, purchasingPowerLoss: 42, years: 10 },
+            start: 15.5,
+            end: 19.5,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-5",
+            name: "Chase Wire Transfer",
+            compositionId: "banking-notification",
+            props: { bankName: "CHASE", amount: "$12,450.00", notificationType: "Deposit" },
+            start: 20.0,
+            end: 24.0,
+            position: { x: 50, y: 20 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-6",
+            name: "Income Budget Waterfall",
+            compositionId: "budget-waterfall",
+            props: { income: 8500, savings: 2500 },
+            start: 24.5,
+            end: 28.5,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-7",
+            name: "Snowball Debt Payoff Tracker",
+            compositionId: "debt-payoff-tracker",
+            props: { initialDebt: 28000, paidAmount: 28000, currentBalance: 0 },
+            start: 29.0,
+            end: 33.5,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-8",
+            name: "Real Estate ROI Scale",
+            compositionId: "roi-balance-scale",
+            props: { cost: 50000, returns: 175000, roiMultiple: "3.5x" },
+            start: 34.0,
+            end: 38.5,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-9",
+            name: "Compounding Flywheel",
+            compositionId: "wealth-flywheel",
+            props: { activeStage: 3, centerLabel: "PASSIVE CASH FLOW" },
+            start: 39.0,
+            end: 43.5,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+          {
+            id: "fg-10",
+            name: "Index vs Active Battle Chart",
+            compositionId: "battle-chart",
+            props: { sp500Return: "+312%", hedgeReturn: "+148%", deltaLabel: "+164%" },
+            start: 44.0,
+            end: 49.0,
+            position: { x: 50, y: 50 },
+            scale: 1.0,
+          },
+        ],
+      },
+    });
+
+    it("compiles all 10 finance motion graphics into Remotion scene asset layers", () => {
+      const project = createFinanceMockProject();
+      const scene = timelineProjectToSceneDefinition(project);
+
+      expect(scene.id).toBe("proj-finance-pipeline-test");
+      expect(scene.durationInFrames).toBe(1500); // 50s * 30fps
+
+      const graphicLayers = scene.elements.filter((e) => e.type === "asset");
+      expect(graphicLayers).toHaveLength(10);
+
+      // Verify each of the 10 finance compositions is compiled with correct assetId & props
+      const expectedCompositions = [
+        "candlestick-hud",
+        "compound-growth-curve",
+        "portfolio-donut",
+        "inflation-cash-burn",
+        "banking-notification",
+        "budget-waterfall",
+        "debt-payoff-tracker",
+        "roi-balance-scale",
+        "wealth-flywheel",
+        "battle-chart",
+      ];
+
+      expectedCompositions.forEach((compId) => {
+        const layer = graphicLayers.find((l) => l.assetId === compId);
+        expect(layer).toBeDefined();
+        expect(layer?.timing.startFrame).toBeGreaterThanOrEqual(0);
+        expect(layer?.timing.durationInFrames).toBeGreaterThan(0);
+        expect((layer?.animation as any)?.props).toBeDefined();
+      });
+
+      // Specific prop checks
+      const candleLayer = graphicLayers.find((l) => l.assetId === "candlestick-hud");
+      expect((candleLayer?.animation as any).props.ticker).toBe("BTC/USD");
+
+      const bankLayer = graphicLayers.find((l) => l.assetId === "banking-notification");
+      expect((bankLayer?.animation as any).props.bankName).toBe("CHASE");
+      expect((bankLayer?.animation as any).props.amount).toBe("$12,450.00");
+
+      const debtLayer = graphicLayers.find((l) => l.assetId === "debt-payoff-tracker");
+      expect((debtLayer?.animation as any).props.paidAmount).toBe(28000);
+    });
+
+    it("performs bidirectional lossless round-trip serialization for all finance graphics", () => {
+      const project = createFinanceMockProject();
+      const scene = timelineProjectToSceneDefinition(project);
+      const restored = sceneDefinitionToTimelineProject(scene, {
+        fps: project.fps,
+        aspectRatio: project.aspectRatio,
+      });
+
+      expect(restored.tracks.graphicsTrack).toHaveLength(10);
+
+      project.tracks.graphicsTrack.forEach((original) => {
+        const matching = restored.tracks.graphicsTrack.find(
+          (g) => g.compositionId === original.compositionId
+        );
+        expect(matching).toBeDefined();
+        expect(matching?.start).toBeCloseTo(original.start, 2);
+        expect(matching?.end).toBeCloseTo(original.end, 2);
+        expect(matching?.props).toEqual(original.props);
+      });
+    });
+
+    it("compiles all 10 finance graphics into worker-compatible MasterBlueprint", () => {
+      const project = createFinanceMockProject();
+      const blueprint = timelineProjectToMasterBlueprint(project);
+
+      expect(blueprint.id).toBe("proj-finance-pipeline-test");
+      expect(blueprint.totalDuration).toBe(50.0);
+
+      const mgEdits = blueprint.edits.filter((e) => e.action === "motion_graphics");
+      expect(mgEdits).toHaveLength(10);
+
+      // Verify each edit has valid template, props, start, and end
+      mgEdits.forEach((edit) => {
+        expect(edit.compositionId).toBeDefined();
+        expect(edit.motion_graphics_type).toBe(edit.compositionId);
+        expect(edit.props).toBeDefined();
+        expect(edit.start).toBeLessThan(edit.end);
+      });
+    });
+
+    it("RenderExportModal displays accurate statistics including all 10 finance graphics", () => {
+      const project = createFinanceMockProject();
+      render(<RenderExportModal isOpen={true} onClose={vi.fn()} project={project} />);
+
+      expect(screen.getByText("Finance Pipeline Master Reel")).toBeDefined();
+      expect(screen.getByText("50.0s")).toBeDefined();
+      expect(screen.getByText("10")).toBeDefined(); // 10 graphics
+    });
+  });
 });
+

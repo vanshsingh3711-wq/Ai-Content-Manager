@@ -2399,6 +2399,700 @@ export function GraphicCanvasRenderer({ graphic, playheadTime }: GraphicCanvasRe
     );
   }
 
+  // =========================================================================
+  // FINANCE MOTION GRAPHICS PACK (PHASE 1 & PHASE 2 WYSIWYG RENDERERS)
+  // =========================================================================
+
+  // 1. CANDLESTICK TRADING HUD
+  if (compKey === "candlestick-hud" || compKey === "candlestick_hud" || compKey === "trading-hud") {
+    const symbol = props.symbol || "BTC / USD";
+    const timeframe = props.timeframe || "4H BREAKOUT";
+    const startingPrice = typeof props.startingPrice === "number" ? props.startingPrice : 48250;
+    const endingPrice = typeof props.endingPrice === "number" ? props.endingPrice : 64180;
+    const percentageGain = props.percentageGain || "+32.8%";
+    const trend = props.trend || "bullish";
+    const headline = props.headline || "INSTITUTIONAL LIQUIDITY SURGE";
+
+    const isBull = trend === "bullish";
+    const accentColor = isBull ? "text-emerald-400" : "text-rose-400";
+    const accentBorder = isBull ? "border-emerald-500/40" : "border-rose-500/40";
+    const accentShadow = isBull
+      ? "shadow-[0_0_30px_rgba(16,185,129,0.25)]"
+      : "shadow-[0_0_30px_rgba(239,68,68,0.25)]";
+
+    const currentPrice = Math.round(startingPrice + (endingPrice - startingPrice) * introProgress);
+
+    return (
+      <div
+        data-testid="graphic-candlestick-hud"
+        className={cn(
+          "relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border",
+          accentBorder,
+          accentShadow
+        )}
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5 mb-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full",
+                  isBull
+                    ? "bg-emerald-400 shadow-[0_0_8px_#34d399]"
+                    : "bg-rose-400 shadow-[0_0_8px_#f87171]"
+                )}
+              />
+              <span className="font-black text-sm tracking-wide text-white">{symbol}</span>
+              <span className="text-[9px] font-mono font-bold bg-neutral-800 text-neutral-300 px-1.5 py-0.5 rounded">
+                {timeframe}
+              </span>
+            </div>
+            <div className="text-[10px] text-neutral-400 font-medium truncate mt-0.5">{headline}</div>
+          </div>
+          <div className="text-right">
+            <div className="font-mono font-black text-base text-white">
+              ${currentPrice.toLocaleString()}
+            </div>
+            <div className={cn("text-[10px] font-bold font-mono", accentColor)}>
+              {isBull ? "▲" : "▼"} {percentageGain}
+            </div>
+          </div>
+        </div>
+
+        <div className="relative h-28 w-full">
+          <svg className="w-full h-full overflow-visible" viewBox="0 0 260 100">
+            <line x1="0" y1="25" x2="260" y2="25" stroke="#334155" strokeDasharray="3 3" strokeWidth="0.8" opacity="0.4" />
+            <line x1="0" y1="50" x2="260" y2="50" stroke="#334155" strokeDasharray="3 3" strokeWidth="0.8" opacity="0.4" />
+            <line x1="0" y1="75" x2="260" y2="75" stroke="#334155" strokeDasharray="3 3" strokeWidth="0.8" opacity="0.4" />
+
+            {[
+              { x: 15, o: 65, c: 55, h: 48, l: 72, bull: true },
+              { x: 42, o: 55, c: 60, h: 50, l: 68, bull: false },
+              { x: 69, o: 60, c: 45, h: 38, l: 65, bull: true },
+              { x: 96, o: 45, c: 50, h: 40, l: 56, bull: false },
+              { x: 123, o: 50, c: 35, h: 28, l: 58, bull: true },
+              { x: 150, o: 35, c: 30, h: 24, l: 42, bull: true },
+              { x: 177, o: 30, c: 38, h: 26, l: 44, bull: false },
+              { x: 204, o: 38, c: 22, h: 16, l: 42, bull: true },
+              { x: 231, o: 22, c: 14, h: 8, l: 28, bull: true },
+            ].map((cd, i) => (
+              <g key={i}>
+                <line x1={cd.x} y1={cd.h} x2={cd.x} y2={cd.l} stroke={cd.bull ? "#10b981" : "#ef4444"} strokeWidth="1.5" />
+                <rect
+                  x={cd.x - 7}
+                  y={Math.min(cd.o, cd.c)}
+                  width="14"
+                  height={Math.max(3, Math.abs(cd.c - cd.o))}
+                  fill={cd.bull ? "#10b981" : "#ef4444"}
+                  rx="1.5"
+                />
+              </g>
+            ))}
+
+            <path
+              d="M 15 62 Q 96 48 150 32 T 231 16"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="2.5"
+              className="drop-shadow-[0_0_6px_#38bdf8]"
+            />
+          </svg>
+        </div>
+
+        <div className="mt-2.5 flex items-center justify-between text-[10px] font-mono bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg text-emerald-300">
+          <span className="flex items-center gap-1 font-bold">
+            <span>⚡</span>
+            <span>BREAKOUT CONFIRMED</span>
+          </span>
+          <span className="font-bold">VOL +148%</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. THE SNOWBALL MULTIPLIER (COMPOUND GROWTH CURVE)
+  if (compKey === "compound-growth-curve" || compKey === "compound_growth_curve" || compKey === "compound-curve") {
+    const title = props.title || "THE EXPONENTIAL SNOWBALL EFFECT";
+    const monthlyDeposit = props.monthlyDeposit || "$500 / Month";
+    const annualRate = props.annualRate || "10% S&P 500 Historical";
+    const terminalCompound = typeof props.terminalCompound === "number" ? props.terminalCompound : 1130240;
+    const terminalCash = typeof props.terminalCash === "number" ? props.terminalCash : 180000;
+
+    const currentCompound = Math.round(terminalCompound * introProgress);
+
+    return (
+      <div
+        data-testid="graphic-compound-growth-curve"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5 mb-3">
+          <div>
+            <span className="bg-gradient-to-r from-emerald-400 to-amber-300 text-black text-[9px] font-black px-2 py-0.5 rounded font-mono uppercase tracking-wider">
+              WEALTH MULTIPLIER
+            </span>
+            <h4 className="font-black text-xs text-white mt-1 leading-snug">{title}</h4>
+          </div>
+          <div className="text-right">
+            <div className="text-[9px] font-bold text-neutral-400 uppercase">Year 30 Wealth</div>
+            <div className="text-emerald-400 font-mono font-black text-base text-shadow-sm">
+              ${currentCompound.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* SVG Exponential vs Linear Curves */}
+        <div className="relative h-28 w-full">
+          <svg className="w-full h-full overflow-visible" viewBox="0 0 260 100">
+            <defs>
+              <linearGradient id="liveSnowballGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            {/* Area Fill */}
+            <path
+              d="M 10 90 C 110 88 180 50 250 15 L 250 90 L 10 90 Z"
+              fill="url(#liveSnowballGrad)"
+            />
+
+            {/* Linear Savings Line (Dashed) */}
+            <line x1="10" y1="90" x2="250" y2="68" stroke="#64748b" strokeWidth="2" strokeDasharray="4 4" />
+
+            {/* Exponential Compound Curve */}
+            <path
+              d="M 10 90 C 110 88 180 50 250 15"
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="3.5"
+              className="drop-shadow-[0_0_8px_#10b981]"
+            />
+
+            {/* Inflection Point Spark */}
+            <circle cx="150" cy="58" r="4" fill="#facc15" className="animate-ping" />
+            <circle cx="150" cy="58" r="3" fill="#ffffff" />
+          </svg>
+        </div>
+
+        {/* Comparison Bottom Grid */}
+        <div className="mt-2.5 grid grid-cols-2 gap-2 text-[10px] font-mono">
+          <div className="bg-neutral-900/80 border border-neutral-800 p-2 rounded-lg">
+            <div className="text-neutral-400 text-[9px]">Cash Stash ({monthlyDeposit})</div>
+            <div className="font-bold text-neutral-300 mt-0.5">${terminalCash.toLocaleString()}</div>
+          </div>
+          <div className="bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-lg">
+            <div className="text-emerald-300 text-[9px] font-bold">S&P 500 Compounded</div>
+            <div className="font-bold text-emerald-400 mt-0.5">+6.3x Net Alpha</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. ASSET ALLOCATION DONUT WHEEL
+  if (compKey === "portfolio-donut" || compKey === "portfolio_donut" || compKey === "asset-allocation-donut") {
+    const title = props.title || "ALL-WEATHER PORTFOLIO";
+    const totalValuation = typeof props.totalValuation === "number" ? props.totalValuation : 250000;
+    const subtitle = props.subtitle || "RAY DALIO ALLOCATION BLUEPRINT";
+
+    const currentTotal = Math.round(totalValuation * introProgress);
+
+    return (
+      <div
+        data-testid="graphic-portfolio-donut"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-sky-500/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="text-center border-b border-neutral-800 pb-2 mb-3">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            PORTFOLIO ARCHITECTURE
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          {/* Radial SVG Donut */}
+          <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              {/* S&P 500 50% */}
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#3b82f6" strokeWidth="14" strokeDasharray="119.4 238.8" strokeDashoffset="0" />
+              {/* REITs 20% */}
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#10b981" strokeWidth="14" strokeDasharray="47.7 238.8" strokeDashoffset="-119.4" />
+              {/* Treasuries 20% */}
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#f59e0b" strokeWidth="14" strokeDasharray="47.7 238.8" strokeDashoffset="-167.1" />
+              {/* Crypto 10% */}
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#8b5cf6" strokeWidth="14" strokeDasharray="23.9 238.8" strokeDashoffset="-214.8" />
+            </svg>
+            <div className="absolute text-center flex flex-col items-center">
+              <span className="text-[8px] font-bold text-neutral-400">TOTAL</span>
+              <span className="text-[11px] font-mono font-black text-white">${(currentTotal / 1000).toFixed(0)}K</span>
+            </div>
+          </div>
+
+          {/* Slices Legend */}
+          <div className="space-y-1.5 flex-1 text-[10px]">
+            <div className="flex items-center justify-between bg-neutral-900/60 px-2 py-1 rounded border border-blue-500/30">
+              <span className="flex items-center gap-1.5 font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <span>S&P 500 Index</span>
+              </span>
+              <span className="font-mono font-black text-blue-400">50%</span>
+            </div>
+            <div className="flex items-center justify-between bg-neutral-900/60 px-2 py-1 rounded border border-emerald-500/30">
+              <span className="flex items-center gap-1.5 font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>REIT Real Estate</span>
+              </span>
+              <span className="font-mono font-black text-emerald-400">20%</span>
+            </div>
+            <div className="flex items-center justify-between bg-neutral-900/60 px-2 py-1 rounded border border-amber-500/30">
+              <span className="flex items-center gap-1.5 font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span>Treasuries / Cash</span>
+              </span>
+              <span className="font-mono font-black text-amber-400">20%</span>
+            </div>
+            <div className="flex items-center justify-between bg-neutral-900/60 px-2 py-1 rounded border border-purple-500/30">
+              <span className="flex items-center gap-1.5 font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-purple-500" />
+                <span>Asymmetric Crypto</span>
+              </span>
+              <span className="font-mono font-black text-purple-400">10%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. INFLATION CASH-BURN & PURCHASING POWER DECAY
+  if (compKey === "inflation-cash-burn" || compKey === "inflation_cash_burn" || compKey === "cash-burn") {
+    const initialCapital = typeof props.initialCapital === "number" ? props.initialCapital : 10000;
+    const terminalValue = typeof props.terminalValue === "number" ? props.terminalValue : 4980;
+    const averageInflation = props.averageInflation || "7.2% / Year";
+    const lossPercentage = props.lossPercentage || "-50.2%";
+
+    const currentValue = Math.round(initialCapital - (initialCapital - terminalValue) * introProgress);
+
+    return (
+      <div
+        data-testid="graphic-inflation-cash-burn"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-rose-500/40 shadow-[0_0_30px_rgba(239,68,68,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-3">
+          <div>
+            <span className="text-[9px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded">
+              ⚠️ PURCHASING POWER EROSION
+            </span>
+            <h4 className="font-black text-xs text-white mt-1">THE SILENT CASH TAX</h4>
+          </div>
+          <div className="text-right">
+            <div className="text-[9px] font-bold text-neutral-400">Real Value Left</div>
+            <div className="text-rose-400 font-mono font-black text-base">
+              ${currentValue.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* 3D Bill Simulation with Burn Gradient */}
+        <div className="relative rounded-xl bg-gradient-to-br from-emerald-950 to-emerald-900 border border-emerald-500/40 p-3 h-24 flex flex-col justify-between overflow-hidden shadow-inner">
+          <div className="flex justify-between items-center text-[10px] font-mono font-bold text-emerald-300">
+            <span>$10,000 CASH</span>
+            <span>FEDERAL RESERVE</span>
+            <span>$10,000 CASH</span>
+          </div>
+
+          <div className="text-center font-black text-xs text-emerald-100 tracking-wider">
+            ZERO-INTEREST SAVINGS ACCOUNT
+          </div>
+
+          <div className="flex justify-between items-center text-[8px] text-emerald-400 font-mono">
+            <span>GUARANTEED DEPRECIATION</span>
+            <span>INFLATION DRAG: {averageInflation}</span>
+          </div>
+
+          {/* Ember Singe / Burn Effect */}
+          <div
+            className="absolute top-0 bottom-0 right-0 bg-gradient-to-l from-black via-rose-950/90 to-transparent border-l-2 border-amber-500 shadow-[inset_0_0_20px_rgba(239,68,68,0.8)] flex items-center justify-center transition-all duration-300"
+            style={{ width: `${Math.min(65, introProgress * 65)}%` }}
+          >
+            {introProgress > 0.4 && (
+              <span className="text-[11px] font-mono font-black text-rose-400 -rotate-6">
+                🔥 {lossPercentage}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Rubber Stamp */}
+        <div className="mt-2.5 text-center">
+          <span className="inline-block border-2 border-rose-600 bg-rose-600/20 text-rose-400 font-mono font-black text-[10px] tracking-widest px-3 py-0.5 rounded -rotate-2 shadow-sm">
+            INFLATION SLAUGHTER
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. FINTECH MOBILE PUSH NOTIFICATION
+  if (compKey === "banking-notification" || compKey === "banking_notification" || compKey === "deposit-alert") {
+    const headline = props.headline || "Direct Deposit Received";
+    const source = props.source || "VOO Quarterly Dividend Payout • Vanguard";
+    const depositAmount = typeof props.depositAmount === "number" ? props.depositAmount : 4250;
+    const newNetWorth = typeof props.newNetWorth === "number" ? props.newNetWorth : 89450;
+    const badge = props.badge || "100% PASSIVE CASHFLOW";
+
+    const currentDeposit = Math.round(depositAmount * introProgress);
+
+    return (
+      <div
+        data-testid="graphic-banking-notification"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.25)] space-y-3"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        {/* iOS Notification Pill */}
+        <div className="bg-slate-900/90 border border-white/10 rounded-xl p-3 shadow-lg space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-[10px] font-black text-black">
+                $
+              </div>
+              <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-wide">
+                FINANCE WALLET
+              </span>
+            </div>
+            <span className="text-[8px] font-mono text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.2 rounded-full font-bold">
+              {badge}
+            </span>
+          </div>
+
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-xs font-black text-white">{headline}</div>
+              <div className="text-[9px] text-neutral-400 truncate max-w-[170px] mt-0.5">{source}</div>
+            </div>
+            <div className="font-mono font-black text-base text-emerald-400 text-shadow-sm">
+              +${currentDeposit.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Total Net Worth Bar */}
+        <div className="flex items-center justify-between bg-neutral-900/60 border border-neutral-800 p-2.5 rounded-xl">
+          <div>
+            <div className="text-[9px] font-bold text-neutral-400 uppercase">Portfolio Net Worth</div>
+            <div className="text-[8px] text-emerald-400">Automated DRIP Reinvest</div>
+          </div>
+          <div className="font-mono font-black text-sm text-amber-300">
+            ${newNetWorth.toLocaleString()}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 6. 50/30/20 BUDGETING WATERFALL
+  if (compKey === "budget-waterfall" || compKey === "budget_waterfall" || compKey === "50-30-20-budget") {
+    const title = props.title || "THE 50 / 30 / 20 WATERFALL";
+    const monthlyIncome = props.monthlyIncome || "$5,000 Net Income";
+
+    return (
+      <div
+        data-testid="graphic-budget-waterfall"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="text-center border-b border-neutral-800 pb-2 mb-3">
+          <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded">
+            CASHFLOW ARCHITECTURE
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+          <span className="text-[10px] font-mono text-emerald-400 font-bold">{monthlyIncome}</span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {/* Jar 1: Needs */}
+          <div className="bg-neutral-900/80 border border-neutral-700/60 rounded-xl p-2 text-center flex flex-col justify-between h-24">
+            <span className="text-[8px] font-mono font-bold text-neutral-400 bg-neutral-800 rounded px-1">
+              50% NEEDS
+            </span>
+            <div className="h-8 bg-neutral-800/80 rounded my-1 relative overflow-hidden">
+              <div className="absolute inset-x-0 bottom-0 bg-slate-500/40 h-1/2 border-t border-slate-400" />
+            </div>
+            <span className="text-[9px] font-mono font-bold text-white">$2,500</span>
+          </div>
+
+          {/* Jar 2: Wants */}
+          <div className="bg-neutral-900/80 border border-rose-500/30 rounded-xl p-2 text-center flex flex-col justify-between h-24">
+            <span className="text-[8px] font-mono font-bold text-rose-400 bg-rose-500/10 rounded px-1">
+              30% WANTS
+            </span>
+            <div className="h-8 bg-neutral-800/80 rounded my-1 relative overflow-hidden">
+              <div className="absolute inset-x-0 bottom-0 bg-rose-500/40 h-1/3 border-t border-rose-400" />
+            </div>
+            <span className="text-[9px] font-mono font-bold text-rose-300">$1,500</span>
+          </div>
+
+          {/* Jar 3: Wealth (Highlighted) */}
+          <div className="bg-emerald-500/10 border-2 border-emerald-400 rounded-xl p-2 text-center flex flex-col justify-between h-24 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
+            <span className="text-[8px] font-mono font-black text-emerald-300 bg-emerald-500/20 rounded px-1">
+              20% WEALTH
+            </span>
+            <div className="h-8 bg-neutral-800/80 rounded my-1 relative overflow-hidden">
+              <div className="absolute inset-x-0 bottom-0 bg-emerald-500/50 h-4/5 border-t-2 border-emerald-300" />
+            </div>
+            <span className="text-[9px] font-mono font-black text-emerald-400">$1,000</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 7. DEBT PAYOFF TRACKER
+  if (compKey === "debt-payoff-tracker" || compKey === "debt_payoff_tracker" || compKey === "debt-avalanche") {
+    const title = props.title || "THE DEBT AVALANCHE ACCELERATOR";
+    const totalDebt = props.totalDebt || "$35,400 TOTAL DEBT";
+    const freedCashflow = props.freedCashflow || "+$650 / MO FREED";
+
+    return (
+      <div
+        data-testid="graphic-debt-payoff-tracker"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-rose-500/40 shadow-[0_0_30px_rgba(239,68,68,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-3">
+          <div>
+            <span className="text-[9px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded">
+              DEBT DESTROYER
+            </span>
+            <h4 className="font-black text-xs text-white mt-1 leading-tight">{title}</h4>
+          </div>
+          <div className="text-right">
+            <div className="text-[9px] font-bold text-neutral-400">Total Debt</div>
+            <div className="font-mono font-black text-xs text-rose-400">{totalDebt}</div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {/* Debt 1: Paid Off */}
+          <div className="relative bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-2.5 flex items-center justify-between overflow-hidden">
+            <div>
+              <div className="text-xs font-black text-white">Credit Card Debt</div>
+              <div className="text-[9px] font-mono text-rose-400 font-bold">26.99% APR</div>
+            </div>
+            <div className="text-right">
+              <span className="inline-block border border-emerald-400 bg-emerald-500/20 text-emerald-300 font-mono font-black text-[9px] px-2 py-0.5 rounded rotate-[-4deg]">
+                PAID IN FULL
+              </span>
+            </div>
+          </div>
+
+          {/* Debt 2: In Queue */}
+          <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-2.5 flex items-center justify-between">
+            <div>
+              <div className="text-xs font-bold text-neutral-300">Personal Loan</div>
+              <div className="text-[9px] font-mono text-neutral-500">14.50% APR</div>
+            </div>
+            <div className="text-right font-mono font-black text-xs text-neutral-200">
+              $9,800
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex items-center justify-between text-[10px] font-mono bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-emerald-300 font-bold">
+          <span>⚡ AVALANCHE UNLOCKED</span>
+          <span>{freedCashflow}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 8. OPPORTUNITY COST ROI BALANCE SCALE
+  if (compKey === "roi-balance-scale" || compKey === "roi_balance_scale" || compKey === "wealth-scale") {
+    const title = props.title || "WEALTH WEIGHING SCALE";
+    const leftName = props.leftName || "New Financed SUV";
+    const rightName = props.rightName || "S&P 500 Index Fund";
+
+    return (
+      <div
+        data-testid="graphic-roi-balance-scale"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="text-center border-b border-neutral-800 pb-2 mb-3">
+          <span className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+            OPPORTUNITY COST ARBITRAGE
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
+          {/* Left Pan: Liability */}
+          <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-2.5 flex flex-col justify-between">
+            <span className="text-[8px] font-mono font-bold text-rose-400">LIABILITY (-$850/MO)</span>
+            <div className="font-black text-xs text-white my-1">{leftName}</div>
+            <span className="text-rose-400 font-mono font-bold">$14,000 (10 Yr)</span>
+          </div>
+
+          {/* Right Pan: Compounding Asset */}
+          <div className="bg-emerald-500/15 border-2 border-emerald-400 rounded-xl p-2.5 flex flex-col justify-between shadow-[0_0_15px_rgba(16,185,129,0.25)]">
+            <span className="text-[8px] font-mono font-black text-emerald-300">ASSET (+$850/MO)</span>
+            <div className="font-black text-xs text-white my-1">{rightName}</div>
+            <span className="text-emerald-400 font-mono font-black text-xs">$184,200</span>
+          </div>
+        </div>
+
+        <div className="mt-2.5 text-center text-[10px] font-mono font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 py-1 rounded-lg">
+          NET ALPHA DELTA: +13.1x WEALTH
+        </div>
+      </div>
+    );
+  }
+
+  // 9. WEALTH FLYWHEEL VS DEBT TRAP
+  if (compKey === "wealth-flywheel" || compKey === "wealth_flywheel" || compKey === "debt-trap-flywheel") {
+    const title = props.title || "EXPONENTIAL WEALTH FLYWHEEL";
+    const mode = props.mode || "wealth";
+    const isWealth = mode === "wealth";
+
+    return (
+      <div
+        data-testid="graphic-wealth-flywheel"
+        className={cn(
+          "relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border",
+          isWealth
+            ? "border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.25)]"
+            : "border-rose-500/40 shadow-[0_0_30px_rgba(239,68,68,0.25)]"
+        )}
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="text-center border-b border-neutral-800 pb-2 mb-3">
+          <span
+            className={cn(
+              "text-[9px] font-mono font-bold px-2 py-0.5 rounded",
+              isWealth
+                ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/30"
+                : "text-rose-400 bg-rose-500/10 border border-rose-500/30"
+            )}
+          >
+            {isWealth ? "VIRTUOUS CAPITAL CYCLE" : "VICIOUS RAT RACE TRAP"}
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+        </div>
+
+        <div className="relative h-24 flex items-center justify-center">
+          <div
+            className={cn(
+              "w-20 h-20 rounded-full border-2 border-dashed flex items-center justify-center animate-spin-slow",
+              isWealth ? "border-emerald-400/60" : "border-rose-400/60"
+            )}
+          >
+            <div
+              className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center text-xs font-black",
+                isWealth ? "bg-emerald-500 text-black shadow-[0_0_12px_#34d399]" : "bg-rose-500 text-white shadow-[0_0_12px_#f87171]"
+              )}
+            >
+              {isWealth ? "⚡" : "⛓️"}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-1 text-[9px] font-mono font-bold text-center text-neutral-300">
+          <div>1. Income ➔ 2. Auto-Invest ➔ 3. S&P 500</div>
+          <div className={isWealth ? "text-emerald-400 font-black" : "text-rose-400 font-black"}>
+            {isWealth ? "➔ 4. Compounding Dividends ➔ 5. Freedom" : "➔ 4. Interest Payments ➔ 5. Exhaustion"}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 10. BATTLE CHART (WARREN BUFFETT VS HEDGE FUNDS)
+  if (compKey === "battle-chart" || compKey === "battle_chart") {
+    const title = props.title || "10-YEAR RESULTS: THE VERDICT";
+    const subtitle = props.subtitle || "BUFFETT $1,000,000 CHALLENGE";
+    const sp500Return = typeof props.sp500Return === "number" ? props.sp500Return : 126;
+    const hedgeReturn = typeof props.hedgeReturn === "number" ? props.hedgeReturn : 36;
+    const deltaLabel = props.deltaLabel || "+90% S&P 500 ADVANTAGE";
+
+    return (
+      <div
+        data-testid="graphic-battle-chart"
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl p-4 sm:p-5 w-[300px] max-w-full text-white font-sans transition-all border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.25)]"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+        }}
+      >
+        <div className="border-b border-neutral-800 pb-2 mb-3 text-center">
+          <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+            {subtitle}
+          </span>
+          <h4 className="font-black text-xs text-white mt-1">{title}</h4>
+        </div>
+
+        <div className="space-y-2.5">
+          {/* S&P 500 */}
+          <div>
+            <div className="flex justify-between text-[10px] font-bold mb-1">
+              <span className="text-emerald-400">S&P 500 Index Fund (Buffett)</span>
+              <span className="font-mono text-emerald-400">+{sp500Return}%</span>
+            </div>
+            <div className="h-4 bg-neutral-900 rounded-full overflow-hidden border border-emerald-500/30">
+              <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full w-[95%]" />
+            </div>
+          </div>
+
+          {/* Hedge Funds */}
+          <div>
+            <div className="flex justify-between text-[10px] font-bold mb-1">
+              <span className="text-neutral-400">Top 5 Hedge Funds (High Fees)</span>
+              <span className="font-mono text-neutral-300">+{hedgeReturn}%</span>
+            </div>
+            <div className="h-4 bg-neutral-900 rounded-full overflow-hidden border border-neutral-700">
+              <div className="h-full bg-neutral-600 rounded-full w-[30%]" />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 text-center bg-emerald-500/15 border border-emerald-500/35 py-1 rounded-lg text-emerald-300 font-mono font-black text-[10px]">
+          {deltaLabel}
+        </div>
+      </div>
+    );
+  }
+
   // DEFAULT FALLBACK: HERO REVEAL / COOKED CARD / STAT CARD
   const headline = props.headline || props.title || graphic.name || "ESSENTIAL INSIGHT";
   const supporting = props.supporting || props.label || "KEY TAKEAWAY";

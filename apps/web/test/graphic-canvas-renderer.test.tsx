@@ -413,6 +413,255 @@ describe("GraphicCanvasRenderer Component", () => {
     expect(screen.getByText("COMMUNITY MEMBERS")).toBeDefined();
     expect(screen.getByText(/k/i)).toBeDefined();
   });
+
+  describe("Finance Niche Motion Graphics WYSIWYG Renderers", () => {
+    it("renders candlestick-hud with ticker, breakout badge, and live price count", () => {
+      const graphic: GraphicElement = {
+        id: "fin-1",
+        name: "Bitcoin Trading HUD",
+        compositionId: "candlestick-hud",
+        props: {
+          symbol: "BTC / USD",
+          timeframe: "4H BREAKOUT",
+          startingPrice: 48000,
+          endingPrice: 65000,
+          percentageGain: "+35.4%",
+          trend: "bullish",
+          headline: "INSTITUTIONAL LIQUIDITY SURGE",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.5} />);
+
+      expect(screen.getByTestId("graphic-candlestick-hud")).toBeDefined();
+      expect(screen.getByText("BTC / USD")).toBeDefined();
+      expect(screen.getByText("4H BREAKOUT")).toBeDefined();
+      expect(screen.getByText("INSTITUTIONAL LIQUIDITY SURGE")).toBeDefined();
+      expect(screen.getByText("BREAKOUT CONFIRMED")).toBeDefined();
+      expect(screen.getByText(/\+35\.4%/)).toBeDefined();
+    });
+
+    it("renders compound-growth-curve with exponential snowball curve and net alpha", () => {
+      const graphic: GraphicElement = {
+        id: "fin-2",
+        name: "Compound Growth Curve",
+        compositionId: "compound-growth-curve",
+        props: {
+          title: "THE EXPONENTIAL SNOWBALL EFFECT",
+          monthlyDeposit: "$500 / Month",
+          annualRate: "10% S&P 500 Historical",
+          terminalCompound: 1130240,
+          terminalCash: 180000,
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.5} />);
+
+      expect(screen.getByTestId("graphic-compound-growth-curve")).toBeDefined();
+      expect(screen.getByText("THE EXPONENTIAL SNOWBALL EFFECT")).toBeDefined();
+      expect(screen.getByText("WEALTH MULTIPLIER")).toBeDefined();
+      expect(screen.getByText("Cash Stash ($500 / Month)")).toBeDefined();
+      expect(screen.getByText("+6.3x Net Alpha")).toBeDefined();
+    });
+
+    it("renders portfolio-donut with asset allocation slices and net worth center", () => {
+      const graphic: GraphicElement = {
+        id: "fin-3",
+        name: "Asset Allocation Donut",
+        compositionId: "portfolio-donut",
+        props: {
+          title: "ALL-WEATHER PORTFOLIO",
+          totalValuation: 250000,
+          subtitle: "RAY DALIO ALLOCATION BLUEPRINT",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.5} />);
+
+      expect(screen.getByTestId("graphic-portfolio-donut")).toBeDefined();
+      expect(screen.getByText("ALL-WEATHER PORTFOLIO")).toBeDefined();
+      expect(screen.getByText("PORTFOLIO ARCHITECTURE")).toBeDefined();
+      expect(screen.getByText("S&P 500 Index")).toBeDefined();
+      expect(screen.getByText("REIT Real Estate")).toBeDefined();
+      expect(screen.getByText("Treasuries / Cash")).toBeDefined();
+      expect(screen.getByText("Asymmetric Crypto")).toBeDefined();
+    });
+
+    it("renders inflation-cash-burn with purchasing power erosion and burn overlay", () => {
+      const graphic: GraphicElement = {
+        id: "fin-4",
+        name: "Inflation Cash Burn",
+        compositionId: "inflation-cash-burn",
+        props: {
+          initialCapital: 10000,
+          terminalValue: 4980,
+          averageInflation: "7.2% / Year",
+          lossPercentage: "-50.2%",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={3.0} />);
+
+      expect(screen.getByTestId("graphic-inflation-cash-burn")).toBeDefined();
+      expect(screen.getByText("THE SILENT CASH TAX")).toBeDefined();
+      expect(screen.getByText("INFLATION SLAUGHTER")).toBeDefined();
+      expect(screen.getByText("ZERO-INTEREST SAVINGS ACCOUNT")).toBeDefined();
+      expect(screen.getByText("INFLATION DRAG: 7.2% / Year")).toBeDefined();
+    });
+
+    it("renders banking-notification with push pill, dividend source, and net worth", () => {
+      const graphic: GraphicElement = {
+        id: "fin-5",
+        name: "Banking Notification",
+        compositionId: "banking-notification",
+        props: {
+          headline: "Direct Deposit Received",
+          source: "VOO Quarterly Dividend Payout • Vanguard",
+          depositAmount: 4250,
+          newNetWorth: 89450,
+          badge: "100% PASSIVE CASHFLOW",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.0} />);
+
+      expect(screen.getByTestId("graphic-banking-notification")).toBeDefined();
+      expect(screen.getByText("FINANCE WALLET")).toBeDefined();
+      expect(screen.getByText("Direct Deposit Received")).toBeDefined();
+      expect(screen.getByText("VOO Quarterly Dividend Payout • Vanguard")).toBeDefined();
+      expect(screen.getByText("100% PASSIVE CASHFLOW")).toBeDefined();
+      expect(screen.getByText("$89,450")).toBeDefined();
+    });
+
+    it("renders budget-waterfall with 50/30/20 jars and monthly income", () => {
+      const graphic: GraphicElement = {
+        id: "fin-6",
+        name: "50/30/20 Budget Waterfall",
+        compositionId: "budget-waterfall",
+        props: {
+          title: "THE 50 / 30 / 20 WATERFALL",
+          monthlyIncome: "$5,000 Net Income",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.0} />);
+
+      expect(screen.getByTestId("graphic-budget-waterfall")).toBeDefined();
+      expect(screen.getByText("THE 50 / 30 / 20 WATERFALL")).toBeDefined();
+      expect(screen.getByText("$5,000 Net Income")).toBeDefined();
+      expect(screen.getByText("50% NEEDS")).toBeDefined();
+      expect(screen.getByText("30% WANTS")).toBeDefined();
+      expect(screen.getByText("20% WEALTH")).toBeDefined();
+      expect(screen.getByText("$2,500")).toBeDefined();
+      expect(screen.getByText("$1,500")).toBeDefined();
+      expect(screen.getByText("$1,000")).toBeDefined();
+    });
+
+    it("renders debt-payoff-tracker with paid in full stamp and freed cashflow", () => {
+      const graphic: GraphicElement = {
+        id: "fin-7",
+        name: "Debt Payoff Avalanche",
+        compositionId: "debt-payoff-tracker",
+        props: {
+          title: "THE DEBT AVALANCHE ACCELERATOR",
+          totalDebt: "$35,400 TOTAL DEBT",
+          freedCashflow: "+$650 / MO FREED",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.0} />);
+
+      expect(screen.getByTestId("graphic-debt-payoff-tracker")).toBeDefined();
+      expect(screen.getByText("THE DEBT AVALANCHE ACCELERATOR")).toBeDefined();
+      expect(screen.getByText("$35,400 TOTAL DEBT")).toBeDefined();
+      expect(screen.getByText("PAID IN FULL")).toBeDefined();
+      expect(screen.getByText("Credit Card Debt")).toBeDefined();
+      expect(screen.getByText("+$650 / MO FREED")).toBeDefined();
+    });
+
+    it("renders roi-balance-scale with liability vs compounding asset delta", () => {
+      const graphic: GraphicElement = {
+        id: "fin-8",
+        name: "Opportunity Cost Scale",
+        compositionId: "roi-balance-scale",
+        props: {
+          title: "WEALTH WEIGHING SCALE",
+          leftName: "New Financed SUV",
+          rightName: "S&P 500 Index Fund",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.0} />);
+
+      expect(screen.getByTestId("graphic-roi-balance-scale")).toBeDefined();
+      expect(screen.getByText("WEALTH WEIGHING SCALE")).toBeDefined();
+      expect(screen.getByText("New Financed SUV")).toBeDefined();
+      expect(screen.getByText("S&P 500 Index Fund")).toBeDefined();
+      expect(screen.getByText("NET ALPHA DELTA: +13.1x WEALTH")).toBeDefined();
+    });
+
+    it("renders wealth-flywheel with virtuous loop", () => {
+      const graphic: GraphicElement = {
+        id: "fin-9",
+        name: "Wealth Flywheel",
+        compositionId: "wealth-flywheel",
+        props: {
+          title: "EXPONENTIAL WEALTH FLYWHEEL",
+          mode: "wealth",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.0} />);
+
+      expect(screen.getByTestId("graphic-wealth-flywheel")).toBeDefined();
+      expect(screen.getByText("EXPONENTIAL WEALTH FLYWHEEL")).toBeDefined();
+      expect(screen.getByText("VIRTUOUS CAPITAL CYCLE")).toBeDefined();
+      expect(screen.getByText("1. Income ➔ 2. Auto-Invest ➔ 3. S&P 500")).toBeDefined();
+      expect(screen.getByText("➔ 4. Compounding Dividends ➔ 5. Freedom")).toBeDefined();
+    });
+
+    it("renders battle-chart with Warren Buffett challenge and delta advantage", () => {
+      const graphic: GraphicElement = {
+        id: "fin-10",
+        name: "Buffett vs Hedge Funds",
+        compositionId: "battle-chart",
+        props: {
+          title: "10-YEAR RESULTS: THE VERDICT",
+          subtitle: "BUFFETT $1,000,000 CHALLENGE",
+          sp500Return: 126,
+          hedgeReturn: 36,
+          deltaLabel: "+90% S&P 500 ADVANTAGE",
+        },
+        start: 0,
+        end: 5,
+      };
+
+      render(<GraphicCanvasRenderer graphic={graphic} playheadTime={2.0} />);
+
+      expect(screen.getByTestId("graphic-battle-chart")).toBeDefined();
+      expect(screen.getByText("10-YEAR RESULTS: THE VERDICT")).toBeDefined();
+      expect(screen.getByText("BUFFETT $1,000,000 CHALLENGE")).toBeDefined();
+      expect(screen.getByText("+90% S&P 500 ADVANTAGE")).toBeDefined();
+    });
+  });
 });
 
 

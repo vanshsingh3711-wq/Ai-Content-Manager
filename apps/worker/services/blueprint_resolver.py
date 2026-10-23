@@ -5,15 +5,24 @@ from services.speech_pruner import merge_cuts
 
 TEMPLATE_VARIETY_CYCLE = [
     "hero_reveal",
+    "candlestick_hud",
     "metric_reveal",
+    "compound_growth_curve",
     "cooked_social_post",
+    "portfolio_donut",
     "stat_card_highlight",
+    "inflation_cash_burn",
     "quote_reveal",
+    "banking_notification",
     "cooked_terminal",
+    "budget_waterfall",
+    "debt_payoff_tracker",
     "cooked_notes",
+    "roi_balance_scale",
+    "wealth_flywheel",
+    "battle_chart",
     "step_sequence",
     "showdown_duel",
-    "battle_chart",
     "compound_formula",
     "wall_street_failure_hook",
 ]
@@ -179,28 +188,83 @@ def coordinate_whole_video_plan(
     if transcript_beats and len(transcript_beats) >= 2:
         sorted_beats = sorted(transcript_beats, key=lambda b: float(b.get("start", 0.0)))
         mg_templates = ["hero_reveal", "metric_reveal", "cooked_social_post", "stat_card_highlight", "quote_reveal"]
+        finance_mg_cycle = [
+            "candlestick_hud",
+            "compound_growth_curve",
+            "portfolio_donut",
+            "inflation_cash_burn",
+            "banking_notification",
+            "budget_waterfall",
+            "debt_payoff_tracker",
+            "roi_balance_scale",
+            "wealth_flywheel",
+            "battle_chart",
+        ]
+        is_finance_topic = any(
+            k in lower for k in ["finance", "money", "crypto", "bitcoin", "invest", "trading", "stock", "wealth", "budget", "portfolio", "roi", "compound"]
+        ) or any(
+            any(k in str(b.get("text", "")).lower() for k in ["bitcoin", "crypto", "stock", "invest", "compound", "portfolio", "inflation", "debt", "budget", "roi", "dividend"])
+            for b in sorted_beats
+        )
+
         for idx, beat in enumerate(sorted_beats):
             b_start = round(float(beat.get("start", 0.0)), 2)
             b_end = round(float(beat.get("end", b_start + 3.5)), 2)
             role = str(beat.get("role", "story")).lower()
             text = str(beat.get("text", "")).strip()
+            text_lower = text.lower()
 
             if b_start >= duration - 2.0:
                 continue
 
-            if role in ("hook", "cta", "solution", "metric", "stat"):
-                comp = mg_templates[idx % len(mg_templates)]
+            if role in ("hook", "cta", "solution", "metric", "stat", "finance"):
                 targets = {}
-                if comp == "hero_reveal":
-                    targets = {"label": "KEY INSIGHT", "headline": text[:40] if text else "Essential Strategy", "supporting": "Accelerating workflow execution"}
-                elif comp == "metric_reveal":
-                    targets = {"label": "METRIC IMPACT", "metric": "+140%", "delta": "Target Exceeded"}
-                elif comp == "cooked_social_post":
-                    targets = {"name": "Industry Leader", "handle": "@creator_insights", "text": text[:60] if text else "Game-changing workflow.", "likes": "18.4K"}
-                elif comp == "stat_card_highlight":
-                    targets = {"label": "PRODUCTIVITY", "stat": "3.5x Faster", "delta": "+250% output"}
+                if is_finance_topic:
+                    if any(k in text_lower for k in ["crypto", "bitcoin", "btc", "trading", "candlestick", "stock"]):
+                        comp = "candlestick_hud"
+                        targets = {"ticker": "BTC/USDT", "price": "$64,250.00", "change": "+8.4%", "volume": "1.42B"}
+                    elif any(k in text_lower for k in ["compound", "snowball", "exponential"]):
+                        comp = "compound_growth_curve"
+                        targets = {"principal": "$10,000", "futureValue": "$174,494", "multiplier": "17.4x", "years": 30}
+                    elif any(k in text_lower for k in ["portfolio", "allocation", "asset"]):
+                        comp = "portfolio_donut"
+                        targets = {"totalValue": "$250,000", "asset1": "Stocks (60%)", "asset2": "Real Estate (20%)"}
+                    elif any(k in text_lower for k in ["inflation", "purchasing power", "burn"]):
+                        comp = "inflation_cash_burn"
+                        targets = {"originalValue": "$100,000", "purchasingPower": "$68,400", "lossAmount": "-$31,600"}
+                    elif any(k in text_lower for k in ["bank", "wire", "deposit", "dividend", "payout"]):
+                        comp = "banking_notification"
+                        targets = {"bankName": "CHASE PRIVATE CLIENT", "amount": "+$24,500.00", "status": "CLEARED"}
+                    elif any(k in text_lower for k in ["budget", "waterfall", "50 30 20", "50/30/20"]):
+                        comp = "budget_waterfall"
+                        targets = {"monthlyIncome": "$10,000", "needs": "$5,000 (50%)", "wants": "$3,000 (30%)", "savings": "$2,000 (20%)"}
+                    elif any(k in text_lower for k in ["debt", "payoff", "avalanche"]):
+                        comp = "debt_payoff_tracker"
+                        targets = {"totalDebt": "$45,000", "paidOff": "$36,000", "remaining": "$9,000", "progress": 80}
+                    elif any(k in text_lower for k in ["roi", "return", "risk"]):
+                        comp = "roi_balance_scale"
+                        targets = {"costSide": "Cost ($5k)", "returnSide": "Return ($50k)", "roiMultiplier": "10x ROI"}
+                    elif any(k in text_lower for k in ["flywheel", "system"]):
+                        comp = "wealth_flywheel"
+                        targets = {"title": "THE WEALTH FLYWHEEL", "stage1": "EARN HIGH INCOME", "stage2": "SAVE 40%+"}
+                    elif any(k in text_lower for k in ["battle", "buffett", "hedge"]):
+                        comp = "battle_chart"
+                        targets = {"contestantA": "S&P 500 INDEX", "contestantB": "TOP 5 HEDGE FUNDS", "sp500Return": "+125.8%", "hedgeReturn": "+36.3%"}
+                    else:
+                        comp = finance_mg_cycle[idx % len(finance_mg_cycle)]
+                        targets = {"title": "FINANCIAL INSIGHT", "note": text[:40] if text else "Strategic Execution"}
                 else:
-                    targets = {"quote": text[:60] if text else "Focus on high-leverage creative work.", "author": "Creative Director"}
+                    comp = mg_templates[idx % len(mg_templates)]
+                    if comp == "hero_reveal":
+                        targets = {"label": "KEY INSIGHT", "headline": text[:40] if text else "Essential Strategy", "supporting": "Accelerating workflow execution"}
+                    elif comp == "metric_reveal":
+                        targets = {"label": "METRIC IMPACT", "metric": "+140%", "delta": "Target Exceeded"}
+                    elif comp == "cooked_social_post":
+                        targets = {"name": "Industry Leader", "handle": "@creator_insights", "text": text[:60] if text else "Game-changing workflow.", "likes": "18.4K"}
+                    elif comp == "stat_card_highlight":
+                        targets = {"label": "PRODUCTIVITY", "stat": "3.5x Faster", "delta": "+250% output"}
+                    else:
+                        targets = {"quote": text[:60] if text else "Focus on high-leverage creative work.", "author": "Creative Director"}
 
                 raw_candidates.append(
                     EditDecision(

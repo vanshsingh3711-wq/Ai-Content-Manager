@@ -960,6 +960,29 @@ export function InspectorPanel() {
         r.id.replace(/^mg-/, "") === graphic.compositionId?.replace(/_/g, "-")
     );
 
+    const compKey = (graphic.compositionId || "").toLowerCase().replace(/_/g, "-");
+    const isFinance = [
+      "candlestick-hud",
+      "trading-hud",
+      "compound-growth-curve",
+      "compound-curve",
+      "portfolio-donut",
+      "asset-allocation-donut",
+      "inflation-cash-burn",
+      "cash-burn",
+      "banking-notification",
+      "deposit-alert",
+      "budget-waterfall",
+      "50-30-20-budget",
+      "debt-payoff-tracker",
+      "debt-avalanche",
+      "roi-balance-scale",
+      "wealth-scale",
+      "wealth-flywheel",
+      "debt-trap-flywheel",
+      "battle-chart",
+    ].some((k) => compKey === k || compKey.startsWith(k));
+
     const gProps = graphic.props || {};
 
     const updateProp = (key: string, value: any) => {
@@ -985,14 +1008,23 @@ export function InspectorPanel() {
       "appName", "fileName", "fileSize", "fileType", "status", "icon", "concept", "emoji",
       "likes", "likesCount", "likeCount", "direction", "cornerRadius", "radius", "lineLength",
       "lineStyle", "tailPosition",
+      // Finance motion graphics keys
+      "symbol", "timeframe", "startingPrice", "endingPrice", "percentageGain", "trend",
+      "monthlyDeposit", "annualRate", "terminalCompound", "terminalCash",
+      "totalValuation", "subtitle", "initialCapital", "terminalValue", "averageInflation", "lossPercentage",
+      "depositAmount", "newNetWorth", "monthlyIncome", "totalDebt", "freedCashflow",
+      "leftName", "rightName", "mode", "sp500Return", "hedgeReturn", "deltaLabel",
     ]);
 
     return (
       <aside className="w-64 border-l border-neutral-900 bg-neutral-950 p-4 flex flex-col select-none text-slate-300">
         <div className="flex items-center justify-between pb-3 border-b border-neutral-900 mb-4">
-          <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+          <h3 className={cn(
+            "text-xs font-bold uppercase tracking-wider flex items-center gap-1.5",
+            isFinance ? "text-emerald-400" : "text-yellow-400"
+          )}>
             <Layers className="w-3.5 h-3.5" />
-            <span>Motion Graphic</span>
+            <span>{isFinance ? "Finance Graphic" : "Motion Graphic"}</span>
           </h3>
           <button
             onClick={() => setSelectedItem(null)}
@@ -1010,18 +1042,29 @@ export function InspectorPanel() {
               type="text"
               value={graphic.name}
               onChange={(e) => updateGraphicElement(graphic.id, { name: e.target.value })}
-              className="w-full bg-slate-900 border border-neutral-800 rounded-lg p-2 text-xs text-white outline-none focus:border-yellow-400"
+              className={cn(
+                "w-full bg-slate-900 border border-neutral-800 rounded-lg p-2 text-xs text-white outline-none",
+                isFinance ? "focus:border-emerald-400" : "focus:border-yellow-400"
+              )}
             />
           </div>
 
           <div>
             <label className="block text-neutral-500 mb-1 font-medium">Template Type</label>
             <div className="p-2 rounded-lg bg-neutral-900/90 border border-neutral-800 flex items-center justify-between">
-              <span className="text-[11px] font-mono text-yellow-400 font-bold truncate">
+              <span className={cn(
+                "text-[11px] font-mono font-bold truncate",
+                isFinance ? "text-emerald-400" : "text-yellow-400"
+              )}>
                 {resourceDef?.name || graphic.compositionId}
               </span>
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 shrink-0">
-                Customizable
+              <span className={cn(
+                "text-[9px] font-mono px-1.5 py-0.2 rounded border shrink-0",
+                isFinance
+                  ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/30"
+                  : "bg-yellow-400/10 text-yellow-400 border-yellow-400/30"
+              )}>
+                {isFinance ? "Finance Pro" : "Customizable"}
               </span>
             </div>
           </div>
@@ -1032,11 +1075,560 @@ export function InspectorPanel() {
           <div className="border-t border-neutral-800/80 pt-3 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-yellow-400" />
+                <Sparkles className={cn("w-3 h-3", isFinance ? "text-emerald-400" : "text-yellow-400")} />
                 Template Content
               </span>
               <span className="text-[9px] text-emerald-400 font-mono">Live On Video</span>
             </div>
+
+            {/* ========================================================= */}
+            {/* FINANCE NICHE MOTION GRAPHICS PACK CONTROLS               */}
+            {/* ========================================================= */}
+
+            {/* 1. Candlestick Trading HUD */}
+            {(compKey === "candlestick-hud" || compKey === "trading-hud" || gProps.startingPrice !== undefined) && (
+              <div className="space-y-3 border border-emerald-500/30 rounded-xl p-3 bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">
+                    Trading HUD Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                    HUD Live
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Ticker Symbol</label>
+                    <input
+                      type="text"
+                      value={gProps.symbol ?? "BTC / USD"}
+                      onChange={(e) => updateProp("symbol", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Timeframe</label>
+                    <input
+                      type="text"
+                      value={gProps.timeframe ?? "4H BREAKOUT"}
+                      onChange={(e) => updateProp("timeframe", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-neutral-300 outline-none focus:border-emerald-400 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Start Price ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.startingPrice ?? 48250}
+                      onChange={(e) => updateProp("startingPrice", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Target Price ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.endingPrice ?? 64180}
+                      onChange={(e) => updateProp("endingPrice", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-400 outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Gain / Return</label>
+                    <input
+                      type="text"
+                      value={gProps.percentageGain ?? "+32.8%"}
+                      onChange={(e) => updateProp("percentageGain", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-300 outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Market Trend</label>
+                    <select
+                      value={gProps.trend ?? "bullish"}
+                      onChange={(e) => updateProp("trend", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 cursor-pointer"
+                    >
+                      <option value="bullish">Bullish (Green)</option>
+                      <option value="bearish">Bearish (Red)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Trading Headline</label>
+                  <input
+                    type="text"
+                    value={gProps.headline ?? "INSTITUTIONAL LIQUIDITY SURGE"}
+                    onChange={(e) => updateProp("headline", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 2. Compound Growth Curve */}
+            {(compKey === "compound-growth-curve" || compKey === "compound-curve" || gProps.terminalCompound !== undefined) && (
+              <div className="space-y-3 border border-emerald-500/30 rounded-xl p-3 bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">
+                    Snowball Multiplier Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                    Compounding
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Headline</label>
+                  <input
+                    type="text"
+                    value={gProps.title ?? "THE EXPONENTIAL SNOWBALL EFFECT"}
+                    onChange={(e) => updateProp("title", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-bold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Monthly Deposit</label>
+                    <input
+                      type="text"
+                      value={gProps.monthlyDeposit ?? "$500 / Month"}
+                      onChange={(e) => updateProp("monthlyDeposit", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Annual Rate</label>
+                    <input
+                      type="text"
+                      value={gProps.annualRate ?? "10% S&P 500 Historical"}
+                      onChange={(e) => updateProp("annualRate", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-neutral-300 outline-none focus:border-emerald-400 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Terminal Wealth ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.terminalCompound ?? 1130240}
+                      onChange={(e) => updateProp("terminalCompound", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-400 outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Cash Baseline ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.terminalCash ?? 180000}
+                      onChange={(e) => updateProp("terminalCash", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-neutral-300 outline-none focus:border-emerald-400 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Portfolio Donut */}
+            {(compKey === "portfolio-donut" || compKey === "asset-allocation-donut" || gProps.totalValuation !== undefined) && (
+              <div className="space-y-3 border border-sky-500/30 rounded-xl p-3 bg-sky-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider font-mono">
+                    Portfolio Allocation Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-sky-400 bg-sky-500/20 px-1.5 py-0.5 rounded">
+                    Dalio Wheel
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Portfolio Title</label>
+                  <input
+                    type="text"
+                    value={gProps.title ?? "ALL-WEATHER PORTFOLIO"}
+                    onChange={(e) => updateProp("title", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-sky-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Architecture Subtitle</label>
+                  <input
+                    type="text"
+                    value={gProps.subtitle ?? "RAY DALIO ALLOCATION BLUEPRINT"}
+                    onChange={(e) => updateProp("subtitle", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-neutral-300 outline-none focus:border-sky-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Total Valuation ($)</label>
+                  <input
+                    type="number"
+                    value={gProps.totalValuation ?? 250000}
+                    onChange={(e) => updateProp("totalValuation", Number(e.target.value))}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-sky-300 outline-none focus:border-sky-400 font-mono font-bold"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 4. Inflation Cash Burn */}
+            {(compKey === "inflation-cash-burn" || compKey === "cash-burn" || gProps.initialCapital !== undefined) && (
+              <div className="space-y-3 border border-rose-500/30 rounded-xl p-3 bg-rose-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider font-mono">
+                    Cash-Burn Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-rose-400 bg-rose-500/20 px-1.5 py-0.5 rounded">
+                    Decay
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Initial Capital ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.initialCapital ?? 10000}
+                      onChange={(e) => updateProp("initialCapital", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-rose-400 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Real Value Left ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.terminalValue ?? 4980}
+                      onChange={(e) => updateProp("terminalValue", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-rose-400 outline-none focus:border-rose-400 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Average Inflation</label>
+                    <input
+                      type="text"
+                      value={gProps.averageInflation ?? "7.2% / Year"}
+                      onChange={(e) => updateProp("averageInflation", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-rose-400 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Loss Percentage</label>
+                    <input
+                      type="text"
+                      value={gProps.lossPercentage ?? "-50.2%"}
+                      onChange={(e) => updateProp("lossPercentage", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-rose-300 outline-none focus:border-rose-400 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 5. Banking Push Notification */}
+            {(compKey === "banking-notification" || compKey === "deposit-alert" || gProps.depositAmount !== undefined) && (
+              <div className="space-y-3 border border-emerald-500/30 rounded-xl p-3 bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">
+                    Deposit Alert Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                    Fintech Push
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Push Headline</label>
+                  <input
+                    type="text"
+                    value={gProps.headline ?? "Direct Deposit Received"}
+                    onChange={(e) => updateProp("headline", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Deposit Source</label>
+                  <input
+                    type="text"
+                    value={gProps.source ?? "VOO Quarterly Dividend Payout • Vanguard"}
+                    onChange={(e) => updateProp("source", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-neutral-300 outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Deposit Amount ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.depositAmount ?? 4250}
+                      onChange={(e) => updateProp("depositAmount", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-400 outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Net Worth ($)</label>
+                    <input
+                      type="number"
+                      value={gProps.newNetWorth ?? 89450}
+                      onChange={(e) => updateProp("newNetWorth", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-amber-300 outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Alert Badge</label>
+                  <input
+                    type="text"
+                    value={gProps.badge ?? "100% PASSIVE CASHFLOW"}
+                    onChange={(e) => updateProp("badge", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-300 outline-none focus:border-emerald-400 font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 6. Budget Waterfall */}
+            {(compKey === "budget-waterfall" || compKey === "50-30-20-budget" || gProps.monthlyIncome !== undefined) && (
+              <div className="space-y-3 border border-emerald-500/30 rounded-xl p-3 bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">
+                    50/30/20 Budget Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                    Waterfall
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={gProps.title ?? "THE 50 / 30 / 20 WATERFALL"}
+                    onChange={(e) => updateProp("title", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Monthly Net Income</label>
+                  <input
+                    type="text"
+                    value={gProps.monthlyIncome ?? "$5,000 Net Income"}
+                    onChange={(e) => updateProp("monthlyIncome", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-400 outline-none focus:border-emerald-400 font-mono font-bold"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 7. Debt Payoff Tracker */}
+            {(compKey === "debt-payoff-tracker" || compKey === "debt-avalanche" || gProps.totalDebt !== undefined) && (
+              <div className="space-y-3 border border-rose-500/30 rounded-xl p-3 bg-rose-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider font-mono">
+                    Debt Avalanche Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-rose-400 bg-rose-500/20 px-1.5 py-0.5 rounded">
+                    Debt Buster
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Strategy Title</label>
+                  <input
+                    type="text"
+                    value={gProps.title ?? "THE DEBT AVALANCHE ACCELERATOR"}
+                    onChange={(e) => updateProp("title", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-rose-400 font-bold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Total Debt</label>
+                    <input
+                      type="text"
+                      value={gProps.totalDebt ?? "$35,400 TOTAL DEBT"}
+                      onChange={(e) => updateProp("totalDebt", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-rose-400 outline-none focus:border-rose-400 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Freed Cashflow</label>
+                    <input
+                      type="text"
+                      value={gProps.freedCashflow ?? "+$650 / MO FREED"}
+                      onChange={(e) => updateProp("freedCashflow", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-300 outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 8. Opportunity Cost ROI Balance Scale */}
+            {(compKey === "roi-balance-scale" || compKey === "wealth-scale" || gProps.leftName !== undefined || gProps.rightName !== undefined) && (
+              <div className="space-y-3 border border-amber-500/30 rounded-xl p-3 bg-amber-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider font-mono">
+                    ROI Balance Scale Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded">
+                    Arbitrage
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Comparison Title</label>
+                  <input
+                    type="text"
+                    value={gProps.title ?? "WEALTH WEIGHING SCALE"}
+                    onChange={(e) => updateProp("title", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-amber-400 font-bold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Liability (Left)</label>
+                    <input
+                      type="text"
+                      value={gProps.leftName ?? "New Financed SUV"}
+                      onChange={(e) => updateProp("leftName", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-rose-300 outline-none focus:border-rose-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Compounding Asset (Right)</label>
+                    <input
+                      type="text"
+                      value={gProps.rightName ?? "S&P 500 Index Fund"}
+                      onChange={(e) => updateProp("rightName", e.target.value)}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-300 outline-none focus:border-emerald-400 font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 9. Wealth Flywheel */}
+            {(compKey === "wealth-flywheel" || compKey === "debt-trap-flywheel" || gProps.mode !== undefined) && (
+              <div className="space-y-3 border border-emerald-500/30 rounded-xl p-3 bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">
+                    Flywheel Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                    Orbital
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Diagram Title</label>
+                  <input
+                    type="text"
+                    value={gProps.title ?? "EXPONENTIAL WEALTH FLYWHEEL"}
+                    onChange={(e) => updateProp("title", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Flywheel Cycle Mode</label>
+                  <select
+                    value={gProps.mode ?? "wealth"}
+                    onChange={(e) => updateProp("mode", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 cursor-pointer"
+                  >
+                    <option value="wealth">Virtuous Wealth Cycle (Green)</option>
+                    <option value="trap">Vicious Debt Trap (Red)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* 10. Battle Chart (Buffett vs Hedge Funds) */}
+            {(compKey === "battle-chart" || gProps.sp500Return !== undefined || gProps.hedgeReturn !== undefined) && (
+              <div className="space-y-3 border border-emerald-500/30 rounded-xl p-3 bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">
+                    Battle Chart Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                    Head to Head
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Verdict Title</label>
+                  <input
+                    type="text"
+                    value={gProps.title ?? "10-YEAR RESULTS: THE VERDICT"}
+                    onChange={(e) => updateProp("title", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-white outline-none focus:border-emerald-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Challenge Subtitle</label>
+                  <input
+                    type="text"
+                    value={gProps.subtitle ?? "BUFFETT $1,000,000 CHALLENGE"}
+                    onChange={(e) => updateProp("subtitle", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-neutral-300 outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">S&P 500 Return (%)</label>
+                    <input
+                      type="number"
+                      value={gProps.sp500Return ?? 126}
+                      onChange={(e) => updateProp("sp500Return", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-400 outline-none focus:border-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-400 text-[10px] mb-1">Hedge Funds (%)</label>
+                    <input
+                      type="number"
+                      value={gProps.hedgeReturn ?? 36}
+                      onChange={(e) => updateProp("hedgeReturn", Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-rose-400 outline-none focus:border-rose-400 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-400 text-[10px] mb-1">Advantage Delta Label</label>
+                  <input
+                    type="text"
+                    value={gProps.deltaLabel ?? "+90% S&P 500 ADVANTAGE"}
+                    onChange={(e) => updateProp("deltaLabel", e.target.value)}
+                    className="w-full bg-slate-900 border border-neutral-800 rounded p-1.5 text-xs text-emerald-300 outline-none focus:border-emerald-400 font-mono font-bold"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* 1. Primary Text / Name / Channel / Author */}
             {gProps.channelName !== undefined && (
@@ -1076,7 +1668,7 @@ export function InspectorPanel() {
             )}
 
             {/* 2. Headline / Title */}
-            {gProps.headline !== undefined && (
+            {!isFinance && gProps.headline !== undefined && (
               <div>
                 <label className="block text-neutral-500 mb-1 font-medium">Main Headline</label>
                 <input
@@ -1088,7 +1680,7 @@ export function InspectorPanel() {
               </div>
             )}
 
-            {gProps.title !== undefined && gProps.step1 === undefined && gProps.appName === undefined && (
+            {!isFinance && gProps.title !== undefined && gProps.step1 === undefined && gProps.appName === undefined && (
               <div>
                 <label className="block text-neutral-500 mb-1 font-medium">Title / Subtitle</label>
                 <input
@@ -1101,7 +1693,7 @@ export function InspectorPanel() {
             )}
 
             {/* Surge Badge / Header Tag */}
-            {(gProps.badgeText !== undefined || gProps.badge !== undefined || graphic.compositionId === "chart-reveal" || graphic.compositionId === "rising-graph") && (
+            {(gProps.badgeText !== undefined || (!isFinance && gProps.badge !== undefined) || graphic.compositionId === "chart-reveal" || graphic.compositionId === "rising-graph") && (
               <div>
                 <label className="block text-neutral-500 mb-1 font-medium">Surge Badge Text</label>
                 <input

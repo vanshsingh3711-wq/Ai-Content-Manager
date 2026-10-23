@@ -164,6 +164,363 @@ export function extractTimeRangeFromPrompt(
   return { cleanedPrompt: prompt };
 }
 
+export interface GraphicConfig {
+  triggers: string[];
+  compositionId: string;
+  name: string;
+  props: Record<string, any>;
+}
+
+export const GRAPHIC_CONFIGS: GraphicConfig[] = [
+  {
+    triggers: [
+      "rising graph",
+      "rising graphs",
+      "rising chart",
+      "growth chart",
+      "trend graph",
+      "bar chart",
+      "line chart",
+      "graph animation",
+      "graphs animation",
+      "chart animation",
+      "graph",
+      "graphs",
+      "chart",
+      "charts",
+    ],
+    compositionId: "chart-reveal",
+    name: "RISING GRAPH",
+    props: {
+      title: "GROWTH TREND",
+      dataPoint1: "Stage 1: Baseline",
+      dataPoint2: "Stage 2: +85%",
+      dataPoint3: "Stage 3: +165% Surge",
+      personality: "technical",
+    },
+  },
+  {
+    triggers: ["animated counter", "counter", "ticker", "growth counter", "subscriber counter", "subscribers counter", "subscriber count"],
+    compositionId: "animated_counter",
+    name: "COUNTER",
+    props: { from: 0, to: 50000, label: "SUBSCRIBERS", prefix: "", suffix: "" },
+  },
+  {
+    triggers: ["animated kpi", "metric reveal", "kpi", "metric", "revenue", "subscribers"],
+    compositionId: "animated_kpi",
+    name: "KPI METRIC",
+    props: { title: "MRR Growth", value: "$48,500", change: "+32%" },
+  },
+  {
+    triggers: ["animated arrow", "arrow", "pointer", "callout"],
+    compositionId: "animated_arrow",
+    name: "ARROW",
+    props: { label: "Look Here" },
+  },
+  {
+    triggers: ["terminal", "code", "cli", "command prompt"],
+    compositionId: "cooked-terminal",
+    name: "TERMINAL",
+    props: { command: "npm run deploy", output: "Server running: 100% production ready" },
+  },
+  {
+    triggers: ["social post", "tweet", "x.com post"],
+    compositionId: "cooked-social-post",
+    name: "SOCIAL POST",
+    props: { name: "Creator Pro", handle: "@creator_pro", text: "Scaling to the next level 🚀", likes: "18.4K" },
+  },
+  {
+    triggers: ["lower third", "lower-third", "speaker badge", "speaker name", "speaker title", "interview badge", "host tag", "name tag"],
+    compositionId: "lower-third",
+    name: "LOWER THIRD",
+    props: { name: "Alex Rivera", title: "Lead Product Architect", handle: "@alexrivera", accentColor: "#38bdf8" },
+  },
+  {
+    triggers: ["subscribe badge", "subscribe button", "subscribe callout", "sub button", "bell callout", "subscribe and bell", "subscribe"],
+    compositionId: "subscribe-badge",
+    name: "SUBSCRIBE CALLOUT",
+    props: { channelName: "Creator Studio", subCount: "1.25M", buttonText: "SUBSCRIBE", buttonColor: "#dc2626", showBell: true },
+  },
+  {
+    triggers: ["before after", "before and after", "comparison card", "versus card", "before vs after", "split comparison"],
+    compositionId: "before-after",
+    name: "BEFORE & AFTER",
+    props: { beforeLabel: "BEFORE", beforeText: "6 hrs manual editing", afterLabel: "AFTER", afterText: "60s AI automation", accentColor: "#10b981" },
+  },
+  {
+    triggers: ["countdown timer", "countdown", "timer widget", "timer", "seconds remaining", "clock timer"],
+    compositionId: "countdown-timer",
+    name: "COUNTDOWN TIMER",
+    props: { seconds: 5, label: "TIME REMAINING", accentColor: "#f59e0b" },
+  },
+  {
+    triggers: ["review card", "review", "testimonial", "5 star review", "stars card", "rating card"],
+    compositionId: "review-card",
+    name: "REVIEW CARD",
+    props: { author: "Sarah Jenkins", role: "Verified Creator", rating: 5, review: "Saved our team 20+ hours a week. Absolute game changer!", accentColor: "#fbbf24" },
+  },
+  {
+    triggers: ["social handles", "social badge", "follow badge", "instagram handle", "youtube handle", "tiktok handle", "twitter handle"],
+    compositionId: "social-handles",
+    name: "SOCIAL HANDLES",
+    props: { platform: "youtube", handle: "@contentmaster", actionText: "Follow for daily tips", accentColor: "#a855f7" },
+  },
+  {
+    triggers: ["animated title", "title saying", "animated headline", "hero reveal", "title card", "stat card", "card", "headline"],
+    compositionId: "hero_reveal",
+    name: "HERO REVEAL",
+    props: { headline: "The Solution", label: "KEY TAKEAWAY", colorTheme: "blue" },
+  },
+  {
+    triggers: ["quote reveal", "quote", "famous quote", "inspirational quote", "wisdom"],
+    compositionId: "quote-reveal",
+    name: "QUOTE",
+    props: { quote: "Consistency is what transforms average into excellence.", author: "Key Takeaway", personality: "premium" },
+  },
+  {
+    triggers: ["progress bar", "progress", "loading bar"],
+    compositionId: "cooked-progress",
+    name: "PROGRESS",
+    props: { label: "Completion Rate", progress: 85 },
+  },
+  {
+    triggers: ["notes", "checklist", "bullet list", "bullet points"],
+    compositionId: "cooked-notes",
+    name: "NOTES",
+    props: { title: "Action Items", items: ["Point 1: Focus", "Point 2: Execute", "Point 3: Scale"] },
+  },
+  {
+    triggers: ["toast", "notification", "alert popup", "alert"],
+    compositionId: "cooked-toasts",
+    name: "NOTIFICATION",
+    props: { title: "Alert", message: "Key milestone reached!" },
+  },
+
+  // Pack Finance: 10 High-Production Finance Motion Graphics
+  {
+    triggers: [
+      "candlestick hud",
+      "candlestick chart",
+      "candlestick trading hud",
+      "trading hud",
+      "trading chart",
+      "crypto chart",
+      "bitcoin chart",
+      "crypto ticker",
+      "stock chart",
+      "stock trading hud",
+      "trading station",
+      "candlestick",
+    ],
+    compositionId: "candlestick-hud",
+    name: "CANDLESTICK HUD",
+    props: {
+      ticker: "BTC/USDT",
+      price: "$64,250.00",
+      change: "+8.4%",
+      smaPeriod: 20,
+      volume: "1.42B",
+      timeFrame: "4H",
+    },
+  },
+  {
+    triggers: [
+      "compound growth curve",
+      "compound curve",
+      "compound growth",
+      "snowball curve",
+      "compound interest curve",
+      "exponential growth curve",
+      "wealth curve",
+      "compound interest",
+      "snowball effect",
+    ],
+    compositionId: "compound-growth-curve",
+    name: "COMPOUND GROWTH",
+    props: {
+      principal: "$10,000",
+      rate: "10% Annual",
+      years: 30,
+      futureValue: "$174,494",
+      multiplier: "17.4x",
+      title: "THE SNOWBALL EFFECT",
+    },
+  },
+  {
+    triggers: [
+      "portfolio donut",
+      "asset allocation",
+      "portfolio allocation",
+      "portfolio breakdown",
+      "investment portfolio",
+      "portfolio pie chart",
+      "asset allocation chart",
+      "portfolio split",
+    ],
+    compositionId: "portfolio-donut",
+    name: "PORTFOLIO DONUT",
+    props: {
+      totalValue: "$250,000",
+      asset1: "Stocks (60%)",
+      asset2: "Real Estate (20%)",
+      asset3: "Crypto (10%)",
+      asset4: "Cash (10%)",
+      title: "ASSET ALLOCATION",
+    },
+  },
+  {
+    triggers: [
+      "inflation cash burn",
+      "cash burn",
+      "inflation burn",
+      "purchasing power",
+      "dollar burn",
+      "cash fire",
+      "inflation meter",
+      "inflation",
+    ],
+    compositionId: "inflation-cash-burn",
+    name: "INFLATION CASH BURN",
+    props: {
+      originalValue: "$100,000",
+      purchasingPower: "$68,400",
+      inflationRate: "3.8%",
+      years: 10,
+      title: "INFLATION SILENT KILLER",
+      lossAmount: "-$31,600",
+    },
+  },
+  {
+    triggers: [
+      "banking notification",
+      "bank notification",
+      "wire transfer notification",
+      "deposit notification",
+      "dividend notification",
+      "payout notification",
+      "stripe notification",
+      "wire transfer toast",
+      "bank toast",
+      "deposit alert",
+    ],
+    compositionId: "banking-notification",
+    name: "BANKING NOTIFICATION",
+    props: {
+      bankName: "CHASE PRIVATE CLIENT",
+      amount: "+$24,500.00",
+      sender: "WIRE DEPOSIT / ACME CORP",
+      timeAgo: "JUST NOW",
+      status: "CLEARED",
+    },
+  },
+  {
+    triggers: [
+      "budget waterfall",
+      "50 30 20 budget",
+      "50/30/20 budget",
+      "budget breakdown",
+      "waterfall budget",
+      "income waterfall",
+      "salary breakdown",
+      "income breakdown",
+      "50 30 20",
+    ],
+    compositionId: "budget-waterfall",
+    name: "BUDGET WATERFALL",
+    props: {
+      monthlyIncome: "$10,000",
+      needs: "$5,000 (50%)",
+      wants: "$3,000 (30%)",
+      savings: "$2,000 (20%)",
+      title: "50/30/20 BUDGET RULE",
+    },
+  },
+  {
+    triggers: [
+      "debt payoff tracker",
+      "debt tracker",
+      "debt payoff",
+      "debt snowball tracker",
+      "debt snowball",
+      "debt avalanche",
+      "debt meter",
+      "payoff tracker",
+    ],
+    compositionId: "debt-payoff-tracker",
+    name: "DEBT PAYOFF TRACKER",
+    props: {
+      totalDebt: "$45,000",
+      paidOff: "$36,000",
+      remaining: "$9,000",
+      progress: 80,
+      title: "DEBT SNOWBALL METHOD",
+      stamp: "PAID OFF",
+    },
+  },
+  {
+    triggers: [
+      "roi balance scale",
+      "balance scale",
+      "roi scale",
+      "cost vs return",
+      "investment scale",
+      "risk vs reward scale",
+      "roi comparison",
+      "risk reward",
+    ],
+    compositionId: "roi-balance-scale",
+    name: "ROI BALANCE SCALE",
+    props: {
+      costSide: "Cost ($5k)",
+      returnSide: "Return ($50k)",
+      roiMultiplier: "10x ROI",
+      tiltDegree: 18,
+      title: "ASYMMETRIC RISK/REWARD",
+    },
+  },
+  {
+    triggers: [
+      "wealth flywheel",
+      "compounding flywheel",
+      "cash flywheel",
+      "flywheel",
+      "financial flywheel",
+      "wealth cycle",
+    ],
+    compositionId: "wealth-flywheel",
+    name: "WEALTH FLYWHEEL",
+    props: {
+      stage1: "EARN HIGH INCOME",
+      stage2: "SAVE 40%+",
+      stage3: "BUY ASSETS",
+      stage4: "COMPOUND RETURNS",
+      title: "THE WEALTH FLYWHEEL",
+      speed: "dynamic",
+    },
+  },
+  {
+    triggers: [
+      "battle chart",
+      "warren buffett challenge",
+      "sp500 vs hedge fund",
+      "hedge fund challenge",
+      "asset battle",
+      "index fund vs hedge fund",
+      "buffett bet",
+    ],
+    compositionId: "battle-chart",
+    name: "BUFFETT BATTLE CHART",
+    props: {
+      contestantA: "S&P 500 INDEX",
+      contestantB: "TOP 5 HEDGE FUNDS",
+      sp500Return: "+125.8%",
+      hedgeReturn: "+36.3%",
+      delta: "+89.5% WIN",
+      durationYears: "10-YEAR CHALLENGE",
+    },
+  },
+];
+
 /**
  * Parses a natural language user prompt against deterministic local command patterns.
  */
@@ -224,10 +581,17 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
   // "Add badge when I say 'Hello World'"
   // "Add graphic when I say Subscribe"
   // "Add title Welcome when I say Welcome"
-  const phraseSyncRegex = /add (?:a )?(badge|graphic|card|title|caption)(?: saying| that says| with text)?(?:\s+["']?([^"']+)["']?)?\s+when i say\s+["']?([^"']+)["']?$/i;
+  // 0.1. SPOKEN PHRASE TRANSCRIPT SYNCHRONIZATION ("when I say ...")
+  // Patterns:
+  // "Add a badge when I say Welcome"
+  // "Add badge when I say 'Hello World'"
+  // "Add graphic when I say Subscribe"
+  // "Add title Welcome when I say Welcome"
+  // "Add candlestick hud when I say Bitcoin"
+  const phraseSyncRegex = /add (?:a )?(badge|graphic|card|title|caption|[a-z0-9\s-]+?)(?: saying| that says| with text)?(?:\s+["']?([^"']+)["']?)?\s+when i say\s+["']?([^"']+)["']?$/i;
   const phraseSyncMatch = prompt.match(phraseSyncRegex);
   if (phraseSyncMatch) {
-    const elementType = phraseSyncMatch[1].toLowerCase();
+    const elementType = phraseSyncMatch[1].toLowerCase().trim();
     const explicitText = phraseSyncMatch[2]?.replace(/["']/g, "").trim();
     const targetSpokenPhrase = phraseSyncMatch[3].replace(/["']/g, "").trim().replace(/[.!?]+$/, "");
 
@@ -277,18 +641,28 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
           description: `Add caption "${displayText}" synchronized to phrase "${targetSpokenPhrase}" at ${onsetTime.toFixed(2)}s`,
         };
       } else {
-        // badge, graphic, card
+        // badge, graphic, card, or specific motion graphic template
+        const matchedConfig = GRAPHIC_CONFIGS.find(
+          (c) =>
+            c.compositionId === elementType ||
+            elementType.includes(c.compositionId) ||
+            c.triggers.some((t) => elementType === t || elementType.includes(t))
+        );
+
+        const compositionId = matchedConfig ? matchedConfig.compositionId : "pop_up_badge";
+        const props = matchedConfig
+          ? { ...matchedConfig.props }
+          : { text: displayText.toUpperCase(), variant: "success" };
+        const name = matchedConfig ? matchedConfig.name : displayText.toUpperCase();
+
         const operation: EditOperation = {
           type: "add_element",
           track: "graphic",
           element: {
             id: `graphic-${Date.now()}`,
-            name: displayText.toUpperCase(),
-            compositionId: "pop_up_badge",
-            props: {
-              text: displayText.toUpperCase(),
-              variant: "success",
-            },
+            name,
+            compositionId,
+            props,
             start: onsetTime,
             end: end <= onsetTime ? onsetTime + duration : end,
             position: placement.position,
@@ -313,10 +687,11 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
   // "Add a badge at the hook"
   // "Add card at the cta"
   // "Add graphic at the intro"
-  const beatAnchorRegex = /add (?:a )?(badge|graphic|card|title|caption)(?:\s+["']?([^"']+)["']?)?\s+at (?:the )?(hook|intro|cta|call to action|problem|solution|statistic|conclusion)$/i;
+  // "Add candlestick hud at the hook"
+  const beatAnchorRegex = /add (?:a )?(badge|graphic|card|title|caption|[a-z0-9\s-]+?)(?:\s+["']?([^"']+)["']?)?\s+at (?:the )?(hook|intro|cta|call to action|problem|solution|statistic|conclusion|finance|trading|crypto)$/i;
   const beatMatch = prompt.match(beatAnchorRegex);
   if (beatMatch) {
-    const elementType = beatMatch[1].toLowerCase();
+    const elementType = beatMatch[1].toLowerCase().trim();
     const explicitText = beatMatch[2]?.replace(/["']/g, "").trim();
     const beatRole = beatMatch[3].toLowerCase().trim();
 
@@ -341,17 +716,27 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
 
     const displayText = explicitText || beatRole.toUpperCase();
 
+    const matchedConfig = GRAPHIC_CONFIGS.find(
+      (c) =>
+        c.compositionId === elementType ||
+        elementType.includes(c.compositionId) ||
+        c.triggers.some((t) => elementType === t || elementType.includes(t))
+    );
+
+    const compositionId = matchedConfig ? matchedConfig.compositionId : "pop_up_badge";
+    const props = matchedConfig
+      ? { ...matchedConfig.props }
+      : { text: displayText, variant: "warning" };
+    const name = matchedConfig ? matchedConfig.name : displayText;
+
     const operation: EditOperation = {
       type: "add_element",
       track: "graphic",
       element: {
         id: `graphic-${Date.now()}`,
-        name: displayText,
-        compositionId: "pop_up_badge",
-        props: {
-          text: displayText,
-          variant: "warning",
-        },
+        name,
+        compositionId,
+        props,
         start: onsetTime,
         end: end <= onsetTime ? onsetTime + 3.0 : end,
         position: placement.position,
@@ -655,261 +1040,196 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
   // 7. ADD MOTION GRAPHIC ELEMENT
   // Patterns:
   // "add motion graphics for a rising graphs animation", "add rising graph", "add chart",
-  // "add counter", "add animated counter", "add kpi", "add arrow", "add stat card", "add terminal", etc.
-  const graphicConfigs: Array<{
-    triggers: string[];
-    compositionId: string;
-    name: string;
-    props: Record<string, any>;
-  }> = [
-    {
-      triggers: [
-        "rising graph",
-        "rising graphs",
-        "rising chart",
-        "growth chart",
-        "trend graph",
-        "bar chart",
-        "line chart",
-        "graph animation",
-        "graphs animation",
-        "chart animation",
-        "graph",
-        "graphs",
-        "chart",
-        "charts",
-      ],
-      compositionId: "chart-reveal",
-      name: "RISING GRAPH",
-      props: {
-        title: "GROWTH TREND",
-        dataPoint1: "Stage 1: Baseline",
-        dataPoint2: "Stage 2: +85%",
-        dataPoint3: "Stage 3: +165% Surge",
-        personality: "technical",
-      },
-    },
-    {
-      triggers: ["animated counter", "counter", "ticker", "growth counter", "subscriber counter", "subscribers counter", "subscriber count"],
-      compositionId: "animated_counter",
-      name: "COUNTER",
-      props: { from: 0, to: 50000, label: "SUBSCRIBERS", prefix: "", suffix: "" },
-    },
-    {
-      triggers: ["animated kpi", "metric reveal", "kpi", "metric", "revenue", "subscribers"],
-      compositionId: "animated_kpi",
-      name: "KPI METRIC",
-      props: { title: "MRR Growth", value: "$48,500", change: "+32%" },
-    },
-    {
-      triggers: ["animated arrow", "arrow", "pointer", "callout"],
-      compositionId: "animated_arrow",
-      name: "ARROW",
-      props: { label: "Look Here" },
-    },
-    {
-      triggers: ["terminal", "code", "cli", "command prompt"],
-      compositionId: "cooked-terminal",
-      name: "TERMINAL",
-      props: { command: "npm run deploy", output: "Server running: 100% production ready" },
-    },
-    {
-      triggers: ["social post", "tweet", "x.com post"],
-      compositionId: "cooked-social-post",
-      name: "SOCIAL POST",
-      props: { name: "Creator Pro", handle: "@creator_pro", text: "Scaling to the next level 🚀", likes: "18.4K" },
-    },
-    {
-      triggers: ["lower third", "lower-third", "speaker badge", "speaker name", "speaker title", "interview badge", "host tag", "name tag"],
-      compositionId: "lower-third",
-      name: "LOWER THIRD",
-      props: { name: "Alex Rivera", title: "Lead Product Architect", handle: "@alexrivera", accentColor: "#38bdf8" },
-    },
-    {
-      triggers: ["subscribe badge", "subscribe button", "subscribe callout", "sub button", "bell callout", "subscribe and bell", "subscribe"],
-      compositionId: "subscribe-badge",
-      name: "SUBSCRIBE CALLOUT",
-      props: { channelName: "Creator Studio", subCount: "1.25M", buttonText: "SUBSCRIBE", buttonColor: "#dc2626", showBell: true },
-    },
-    {
-      triggers: ["before after", "before and after", "comparison card", "versus card", "before vs after", "split comparison"],
-      compositionId: "before-after",
-      name: "BEFORE & AFTER",
-      props: { beforeLabel: "BEFORE", beforeText: "6 hrs manual editing", afterLabel: "AFTER", afterText: "60s AI automation", accentColor: "#10b981" },
-    },
-    {
-      triggers: ["countdown timer", "countdown", "timer widget", "timer", "seconds remaining", "clock timer"],
-      compositionId: "countdown-timer",
-      name: "COUNTDOWN TIMER",
-      props: { seconds: 5, label: "TIME REMAINING", accentColor: "#f59e0b" },
-    },
-    {
-      triggers: ["review card", "review", "testimonial", "5 star review", "stars card", "rating card"],
-      compositionId: "review-card",
-      name: "REVIEW CARD",
-      props: { author: "Sarah Jenkins", role: "Verified Creator", rating: 5, review: "Saved our team 20+ hours a week. Absolute game changer!", accentColor: "#fbbf24" },
-    },
-    {
-      triggers: ["social handles", "social badge", "follow badge", "instagram handle", "youtube handle", "tiktok handle", "twitter handle"],
-      compositionId: "social-handles",
-      name: "SOCIAL HANDLES",
-      props: { platform: "youtube", handle: "@contentmaster", actionText: "Follow for daily tips", accentColor: "#a855f7" },
-    },
-    {
-      triggers: ["animated title", "title saying", "animated headline", "hero reveal", "title card", "stat card", "card", "headline"],
-      compositionId: "hero_reveal",
-      name: "HERO REVEAL",
-      props: { headline: "The Solution", label: "KEY TAKEAWAY", colorTheme: "blue" },
-    },
-    {
-      triggers: ["quote reveal", "quote", "famous quote", "inspirational quote", "wisdom"],
-      compositionId: "quote-reveal",
-      name: "QUOTE",
-      props: { quote: "Consistency is what transforms average into excellence.", author: "Key Takeaway", personality: "premium" },
-    },
-    {
-      triggers: ["progress bar", "progress", "loading bar"],
-      compositionId: "cooked-progress",
-      name: "PROGRESS",
-      props: { label: "Completion Rate", progress: 85 },
-    },
-    {
-      triggers: ["notes", "checklist", "bullet list", "bullet points"],
-      compositionId: "cooked-notes",
-      name: "NOTES",
-      props: { title: "Action Items", items: ["Point 1: Focus", "Point 2: Execute", "Point 3: Scale"] },
-    },
-    {
-      triggers: ["toast", "notification", "alert popup", "alert"],
-      compositionId: "cooked-toasts",
-      name: "NOTIFICATION",
-      props: { title: "Alert", message: "Key milestone reached!" },
-    },
-  ];
+  // "add counter", "add animated counter", "add kpi", "add arrow", "add stat card", "add terminal",
+  // "add candlestick hud", "add compound growth curve", "add banking notification", etc.
+  const graphicConfigs = GRAPHIC_CONFIGS;
 
   const testGraphicPrompt = (timeRange.cleanedPrompt || prompt).toLowerCase().trim();
   const isAddOrOverlay = /\b(?:add|insert|overlay|place|put|create)\b/i.test(testGraphicPrompt);
   const isSemanticSearch = /\b(?:find\s+(?:the\s+)?part|search\s+for|where\s+i\s+discuss)\b/i.test(testGraphicPrompt);
 
   if (isAddOrOverlay && !isSemanticSearch) {
+    let bestMatchConfig: GraphicConfig | null = null;
+    let longestTriggerLength = 0;
+
     for (const config of graphicConfigs) {
-      const matchedTrigger = config.triggers.find((t) => {
+      for (const t of config.triggers) {
         const regex = new RegExp(
           `\\b(?:add|insert|overlay|place|put|create)\\s+(?:(?:a|an|the)\\s+)?(?:(?:motion\\s*graphic(?:s)?(?:\\s+(?:for|of)(?:\\s+(?:a|an|the))?)?|animated|visual|[a-z]+)\\s+)?\\b${t}\\b`,
           "i"
         );
         const wordRegex = new RegExp(`\\b${t}\\b`, "i");
-        return (
+        const isMatched =
           regex.test(testGraphicPrompt) ||
-          (wordRegex.test(testGraphicPrompt) && /\b(?:motion\s*graphic|animation|animat\w*)\b/i.test(testGraphicPrompt))
-        );
-      });
+          (wordRegex.test(testGraphicPrompt) && /\b(?:motion\s*graphic|animation|animat\w*)\b/i.test(testGraphicPrompt));
 
-      if (matchedTrigger) {
-        const start = timeRange.start ?? context.playheadTime;
-        const defaultEnd = Number((start + 4.0).toFixed(2));
-        const effectiveDuration = Math.max(context.duration, timeRange.end ?? 0);
-        const end = timeRange.end ?? (effectiveDuration > 0 ? Math.min(effectiveDuration, defaultEnd) : defaultEnd);
-
-        const finalProps = { ...config.props };
-        let defaultPos = { x: 50, y: 50 };
-
-        if (config.compositionId === "hero_reveal") {
-          const sayingMatch =
-            prompt.match(/(?:saying|titled|with text)\s+['"]([^'"]+)['"]/i) ||
-            prompt.match(/(?:saying|titled|with text)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:from|to|between|at)|$)/i);
-          if (sayingMatch) {
-            finalProps.headline = sayingMatch[1].trim();
-          }
-          const colorMatch = prompt.match(/\b(blue|cyan|emerald|green|amber|yellow|rose|red|purple|indigo)\b/i);
-          if (colorMatch) {
-            finalProps.colorTheme = colorMatch[1].toLowerCase();
-          }
-        } else if (config.compositionId === "animated_counter") {
-          const searchPrompt = timeRange.cleanedPrompt || prompt;
-          const countMatch =
-            searchPrompt.match(/(?:counting\s+to|reach(?:ing)?(?:\s+to)?)\s+(\d+(?:\.\d+)?)\s*(k|m|b)?/i) ||
-            searchPrompt.match(/\bto\s+(\d+(?:\.\d+)?)\s*(k|m|b)\b/i) ||
-            searchPrompt.match(/\bto\s+(\d+(?:\.\d+)?)\b/i);
-          if (countMatch) {
-            let num = parseFloat(countMatch[1]);
-            const mult = (countMatch[2] || "").toLowerCase();
-            if (mult === "k") num *= 1000;
-            else if (mult === "m") num *= 1000000;
-            else if (mult === "b") num *= 1000000000;
-            finalProps.to = Math.round(num);
-            finalProps.from = 0;
-          }
-          if (/subscriber/i.test(prompt)) {
-            finalProps.label = "SUBSCRIBERS";
-          } else if (/follower/i.test(prompt)) {
-            finalProps.label = "FOLLOWERS";
-          }
-        } else if (config.compositionId === "lower-third") {
-          defaultPos = { x: 50, y: 82 };
-          const nameMatch =
-            prompt.match(/(?:for|named|speaker|name)\s+['"]([^'"]+)['"]/i) ||
-            prompt.match(/(?:for|named|speaker|name)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
-          if (nameMatch) {
-            finalProps.name = nameMatch[1].trim();
-          }
-          const handleMatch = prompt.match(/(@[a-zA-Z0-9_]+)/);
-          if (handleMatch) {
-            finalProps.handle = handleMatch[1].trim();
-          }
-        } else if (config.compositionId === "countdown-timer") {
-          const secMatch = prompt.match(/\b(\d+)\s*(?:seconds|second|secs|sec|s)\b/i);
-          if (secMatch) {
-            finalProps.seconds = Math.max(1, Math.min(60, parseInt(secMatch[1], 10)));
-          }
-        } else if (config.compositionId === "review-card") {
-          const ratingMatch = prompt.match(/(\d+)\s*star/i);
-          if (ratingMatch) {
-            finalProps.rating = Math.max(1, Math.min(5, parseInt(ratingMatch[1], 10)));
-          }
-        } else if (config.compositionId === "subscribe-badge") {
-          defaultPos = { x: 50, y: 80 };
+        if (isMatched && t.length > longestTriggerLength) {
+          longestTriggerLength = t.length;
+          bestMatchConfig = config;
         }
-
-        let position = defaultPos;
-        if (context.safeZones && context.safeZones.length > 0) {
-          const placement = findNonOverlappingPlacement({
-            elementSize: { width: 50, height: 16 },
-            safeZones: context.safeZones,
-            playheadTime: start,
-            defaultPosition: defaultPos,
-          });
-          position = placement.position;
-        }
-
-        const operation: EditOperation = {
-          type: "add_element",
-          track: "graphic",
-          element: {
-            id: `graphic-${Date.now()}`,
-            name: config.name,
-            compositionId: config.compositionId,
-            props: finalProps,
-            start,
-            end: end <= start ? start + 4.0 : end,
-            position,
-            positionX: position.x,
-            positionY: position.y,
-            scale: 1.0,
-            rotation: 0,
-          },
-        };
-
-        const timingDesc = timeRange.isExplicitRange
-          ? `from ${start.toFixed(1)}s to ${end.toFixed(1)}s`
-          : `at ${start.toFixed(1)}s`;
-
-        return {
-          matched: true,
-          operation,
-          description: `Add graphic ${config.compositionId} ${timingDesc}`,
-        };
       }
+    }
+
+    if (bestMatchConfig) {
+      const config = bestMatchConfig;
+      const start = timeRange.start ?? context.playheadTime;
+      const defaultEnd = Number((start + 4.0).toFixed(2));
+      const effectiveDuration = Math.max(context.duration, timeRange.end ?? 0);
+      const end = timeRange.end ?? (effectiveDuration > 0 ? Math.min(effectiveDuration, defaultEnd) : defaultEnd);
+
+      const finalProps = { ...config.props };
+      let defaultPos = { x: 50, y: 50 };
+
+      if (config.compositionId === "hero_reveal") {
+        const sayingMatch =
+          prompt.match(/(?:saying|titled|with text)\s+['"]([^'"]+)['"]/i) ||
+          prompt.match(/(?:saying|titled|with text)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:from|to|between|at)|$)/i);
+        if (sayingMatch) {
+          finalProps.headline = sayingMatch[1].trim();
+        }
+        const colorMatch = prompt.match(/\b(blue|cyan|emerald|green|amber|yellow|rose|red|purple|indigo)\b/i);
+        if (colorMatch) {
+          finalProps.colorTheme = colorMatch[1].toLowerCase();
+        }
+      } else if (config.compositionId === "animated_counter") {
+        const searchPrompt = timeRange.cleanedPrompt || prompt;
+        const countMatch =
+          searchPrompt.match(/(?:counting\s+to|reach(?:ing)?(?:\s+to)?)\s+(\d+(?:\.\d+)?)\s*(k|m|b)?/i) ||
+          searchPrompt.match(/\bto\s+(\d+(?:\.\d+)?)\s*(k|m|b)\b/i) ||
+          searchPrompt.match(/\bto\s+(\d+(?:\.\d+)?)\b/i);
+        if (countMatch) {
+          let num = parseFloat(countMatch[1]);
+          const mult = (countMatch[2] || "").toLowerCase();
+          if (mult === "k") num *= 1000;
+          else if (mult === "m") num *= 1000000;
+          else if (mult === "b") num *= 1000000000;
+          finalProps.to = Math.round(num);
+          finalProps.from = 0;
+        }
+        if (/subscriber/i.test(prompt)) {
+          finalProps.label = "SUBSCRIBERS";
+        } else if (/follower/i.test(prompt)) {
+          finalProps.label = "FOLLOWERS";
+        }
+      } else if (config.compositionId === "lower-third") {
+        defaultPos = { x: 50, y: 82 };
+        const nameMatch =
+          prompt.match(/(?:for|named|speaker|name)\s+['"]([^'"]+)['"]/i) ||
+          prompt.match(/(?:for|named|speaker|name)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
+        if (nameMatch) {
+          finalProps.name = nameMatch[1].trim();
+        }
+        const handleMatch = prompt.match(/(@[a-zA-Z0-9_]+)/);
+        if (handleMatch) {
+          finalProps.handle = handleMatch[1].trim();
+        }
+      } else if (config.compositionId === "countdown-timer") {
+        const secMatch = prompt.match(/\b(\d+)\s*(?:seconds|second|secs|sec|s)\b/i);
+        if (secMatch) {
+          finalProps.seconds = Math.max(1, Math.min(60, parseInt(secMatch[1], 10)));
+        }
+      } else if (config.compositionId === "review-card") {
+        const ratingMatch = prompt.match(/(\d+)\s*star/i);
+        if (ratingMatch) {
+          finalProps.rating = Math.max(1, Math.min(5, parseInt(ratingMatch[1], 10)));
+        }
+      } else if (config.compositionId === "subscribe-badge") {
+        defaultPos = { x: 50, y: 80 };
+      } else if (config.compositionId === "candlestick-hud") {
+        const tickerMatch =
+          prompt.match(/\b(BTC|ETH|SOL|NVDA|TSLA|AAPL|SPY|QQQ|DOGE|XRP)\b/i) ||
+          prompt.match(/(?:ticker|coin|symbol|asset|stock)\s+([A-Z0-9/]+)/i);
+        if (tickerMatch) {
+          finalProps.ticker = tickerMatch[1].toUpperCase().includes("/")
+            ? tickerMatch[1].toUpperCase()
+            : `${tickerMatch[1].toUpperCase()}/USDT`;
+        }
+        const priceMatch = prompt.match(/\$([0-9,]+(?:\.[0-9]+)?)/);
+        if (priceMatch) {
+          finalProps.price = `$${priceMatch[1]}`;
+        }
+      } else if (config.compositionId === "compound-growth-curve") {
+        const yearsMatch = prompt.match(/(\d+)\s*(?:years|year|yr|yrs)/i);
+        if (yearsMatch) {
+          finalProps.years = parseInt(yearsMatch[1], 10);
+        }
+        const multMatch = prompt.match(/(\d+(?:\.\d+)?)\s*x\b/i);
+        if (multMatch) {
+          finalProps.multiplier = `${multMatch[1]}x`;
+        }
+        const principalMatch = prompt.match(/(?:from|principal|invest(?:ing)?)\s*\$([0-9,]+)/i);
+        if (principalMatch) {
+          finalProps.principal = `$${principalMatch[1]}`;
+        }
+      } else if (config.compositionId === "banking-notification") {
+        defaultPos = { x: 50, y: 22 };
+        const amtMatch = prompt.match(/\+\$([0-9,]+(?:\.[0-9]{2})?)/) || prompt.match(/\$([0-9,]+(?:\.[0-9]{2})?)/);
+        if (amtMatch) {
+          finalProps.amount = amtMatch[0].startsWith("+") ? amtMatch[0] : `+${amtMatch[0]}`;
+        }
+        const bankMatch = prompt.match(/(?:from|bank)\s+(chase|wells fargo|stripe|paypal|revolut|barclays|mercury)/i);
+        if (bankMatch) {
+          finalProps.bankName = bankMatch[1].toUpperCase();
+        }
+      } else if (config.compositionId === "inflation-cash-burn") {
+        const lossMatch = prompt.match(/(?:lost|loss|burned)\s*\$?([0-9,]+)/i);
+        if (lossMatch) {
+          finalProps.lossAmount = `-$${lossMatch[1]}`;
+        }
+      } else if (config.compositionId === "debt-payoff-tracker") {
+        const debtMatch = prompt.match(/(?:debt of|total debt)\s*\$([0-9,]+)/i);
+        if (debtMatch) {
+          finalProps.totalDebt = `$${debtMatch[1]}`;
+        }
+        const progressMatch = prompt.match(/(\d+)%\s*(?:paid|complete|progress)/i);
+        if (progressMatch) {
+          finalProps.progress = parseInt(progressMatch[1], 10);
+        }
+      } else if (config.compositionId === "roi-balance-scale") {
+        const roiMatch = prompt.match(/(\d+(?:\.\d+)?)\s*x\s*roi/i);
+        if (roiMatch) {
+          finalProps.roiMultiplier = `${roiMatch[1]}x ROI`;
+        }
+      }
+
+      let position = defaultPos;
+      if (context.safeZones && context.safeZones.length > 0) {
+        const placement = findNonOverlappingPlacement({
+          elementSize: { width: 50, height: 16 },
+          safeZones: context.safeZones,
+          playheadTime: start,
+          defaultPosition: defaultPos,
+        });
+        position = placement.position;
+      }
+
+      const operation: EditOperation = {
+        type: "add_element",
+        track: "graphic",
+        element: {
+          id: `graphic-${Date.now()}`,
+          name: config.name,
+          compositionId: config.compositionId,
+          props: finalProps,
+          start,
+          end: end <= start ? start + 4.0 : end,
+          position,
+          positionX: position.x,
+          positionY: position.y,
+          scale: 1.0,
+          rotation: 0,
+        },
+      };
+
+      const timingDesc = timeRange.isExplicitRange
+        ? `from ${start.toFixed(1)}s to ${end.toFixed(1)}s`
+        : `at ${start.toFixed(1)}s`;
+
+      return {
+        matched: true,
+        operation,
+        description: `Add graphic ${config.compositionId} ${timingDesc}`,
+      };
     }
   }
 
@@ -1001,10 +1321,13 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
   // Patterns:
   // "Add a subtle whoosh sound when the headline enters between 00:12 and 00:13"
   // "Add a subtle whoosh when the headline enters between 00:12 and 00:13"
+  // "Add cash register sound when banking notification appears"
+  // "Add impact sound when debt payoff enters"
+  // "Add subtle whoosh at candlestick hud"
   // "Add whoosh sound effect at 12s"
   // "Add pop sfx between 1.0 and 1.5"
   // "Add chime sound effect"
-  const sfxKeywords = "whoosh|swoosh|pop|ding|chime|click|tap|riser|impact|thump|glitch|zap|camera|shutter";
+  const sfxKeywords = "cash\\s*register|whoosh|swoosh|pop|ding|chime|click|tap|riser|sweep|impact|thump|stamp|glitch|zap|camera|shutter|coin(?:s)?|money|cash|register|fire|sizzle|clink|creak";
   const sfxRegex = new RegExp(
     `\\b(?:add|insert|put|play)\\s+(?:a\\s+)?(?:subtle\\s+|soft\\s+|loud\\s+|quick\\s+)?(${sfxKeywords})(?:\\s+(?:sound\\s*effect|sound|effect|sfx|cue))?\\b`,
     "i"
@@ -1019,6 +1342,12 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
     const rawSoundName = (sfxMatch ? sfxMatch[1] : (genericMatch ? genericMatch[1] : "pop"))?.toLowerCase() || "pop";
 
     const SFX_ASSET_MAP: Record<string, { name: string; url: string; duration: number }> = {
+      "cash register": { name: "Cash Register SFX", url: "/assets/audio/chime.mp3", duration: 0.8 },
+      cash: { name: "Cash Register SFX", url: "/assets/audio/chime.mp3", duration: 0.8 },
+      register: { name: "Cash Register SFX", url: "/assets/audio/chime.mp3", duration: 0.8 },
+      coin: { name: "Coin Drop SFX", url: "/assets/audio/chime.mp3", duration: 0.6 },
+      coins: { name: "Coin Drop SFX", url: "/assets/audio/chime.mp3", duration: 0.6 },
+      money: { name: "Cash SFX", url: "/assets/audio/chime.mp3", duration: 0.8 },
       whoosh: { name: "Whoosh SFX", url: "/assets/audio/whoosh.mp3", duration: 1.0 },
       swoosh: { name: "Whoosh SFX", url: "/assets/audio/whoosh.mp3", duration: 1.0 },
       pop: { name: "Pop SFX", url: "/assets/audio/pop.mp3", duration: 0.5 },
@@ -1027,16 +1356,24 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
       click: { name: "Click SFX", url: "/assets/audio/click.mp3", duration: 0.3 },
       tap: { name: "Click SFX", url: "/assets/audio/click.mp3", duration: 0.3 },
       riser: { name: "Riser SFX", url: "/assets/audio/riser.mp3", duration: 1.5 },
+      sweep: { name: "Riser Sweep SFX", url: "/assets/audio/riser.mp3", duration: 1.5 },
       impact: { name: "Impact SFX", url: "/assets/audio/impact.mp3", duration: 1.0 },
       thump: { name: "Impact SFX", url: "/assets/audio/impact.mp3", duration: 0.8 },
+      stamp: { name: "Stamp Thud SFX", url: "/assets/audio/impact.mp3", duration: 0.7 },
+      fire: { name: "Fire Sizzle SFX", url: "/assets/audio/whoosh.mp3", duration: 1.0 },
+      sizzle: { name: "Fire Sizzle SFX", url: "/assets/audio/whoosh.mp3", duration: 1.0 },
+      clink: { name: "Balance Scale Clink SFX", url: "/assets/audio/click.mp3", duration: 0.4 },
+      creak: { name: "Balance Scale SFX", url: "/assets/audio/click.mp3", duration: 0.4 },
       glitch: { name: "Glitch Zap SFX", url: "/assets/audio/whoosh.mp3", duration: 0.6 },
       zap: { name: "Glitch Zap SFX", url: "/assets/audio/whoosh.mp3", duration: 0.6 },
       camera: { name: "Camera Shutter SFX", url: "/assets/audio/click.mp3", duration: 0.5 },
       shutter: { name: "Camera Shutter SFX", url: "/assets/audio/click.mp3", duration: 0.5 },
     };
 
-    const sfxKey = Object.keys(SFX_ASSET_MAP).find((k) => rawSoundName.includes(k)) || "pop";
-    const sfxItem = SFX_ASSET_MAP[sfxKey] || { name: "Pop SFX", url: "/assets/audio/pop.mp3", duration: 0.5 };
+    const sfxKey = Object.keys(SFX_ASSET_MAP)
+      .sort((a, b) => b.length - a.length)
+      .find((k) => rawSoundName.includes(k)) || "pop";
+    let sfxItem = SFX_ASSET_MAP[sfxKey] || { name: "Pop SFX", url: "/assets/audio/pop.mp3", duration: 0.5 };
 
     const timeRange = extractTimeRangeFromPrompt(cleanPrompt, context.fps || 30);
     let start = context.playheadTime;
@@ -1049,14 +1386,51 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
       start = timeRange.start;
       end = Number((start + sfxItem.duration).toFixed(3));
     } else {
-      // Check if prompt refers to headline/title entrance ("when the headline enters", etc.)
-      const headlineMatch = /(?:headline|title|badge|card|intro)/i.test(cleanPrompt);
-      if (headlineMatch && context.graphicsElements && context.graphicsElements.length > 0) {
-        const targetGraphic = context.graphicsElements.find((g: any) =>
-          /(?:headline|title|hero|card|intro)/i.test(g.compositionId || g.name || "")
-        ) || context.graphicsElements[0];
+      // Check if prompt refers to headline/title or motion graphic entrance ("when the headline enters", "when banking notification appears", "at candlestick hud", etc.)
+      const graphicTriggerMatch = /(?:headline|title|badge|card|intro|graphic|chart|candlestick|compound|growth|curve|donut|portfolio|inflation|cash\s*burn|burn|banking|notification|waterfall|budget|debt|payoff|scale|balance|roi|flywheel|wealth|battle)/i.test(cleanPrompt);
+      const availableGraphics = (context.graphicsElements || context.trackSummary?.graphicsList || []) as any[];
+      if (graphicTriggerMatch && availableGraphics.length > 0) {
+        const targetGraphic = availableGraphics.find((g: any) => {
+          const compId = (g.compositionId || "").toLowerCase();
+          const name = (g.name || "").toLowerCase();
+          const targetStr = `${compId} ${name}`;
+          if (/\b(?:banking|notification)\b/i.test(cleanPrompt) && (targetStr.includes("banking") || targetStr.includes("notification"))) return true;
+          if (/\b(?:candlestick|hud)\b/i.test(cleanPrompt) && (targetStr.includes("candlestick") || targetStr.includes("hud"))) return true;
+          if (/\b(?:compound|growth|curve)\b/i.test(cleanPrompt) && (targetStr.includes("compound") || targetStr.includes("growth") || targetStr.includes("curve"))) return true;
+          if (/\b(?:portfolio|donut)\b/i.test(cleanPrompt) && (targetStr.includes("portfolio") || targetStr.includes("donut"))) return true;
+          if (/\b(?:inflation|burn)\b/i.test(cleanPrompt) && (targetStr.includes("inflation") || targetStr.includes("burn"))) return true;
+          if (/\b(?:waterfall|budget)\b/i.test(cleanPrompt) && (targetStr.includes("waterfall") || targetStr.includes("budget"))) return true;
+          if (/\b(?:debt|payoff)\b/i.test(cleanPrompt) && (targetStr.includes("debt") || targetStr.includes("payoff"))) return true;
+          if (/\b(?:scale|balance|roi)\b/i.test(cleanPrompt) && (targetStr.includes("scale") || targetStr.includes("balance") || targetStr.includes("roi"))) return true;
+          if (/\b(?:flywheel|wealth)\b/i.test(cleanPrompt) && (targetStr.includes("flywheel") || targetStr.includes("wealth"))) return true;
+          if (/\b(?:battle|versus|duel)\b/i.test(cleanPrompt) && (targetStr.includes("battle") || targetStr.includes("versus") || targetStr.includes("duel"))) return true;
+          if (/\b(?:headline|title|hero|card|intro)\b/i.test(cleanPrompt) && /(?:headline|title|hero|card|intro)/i.test(targetStr)) return true;
+          return false;
+        }) || availableGraphics[0];
+
         if (targetGraphic && typeof targetGraphic.start === "number") {
           start = targetGraphic.start;
+
+          // If a generic sound was requested without explicit sound name, default to the graphic's signature SFX
+          if (!sfxMatch && targetGraphic) {
+            const comp = (targetGraphic.compositionId || targetGraphic.name || "").toLowerCase();
+            let signatureKey = "pop";
+            if (comp.includes("banking") || comp.includes("notification")) signatureKey = "cash register";
+            else if (comp.includes("candlestick")) signatureKey = "riser";
+            else if (comp.includes("compound")) signatureKey = "whoosh";
+            else if (comp.includes("portfolio") || comp.includes("donut")) signatureKey = "click";
+            else if (comp.includes("inflation") || comp.includes("burn")) signatureKey = "fire";
+            else if (comp.includes("waterfall") || comp.includes("budget")) signatureKey = "whoosh";
+            else if (comp.includes("debt") || comp.includes("payoff")) signatureKey = "stamp";
+            else if (comp.includes("scale") || comp.includes("roi")) signatureKey = "clink";
+            else if (comp.includes("flywheel")) signatureKey = "whoosh";
+            else if (comp.includes("battle")) signatureKey = "impact";
+
+            if (SFX_ASSET_MAP[signatureKey]) {
+              sfxItem = SFX_ASSET_MAP[signatureKey];
+            }
+          }
+
           end = Number((start + sfxItem.duration).toFixed(3));
         }
       }

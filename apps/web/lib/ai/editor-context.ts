@@ -60,6 +60,7 @@ export interface EditorContext {
   videoClips?: { id: string; name: string; start: number; end: number }[];
   audioClips?: { id: string; name: string; start: number; end: number; volume?: number }[];
   textTrack?: CaptionBlock[];
+  graphicsElements?: GraphicElement[];
 }
 
 /**
@@ -165,6 +166,7 @@ export function assembleEditorContext(
       volume: a.volume,
     })),
     textTrack: project.tracks.textTrack,
+    graphicsElements: project.tracks.graphicsTrack || [],
   };
 }
 

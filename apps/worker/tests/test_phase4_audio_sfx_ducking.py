@@ -266,8 +266,31 @@ class TestPhase4AudioSFXAndDucking:
         assert os.path.exists(dest_pop)
         assert os.path.getsize(dest_pop) > 1000
 
-        dest_chime = str(tmp_path / "chime",)
+        dest_chime = str(tmp_path / "chime")
         res3 = fetch_sfx("chime", dest_chime)
         assert res3 is True
         assert os.path.exists(dest_chime)
         assert os.path.getsize(dest_chime) > 1000
+
+    def test_finance_motion_graphics_sfx_pairing(self):
+        """
+        Phase 5: Verifies finance motion graphics templates are mapped to
+        appropriate signature SFX cues in audio_sfx_synthesizer.
+        """
+        from services.audio_sfx_synthesizer import recommend_sfx_for_action, resolve_cue_name
+
+        # 1. Template SFX recommendations
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "candlestick-hud"}) == "hit"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "banking-notification"}) == "ding"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "debt-payoff-tracker"}) == "impact"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "inflation-cash-burn"}) == "whoosh-out"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "roi-balance-scale"}) == "tick"
+        assert recommend_sfx_for_action({"action": "motion_graphics", "motion_graphics_type": "compound-growth-curve"}) == "whoosh-in"
+
+        # 2. Finance keyword aliases
+        assert resolve_cue_name("cash") == "ding"
+        assert resolve_cue_name("register") == "ding"
+        assert resolve_cue_name("stamp") == "impact"
+        assert resolve_cue_name("fire") == "whoosh-in"
+        assert resolve_cue_name("clink") == "tick"
+

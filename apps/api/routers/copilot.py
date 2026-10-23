@@ -1506,7 +1506,7 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
         if not llm_handled:
             # TIER-2 DETERMINISTIC FALLBACK
             if (
-                re.search(r"\b(?:motion\s*graphics?|graphics?|cards?|counters?|kpi|metrics?|charts?|rising\s+graphs?|terminals?|social\s+posts?|quote\s+reveals?|progress\s+bars?|toasts?|notes?|badges?)\b", lower)
+                re.search(r"\b(?:motion\s*graphics?|graphics?|cards?|counters?|kpi|metrics?|charts?|rising\s+graphs?|terminals?|social\s+posts?|quote\s+reveals?|progress\s+bars?|toasts?|notes?|badges?|candlestick|trading|compound|snowball|portfolio|donut|inflation|cash\s*burn|banking|wire\s*transfer|deposit|waterfall|budget|debt|roi|balance\s*scale|flywheel|buffett)\b", lower)
                 or re.search(r"\b(?:app\s+upload|upload\s+graphic|upload\s+animation|screen\s+upload)\b", lower)
             ):
                 start_time = extracted_start
@@ -1638,12 +1638,113 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                         "title": "Alert",
                         "message": clean_prompt,
                     }
-                elif re.search(r"\b(?:notes|list|checklist|bullet)\b", lower):
-                    comp_id = "cooked-notes"
-                    title_text = "Action Notes"
+                elif re.search(r"\b(?:candlestick|trading\s+hud|crypto\s+chart|bitcoin\s+chart|crypto\s+ticker|stock\s+chart)\b", lower):
+                    comp_id = "candlestick-hud"
+                    title_text = "Candlestick Trading HUD"
+                    ticker_m = re.search(r"\b(BTC|ETH|SOL|NVDA|TSLA|AAPL|SPY|QQQ)\b", clean_prompt, re.I)
+                    price_m = re.search(r"\$([0-9,]+(?:\.[0-9]+)?)", clean_prompt)
                     props = {
-                        "title": "Key Items",
-                        "items": ["Point 1: Focus", "Point 2: Execute", "Point 3: Scale"],
+                        "ticker": f"{ticker_m.group(1).upper()}/USDT" if ticker_m else "BTC/USDT",
+                        "price": f"${price_m.group(1)}" if price_m else "$64,250.00",
+                        "change": "+8.4%",
+                        "volume": "1.42B",
+                        "timeFrame": "4H",
+                    }
+                elif re.search(r"\b(?:compound\s+growth|compound\s+curve|snowball\s+curve|compound\s+interest|exponential\s+growth)\b", lower):
+                    comp_id = "compound-growth-curve"
+                    title_text = "Compound Growth Curve"
+                    mult_m = re.search(r"(\d+(?:\.\d+)?)\s*x\b", clean_prompt, re.I)
+                    props = {
+                        "principal": "$10,000",
+                        "multiplier": f"{mult_m.group(1)}x" if mult_m else "17.4x",
+                        "futureValue": "$174,494",
+                        "years": 30,
+                        "title": "THE SNOWBALL EFFECT",
+                    }
+                elif re.search(r"\b(?:portfolio\s+donut|asset\s+allocation|portfolio\s+breakdown|portfolio\s+allocation)\b", lower):
+                    comp_id = "portfolio-donut"
+                    title_text = "Portfolio Donut"
+                    props = {
+                        "totalValue": "$250,000",
+                        "asset1": "Stocks (60%)",
+                        "asset2": "Real Estate (20%)",
+                        "asset3": "Crypto (10%)",
+                        "asset4": "Cash (10%)",
+                        "title": "ASSET ALLOCATION",
+                    }
+                elif re.search(r"\b(?:inflation\s+cash\s+burn|cash\s+burn|inflation\s+burn|purchasing\s+power|dollar\s+burn)\b", lower):
+                    comp_id = "inflation-cash-burn"
+                    title_text = "Inflation Cash Burn"
+                    loss_m = re.search(r"\$?([0-9,]+)", clean_prompt)
+                    props = {
+                        "originalValue": "$100,000",
+                        "purchasingPower": "$68,400",
+                        "lossAmount": f"-${loss_m.group(1)}" if loss_m else "-$31,600",
+                        "inflationRate": "3.8%",
+                        "years": 10,
+                    }
+                elif re.search(r"\b(?:banking\s+notification|bank\s+notification|wire\s+transfer|deposit\s+notification|dividend\s+notification|payout\s+notification)\b", lower):
+                    comp_id = "banking-notification"
+                    title_text = "Banking Notification"
+                    amt_m = re.search(r"\+\$([0-9,]+(?:\.[0-9]{2})?)|\$([0-9,]+(?:\.[0-9]{2})?)", clean_prompt)
+                    props = {
+                        "bankName": "CHASE PRIVATE CLIENT",
+                        "amount": amt_m.group(0) if amt_m else "+$24,500.00",
+                        "sender": "WIRE DEPOSIT / ACME CORP",
+                        "status": "CLEARED",
+                        "timeAgo": "JUST NOW",
+                    }
+                elif re.search(r"\b(?:budget\s+waterfall|50\s*30\s*20\s+budget|waterfall\s+budget|income\s+waterfall|salary\s+breakdown)\b", lower):
+                    comp_id = "budget-waterfall"
+                    title_text = "Budget Waterfall"
+                    props = {
+                        "monthlyIncome": "$10,000",
+                        "needs": "$5,000 (50%)",
+                        "wants": "$3,000 (30%)",
+                        "savings": "$2,000 (20%)",
+                        "title": "50/30/20 BUDGET RULE",
+                    }
+                elif re.search(r"\b(?:debt\s+payoff|debt\s+tracker|debt\s+snowball|debt\s+avalanche|payoff\s+tracker)\b", lower):
+                    comp_id = "debt-payoff-tracker"
+                    title_text = "Debt Payoff Tracker"
+                    props = {
+                        "totalDebt": "$45,000",
+                        "paidOff": "$36,000",
+                        "remaining": "$9,000",
+                        "progress": 80,
+                        "title": "DEBT SNOWBALL METHOD",
+                        "stamp": "PAID OFF",
+                    }
+                elif re.search(r"\b(?:roi\s+balance\s+scale|balance\s+scale|roi\s+scale|cost\s+vs\s+return|risk\s+vs\s+reward)\b", lower):
+                    comp_id = "roi-balance-scale"
+                    title_text = "ROI Balance Scale"
+                    props = {
+                        "costSide": "Cost ($5k)",
+                        "returnSide": "Return ($50k)",
+                        "roiMultiplier": "10x ROI",
+                        "tiltDegree": 18,
+                        "title": "ASYMMETRIC RISK/REWARD",
+                    }
+                elif re.search(r"\b(?:wealth\s+flywheel|compounding\s+flywheel|cash\s+flywheel|financial\s+flywheel|wealth\s+cycle)\b", lower):
+                    comp_id = "wealth-flywheel"
+                    title_text = "Wealth Flywheel"
+                    props = {
+                        "stage1": "EARN HIGH INCOME",
+                        "stage2": "SAVE 40%+",
+                        "stage3": "BUY ASSETS",
+                        "stage4": "COMPOUND RETURNS",
+                        "title": "THE WEALTH FLYWHEEL",
+                    }
+                elif re.search(r"\b(?:battle\s+chart|warren\s+buffett\s+challenge|sp500\s+vs|hedge\s+fund\s+vs|buffett\s+bet)\b", lower):
+                    comp_id = "battle-chart"
+                    title_text = "Buffett Battle Chart"
+                    props = {
+                        "contestantA": "S&P 500 INDEX",
+                        "contestantB": "TOP 5 HEDGE FUNDS",
+                        "sp500Return": "+125.8%",
+                        "hedgeReturn": "+36.3%",
+                        "delta": "+89.5% WIN",
+                        "durationYears": "10-YEAR CHALLENGE",
                     }
                 else:
                     comp_id = "hero-reveal"

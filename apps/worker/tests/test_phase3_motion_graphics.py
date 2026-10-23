@@ -202,3 +202,76 @@ def test_remotion_renderer_hero_reveal_and_counter_alpha():
         cmd2 = mock_run.call_args[0][0]
         assert "animated-counter" in cmd2
         assert "--codec=prores" in cmd2
+
+
+def test_remotion_renderer_finance_pack_compositions():
+    """
+    Phase 6: Verifies all 10 Finance Motion Graphics are recognized by
+    RemotionRenderer and properly dispatched to npx remotion render.
+    """
+    from services.remotion_renderer import build_props_from_edit
+
+    finance_templates = [
+        "candlestick-hud",
+        "compound-growth-curve",
+        "portfolio-donut",
+        "inflation-cash-burn",
+        "banking-notification",
+        "budget-waterfall",
+        "debt-payoff-tracker",
+        "roi-balance-scale",
+        "wealth-flywheel",
+        "battle-chart",
+    ]
+
+    for comp in finance_templates:
+        assert comp in ALLOWED_COMPOSITIONS
+        assert comp.replace("-", "_") in ALLOWED_COMPOSITIONS
+
+    with patch("subprocess.run") as mock_run, \
+         patch("os.path.isdir", return_value=True), \
+         patch("os.path.exists", return_value=True), \
+         patch("os.path.getsize", return_value=1024 * 1024 * 2):
+
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        # Test Banking Notification render
+        res_bank = render_motion_graphic(
+            composition_id="banking-notification",
+            props={"bankName": "CHASE", "amount": "$10,000"},
+            duration_frames=120,
+            fps=30,
+            width=1080,
+            height=1920,
+            output_path="/tmp/test_bank.mov",
+        )
+        assert res_bank == "/tmp/test_bank.mov"
+        cmd = mock_run.call_args[0][0]
+        assert "banking-notification" in cmd
+        assert "--codec=prores" in cmd
+        assert "--pixel-format=yuva444p10le" in cmd
+
+        # Test Candlestick HUD render
+        res_candle = render_motion_graphic(
+            composition_id="candlestick_hud",
+            props={"ticker": "BTC/USD", "currentPrice": 94500},
+            duration_frames=150,
+            fps=30,
+            width=1080,
+            height=1920,
+            output_path="/tmp/test_candle.mov",
+        )
+        assert res_candle == "/tmp/test_candle.mov"
+        cmd_candle = mock_run.call_args[0][0]
+        assert "candlestick-hud" in cmd_candle
+
+    # Verify build_props_from_edit
+    edit_decision = {
+        "motion_graphics_type": "debt-payoff-tracker",
+        "motion_graphics_targets": {"initialDebt": 25000, "paidAmount": 25000, "debtName": "Visa Card"},
+    }
+    props = build_props_from_edit(edit_decision)
+    assert props["initialDebt"] == 25000
+    assert props["paidAmount"] == 25000
+    assert props["debtName"] == "Visa Card"
+

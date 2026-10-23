@@ -24,6 +24,7 @@ import {
   Smartphone,
   Monitor,
   Filter,
+  TrendingUp,
 } from "lucide-react";
 import {
   LibraryResource,
@@ -52,6 +53,7 @@ interface ResourceLibraryDrawerProps {
 
 const CATEGORIES = [
   { id: "All", label: "All Packs", icon: Layers },
+  { id: "Finance", label: "Finance", icon: TrendingUp },
   { id: "Shapes", label: "Shapes", icon: Shapes },
   { id: "B-Roll Stock", label: "B-Roll", icon: Film },
   { id: "Visual Effects", label: "Effects", icon: Sparkles },

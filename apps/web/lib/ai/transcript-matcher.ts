@@ -245,10 +245,11 @@ export function findBeatByRoleOrKeyword(
   const roleAliases: Record<string, string[]> = {
     hook: ["hook", "opening", "intro", "introduction", "attention"],
     cta: ["cta", "call to action", "subscribe", "follow", "outro", "conclusion"],
-    problem: ["problem", "pain", "setup", "struggle"],
-    solution: ["solution", "answer", "process", "resolution"],
-    statistic: ["statistic", "metric", "number", "data", "stats"],
-    example: ["example", "demo", "story", "proof"],
+    problem: ["problem", "pain", "setup", "struggle", "debt", "inflation", "burn", "loss"],
+    solution: ["solution", "answer", "process", "resolution", "compound", "flywheel", "snowball"],
+    statistic: ["statistic", "metric", "number", "data", "stats", "roi", "yield", "rate", "percentage", "return", "multiplier"],
+    example: ["example", "demo", "story", "proof", "challenge", "battle"],
+    finance: ["finance", "trading", "investing", "crypto", "bitcoin", "stocks", "portfolio", "budget", "wealth"],
   };
 
   // 1. Direct role match or alias match
@@ -297,6 +298,88 @@ export function getActiveWordAtTimestamp(
     if (playheadTime >= word.start && playheadTime <= word.end) {
       return word;
     }
+  }
+
+  return null;
+}
+
+/**
+ * Maps a spoken text snippet or beat role to the optimal finance motion graphic composition.
+ */
+export function suggestFinanceGraphicForBeat(
+  textOrRole: string
+): { compositionId: string; name: string; props: Record<string, any> } | null {
+  const lower = textOrRole.toLowerCase();
+
+  if (/\b(?:bitcoin|btc|crypto|trading|candlestick|ticker|stock)\b/i.test(lower)) {
+    return {
+      compositionId: "candlestick-hud",
+      name: "CANDLESTICK HUD",
+      props: { ticker: "BTC/USDT", price: "$64,250.00", change: "+8.4%", volume: "1.42B" },
+    };
+  }
+  if (/\b(?:debt|payoff|avalanche)\b/i.test(lower)) {
+    return {
+      compositionId: "debt-payoff-tracker",
+      name: "DEBT PAYOFF TRACKER",
+      props: { totalDebt: "$45,000", paidOff: "$36,000", remaining: "$9,000", progress: 80, stamp: "PAID OFF" },
+    };
+  }
+  if (/\b(?:compound|snowball|exponential|wealth\s*curve)\b/i.test(lower)) {
+    return {
+      compositionId: "compound-growth-curve",
+      name: "COMPOUND GROWTH",
+      props: { principal: "$10,000", multiplier: "17.4x", years: 30, title: "THE SNOWBALL EFFECT" },
+    };
+  }
+  if (/\b(?:portfolio|allocation|diversif\w*|asset\s*split)\b/i.test(lower)) {
+    return {
+      compositionId: "portfolio-donut",
+      name: "PORTFOLIO DONUT",
+      props: { totalValue: "$250,000", asset1: "Stocks (60%)", asset2: "Real Estate (20%)" },
+    };
+  }
+  if (/\b(?:inflation|cash\s*burn|purchasing\s*power|burn\w*)\b/i.test(lower)) {
+    return {
+      compositionId: "inflation-cash-burn",
+      name: "INFLATION CASH BURN",
+      props: { originalValue: "$100,000", purchasingPower: "$68,400", lossAmount: "-$31,600" },
+    };
+  }
+  if (/\b(?:wire|deposit|dividend|payout|bank\s*notification|stripe)\b/i.test(lower)) {
+    return {
+      compositionId: "banking-notification",
+      name: "BANKING NOTIFICATION",
+      props: { bankName: "CHASE PRIVATE CLIENT", amount: "+$24,500.00", status: "CLEARED" },
+    };
+  }
+  if (/\b(?:budget|waterfall|50\s*30\s*20|income\s*breakdown)\b/i.test(lower)) {
+    return {
+      compositionId: "budget-waterfall",
+      name: "BUDGET WATERFALL",
+      props: { monthlyIncome: "$10,000", needs: "$5,000 (50%)", wants: "$3,000 (30%)", savings: "$2,000 (20%)" },
+    };
+  }
+  if (/\b(?:roi|balance\s*scale|return\s*on\s*investment|risk\s*reward)\b/i.test(lower)) {
+    return {
+      compositionId: "roi-balance-scale",
+      name: "ROI BALANCE SCALE",
+      props: { costSide: "Cost ($5k)", returnSide: "Return ($50k)", roiMultiplier: "10x ROI" },
+    };
+  }
+  if (/\b(?:flywheel|compounding\s*engine|cash\s*flywheel)\b/i.test(lower)) {
+    return {
+      compositionId: "wealth-flywheel",
+      name: "WEALTH FLYWHEEL",
+      props: { title: "THE WEALTH FLYWHEEL", stage1: "EARN HIGH INCOME", stage2: "SAVE 40%+" },
+    };
+  }
+  if (/\b(?:battle|buffett|hedge\s*fund|sp500|index\s*vs)\b/i.test(lower)) {
+    return {
+      compositionId: "battle-chart",
+      name: "BUFFETT BATTLE CHART",
+      props: { contestantA: "S&P 500 INDEX", contestantB: "TOP 5 HEDGE FUNDS", sp500Return: "+125.8%", hedgeReturn: "+36.3%" },
+    };
   }
 
   return null;

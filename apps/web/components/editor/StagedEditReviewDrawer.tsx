@@ -693,12 +693,14 @@ export function ProposedEditParamCustomizer({
           {(!edit.operation?.element?.isBgm && edit.action_type === "sfx") && (
             <div className="space-y-1.5">
               <span className="text-[10px] text-neutral-500 font-mono block">SFX Sound Preset:</span>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                 {[
                   { id: "whoosh", label: "Whoosh", url: "/assets/audio/whoosh.mp3" },
                   { id: "pop", label: "Pop", url: "/assets/audio/pop.mp3" },
                   { id: "chime", label: "Chime", url: "/assets/audio/chime.mp3" },
                   { id: "click", label: "Click", url: "/assets/audio/click.mp3" },
+                  { id: "riser", label: "Riser", url: "/assets/audio/riser.mp3" },
+                  { id: "impact", label: "Impact", url: "/assets/audio/impact.mp3" },
                 ].map((sfx) => {
                   const currentUrl = edit.operation?.element?.sourceUrl || "";
                   const isSelected = currentUrl.includes(sfx.id);

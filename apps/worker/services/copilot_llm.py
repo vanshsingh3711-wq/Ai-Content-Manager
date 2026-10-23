@@ -28,6 +28,25 @@ class CopilotIntentProposal(BaseModel):
         "cooked_social_post",
         "hero_reveal",
         "quote_reveal",
+        "candlestick_hud",
+        "compound_growth_curve",
+        "portfolio_donut",
+        "inflation_cash_burn",
+        "banking_notification",
+        "budget_waterfall",
+        "debt_payoff_tracker",
+        "roi_balance_scale",
+        "wealth_flywheel",
+        "battle_chart",
+        "candlestick-hud",
+        "portfolio-donut",
+        "inflation-cash-burn",
+        "banking-notification",
+        "budget-waterfall",
+        "debt-payoff-tracker",
+        "roi-balance-scale",
+        "wealth-flywheel",
+        "battle-chart",
     ]] = Field(default=None, description="Template ID if action_type is graphic")
     graphic_props: Optional[Dict[str, Any]] = Field(default=None, description="Props for motion graphic composition")
     search_query: Optional[str] = Field(default=None, description="Cleaned keyword query for stock video or web search")
@@ -51,6 +70,16 @@ Available Actions:
    - `cooked_social_post`: X/Twitter or social media comment card.
    - `hero_reveal`: Bold headline card with key takeaway or animated title (e.g. blue animated title saying 'The Solution').
    - `quote_reveal`: Notable quote card with author attribution.
+   - `candlestick_hud`: Candlestick trading chart with price ticker, volume bars, RSI breakout overlay.
+   - `compound_growth_curve`: Exponential snowball growth curve with milestone callouts.
+   - `portfolio_donut`: Asset allocation donut breakdown with slice percentages.
+   - `inflation_cash_burn`: Purchasing power burn meter with burning dollar bills.
+   - `banking_notification`: Bank wire/deposit push notification toast.
+   - `budget_waterfall`: 50/30/20 budget breakdown flow from income.
+   - `debt_payoff_tracker`: Debt snowball/avalanche progress meter with PAID OFF stamp.
+   - `roi_balance_scale`: Physics-based balance scale comparing Cost vs. Return.
+   - `wealth_flywheel`: 4-phase cyclical compounding engine with rotating gears.
+   - `battle_chart`: Head-to-head asset comparison (e.g. Warren Buffett S&P 500 vs. Hedge Funds).
 3. `capture_web_evidence`: User wants to show a live webpage, article, GitHub repo, or social post from a URL.
 4. `split_clip`: Cut or split the video at the given timestamp.
 5. `clarification_needed`: When the prompt is ambiguous, subjective, or confidence < 0.65 (e.g. "make it aesthetic", "make it look cooler").

@@ -285,4 +285,147 @@ describe("local-command-parser: Natural Language Intent Parsing", () => {
     expect(op.element.end).toBe(7.0);
     expect(op.element.props.effectType).toBe("golden_hour");
   });
+
+  describe("Pack Finance: Natural Language Motion Graphics Parsing", () => {
+    it("parses 'add candlestick trading hud at 4s' with BTC ticker and price", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add candlestick trading hud at 4s with SOL and $150", context);
+
+      expect(result.matched).toBe(true);
+      expect(result.operation?.type).toBe("add_element");
+      const op = result.operation as any;
+      expect(op.track).toBe("graphic");
+      expect(op.element.compositionId).toBe("candlestick-hud");
+      expect(op.element.name).toBe("CANDLESTICK HUD");
+      expect(op.element.start).toBe(4.0);
+      expect(op.element.props.ticker).toBe("SOL/USDT");
+      expect(op.element.props.price).toBe("$150");
+    });
+
+    it("parses 'add compound growth curve from 1s to 5s' with multiplier and years", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add compound growth curve from 1s to 5s for 25 years with 10x", context);
+
+      expect(result.matched).toBe(true);
+      expect(result.operation?.type).toBe("add_element");
+      const op = result.operation as any;
+      expect(op.track).toBe("graphic");
+      expect(op.element.compositionId).toBe("compound-growth-curve");
+      expect(op.element.start).toBe(1.0);
+      expect(op.element.end).toBe(5.0);
+      expect(op.element.props.years).toBe(25);
+      expect(op.element.props.multiplier).toBe("10x");
+    });
+
+    it("parses 'add portfolio donut at 2s' into asset allocation composition", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add portfolio donut at 2s", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("portfolio-donut");
+      expect(op.element.name).toBe("PORTFOLIO DONUT");
+      expect(op.element.start).toBe(2.0);
+      expect(op.element.props.totalValue).toBe("$250,000");
+    });
+
+    it("parses 'add inflation cash burn at 3s' with custom loss", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add inflation cash burn at 3s lost $45,000", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("inflation-cash-burn");
+      expect(op.element.start).toBe(3.0);
+      expect(op.element.props.lossAmount).toBe("-$45,000");
+    });
+
+    it("parses 'add banking notification at 5s' with custom wire amount", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add banking notification at 5s with +$50,000.00 from Stripe", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("banking-notification");
+      expect(op.element.start).toBe(5.0);
+      expect(op.element.props.amount).toBe("+$50,000.00");
+      expect(op.element.props.bankName).toBe("STRIPE");
+    });
+
+    it("parses 'add budget waterfall at 1s' into 50/30/20 rule graphic", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add budget waterfall at 1s", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("budget-waterfall");
+      expect(op.element.props.needs).toBe("$5,000 (50%)");
+    });
+
+    it("parses 'add debt payoff tracker at 6s' with custom progress", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add debt payoff tracker at 6s with 90% progress", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("debt-payoff-tracker");
+      expect(op.element.props.progress).toBe(90);
+    });
+
+    it("parses 'add roi balance scale at 2s' with multiplier", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add roi balance scale at 2s with 15x roi", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("roi-balance-scale");
+      expect(op.element.props.roiMultiplier).toBe("15x ROI");
+    });
+
+    it("parses 'add wealth flywheel at 4s'", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add wealth flywheel at 4s", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("wealth-flywheel");
+      expect(op.element.name).toBe("WEALTH FLYWHEEL");
+    });
+
+    it("parses 'add battle chart at 3s' into Buffett index challenge", () => {
+      const context = assembleEditorContext(mockProject, 0, null);
+      const result = parseLocalCommand("add battle chart at 3s", context);
+
+      expect(result.matched).toBe(true);
+      const op = result.operation as any;
+      expect(op.element.compositionId).toBe("battle-chart");
+      expect(op.element.props.contestantA).toBe("S&P 500 INDEX");
+    });
+
+    it("synchronizes finance motion graphics when I say target spoken phrase", () => {
+      const mockProjectWithWords: TimelineProject = {
+        ...mockProject,
+        transcript: {
+          videoId: "test-proj",
+          words: [
+            { word: "Invest", start: 1.0, end: 1.5, probability: 0.99 },
+            { word: "in", start: 1.55, end: 1.7, probability: 0.99 },
+            { word: "Bitcoin", start: 1.75, end: 2.3, probability: 0.98 },
+            { word: "today", start: 2.35, end: 2.8, probability: 0.99 },
+          ],
+          text: "Invest in Bitcoin today",
+        },
+      };
+
+      const context = assembleEditorContext(mockProjectWithWords, 0, null);
+      const result = parseLocalCommand("add candlestick hud when I say Bitcoin", context);
+
+      expect(result.matched).toBe(true);
+      expect(result.operation?.type).toBe("add_element");
+      const op = result.operation as any;
+      expect(op.track).toBe("graphic");
+      expect(op.element.compositionId).toBe("candlestick-hud");
+      expect(op.element.start).toBe(1.75);
+    });
+  });
 });

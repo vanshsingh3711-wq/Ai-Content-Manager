@@ -32,6 +32,15 @@ import { TimelineRoadmap } from './compositions/TimelineRoadmap';
 import { HierarchyPyramid } from './compositions/HierarchyPyramid';
 import { TactileChecklistStamp } from './compositions/TactileChecklistStamp';
 import { SplitSliderComparison } from './compositions/SplitSliderComparison';
+import { CandlestickHUD } from './compositions/CandlestickHUD';
+import { CompoundGrowthCurve } from './compositions/CompoundGrowthCurve';
+import { PortfolioDonut } from './compositions/PortfolioDonut';
+import { InflationCashBurn } from './compositions/InflationCashBurn';
+import { BankingNotification } from './compositions/BankingNotification';
+import { BudgetWaterfall } from './compositions/BudgetWaterfall';
+import { DebtPayoffTracker } from './compositions/DebtPayoffTracker';
+import { ROIBalanceScale } from './compositions/ROIBalanceScale';
+import { WealthFlywheel } from './compositions/WealthFlywheel';
 
 // Remotion Root — all compositions registered here
 // Python calls: npx remotion render src/remotion/Root.tsx <ID> --props='{}' out.mov
@@ -85,6 +94,34 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="compound-formula" component={CompoundFormula as any} durationInFrames={150} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}
       defaultProps={{ title: 'THE 3-STEP WINNING FORMULA', autoAmount: '$500 / Month' }} />
+    {/* High-Converting Finance Motion Graphics Pack */}
+    <Composition id="candlestick-hud" component={CandlestickHUD as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ symbol: 'BTC / USD', timeframe: '4H BREAKOUT • HIGH VOLUME', startingPrice: 48250, endingPrice: 64180, percentageGain: '+32.8%', trend: 'bullish' }} />
+    <Composition id="compound-growth-curve" component={CompoundGrowthCurve as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'THE EXPONENTIAL SNOWBALL EFFECT', monthlyDeposit: '$500 / Month', annualRate: '10% S&P 500 Historical', terminalCompound: 1130240, terminalCash: 180000 }} />
+    <Composition id="portfolio-donut" component={PortfolioDonut as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'THE ALL-WEATHER ASSET ALLOCATION', totalValuation: 250000, subtitle: 'RAY DALIO & BOGLEHEAD DIVERSIFICATION BLUEPRINT' }} />
+    <Composition id="inflation-cash-burn" component={InflationCashBurn as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ initialCapital: 10000, timeframeYears: 10, averageInflation: '7.2% / Year', terminalValue: 4980, lossPercentage: '-50.2%' }} />
+    <Composition id="banking-notification" component={BankingNotification as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ headline: 'Direct Deposit Received', source: 'VOO Quarterly Dividend Payout • Vanguard', depositAmount: 4250, newNetWorth: 89450 }} />
+    <Composition id="budget-waterfall" component={BudgetWaterfall as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ monthlyIncome: '$5,000 Net Income', needsAmount: '$2,500 (Rent, Food, Health)', wantsAmount: '$1,500 (Dining, Trips, Tech)', investAmount: '$1,000 (Index Funds & Wealth)' }} />
+    <Composition id="debt-payoff-tracker" component={DebtPayoffTracker as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ title: 'THE DEBT AVALANCHE ACCELERATOR', strategy: 'MATHEMATICAL HIGHEST-APR DESTROYER', totalDebt: '$35,400 TOTAL DEBT', freedCashflow: '+$650 / MONTH FREED CAPITAL' }} />
+    <Composition id="roi-balance-scale" component={ROIBalanceScale as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ leftName: 'New Financed SUV', leftCost: '-$850 / Month Payment', leftValue: '$14,000 (10 Yr Resale)', rightName: 'S&P 500 Index Fund', rightCost: '+$850 / Month Invested', rightValue: '$184,200 (10 Yr Compounded)' }} />
+    <Composition id="wealth-flywheel" component={WealthFlywheel as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{ mode: 'wealth', title: 'THE EXPONENTIAL WEALTH FLYWHEEL' }} />
     {/* Universal Educational & Cognitive Motion Graphics Pack */}
     <Composition id="spotlight-cone" component={SpotlightCone as any} durationInFrames={75} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}

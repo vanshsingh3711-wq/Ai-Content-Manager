@@ -92,6 +92,25 @@ REMOTION_ONLY_TEMPLATES = {
     "hierarchy_pyramid",
     "tactile_checklist_stamp",
     "split_slider_comparison",
+    # 10 Finance Motion Graphics Pack
+    "candlestick_hud",
+    "candlestick-hud",
+    "compound_growth_curve",
+    "compound-growth-curve",
+    "portfolio_donut",
+    "portfolio-donut",
+    "inflation_cash_burn",
+    "inflation-cash-burn",
+    "banking_notification",
+    "banking-notification",
+    "budget_waterfall",
+    "budget-waterfall",
+    "debt_payoff_tracker",
+    "debt-payoff-tracker",
+    "roi_balance_scale",
+    "roi-balance-scale",
+    "wealth_flywheel",
+    "wealth-flywheel",
 }
 
 def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:

@@ -408,6 +408,228 @@ export function ResourceVisualPreview({
   // 2. PACK B: MOTION GRAPHICS & CARDS
   // ==========================================
   if (resType === "motion_graphic") {
+    // ----------------------------------------------------
+    // FINANCE NICHE MOTION GRAPHICS PREVIEWS
+    // ----------------------------------------------------
+    // 1. Candlestick Trading HUD
+    if (resId.includes("candlestick")) {
+      return (
+        <div className="w-full h-full p-2.5 flex flex-col justify-between bg-gradient-to-br from-neutral-950 via-slate-950 to-emerald-950/40 relative overflow-hidden select-none font-mono">
+          <div className="flex items-center justify-between text-[9px] text-emerald-400 font-bold border-b border-neutral-800 pb-1">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>BTC/USD</span>
+            </span>
+            <span>$64.1K ▲</span>
+          </div>
+          <svg className="w-full h-12 overflow-visible" viewBox="0 0 100 40">
+            {/* Candlesticks */}
+            {[
+              { x: 12, h: 22, l: 36, o: 28, c: 24, bull: true },
+              { x: 30, h: 20, l: 34, o: 24, c: 30, bull: false },
+              { x: 48, h: 14, l: 28, o: 26, c: 18, bull: true },
+              { x: 66, h: 10, l: 22, o: 18, c: 12, bull: true },
+              { x: 84, h: 6, l: 18, o: 14, c: 8, bull: true },
+            ].map((cd, i) => (
+              <g key={i}>
+                <line x1={cd.x} y1={cd.h} x2={cd.x} y2={cd.l} stroke={cd.bull ? "#10b981" : "#ef4444"} strokeWidth="1" />
+                <rect x={cd.x - 3} y={Math.min(cd.o, cd.c)} width="6" height={Math.max(2, Math.abs(cd.c - cd.o))} fill={cd.bull ? "#10b981" : "#ef4444"} rx="0.5" />
+              </g>
+            ))}
+            <path d="M 10 30 Q 50 22 86 10" fill="none" stroke="#38bdf8" strokeWidth="1.5" className={cn(isHovered && "filter drop-shadow-[0_0_6px_#38bdf8]")} />
+          </svg>
+          <div className="text-[8px] bg-emerald-500/10 text-emerald-300 px-1 py-0.5 rounded text-center font-bold">
+            BREAKOUT +32.8%
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Compound Growth Curve (Snowball)
+    if (resId.includes("compound-growth") || resId.includes("snowball")) {
+      return (
+        <div className="w-full h-full p-2.5 flex flex-col justify-between bg-gradient-to-br from-neutral-950 via-slate-950 to-emerald-950/40 relative overflow-hidden select-none font-mono">
+          <div className="flex items-center justify-between text-[9px] text-emerald-400 font-bold border-b border-neutral-800 pb-1">
+            <span>S&P 500 SNOWBALL</span>
+            <span className="text-white">$1.13M</span>
+          </div>
+          <svg className="w-full h-14 overflow-visible" viewBox="0 0 100 45">
+            <defs>
+              <linearGradient id="prevSnowball" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+            <path d="M 5 40 C 45 38 70 20 95 6 L 95 40 L 5 40 Z" fill="url(#prevSnowball)" />
+            <line x1="5" y1="40" x2="95" y2="30" stroke="#64748b" strokeWidth="1.2" strokeDasharray="2 2" />
+            <path d="M 5 40 C 45 38 70 20 95 6" fill="none" stroke="#10b981" strokeWidth="2" className={cn(isHovered && "filter drop-shadow-[0_0_6px_#10b981]")} />
+            <circle cx="60" cy="24" r="2.5" fill="#facc15" className="animate-ping" />
+            <circle cx="60" cy="24" r="2" fill="#ffffff" />
+          </svg>
+          <div className="text-[8px] bg-emerald-500/10 text-emerald-300 px-1 py-0.5 rounded text-center font-bold">
+            +6.3x NET ALPHA
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Asset Allocation Donut
+    if (resId.includes("portfolio-donut") || resId.includes("allocation")) {
+      return (
+        <div className="w-full h-full p-2 flex items-center justify-center bg-gradient-to-br from-neutral-950 via-slate-950 to-sky-950/40 relative overflow-hidden select-none font-mono">
+          <div className="relative w-16 h-16 flex items-center justify-center">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="28" fill="none" stroke="#3b82f6" strokeWidth="10" strokeDasharray="88 176" strokeDashoffset="0" />
+              <circle cx="40" cy="40" r="28" fill="none" stroke="#10b981" strokeWidth="10" strokeDasharray="35 176" strokeDashoffset="-88" />
+              <circle cx="40" cy="40" r="28" fill="none" stroke="#f59e0b" strokeWidth="10" strokeDasharray="35 176" strokeDashoffset="-123" />
+              <circle cx="40" cy="40" r="28" fill="none" stroke="#8b5cf6" strokeWidth="10" strokeDasharray="18 176" strokeDashoffset="-158" />
+            </svg>
+            <div className="absolute text-center flex flex-col items-center">
+              <span className="text-[7px] text-neutral-400 font-bold">DALIO</span>
+              <span className="text-[9px] font-black text-white">$250K</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 4. Inflation Cash Burn
+    if (resId.includes("inflation") || resId.includes("cash-burn")) {
+      return (
+        <div className="w-full h-full p-2 flex items-center justify-center bg-gradient-to-br from-neutral-950 to-rose-950/30 relative overflow-hidden select-none font-mono">
+          <div className="w-24 h-14 rounded-lg bg-emerald-950 border border-emerald-500/50 p-1.5 flex flex-col justify-between relative overflow-hidden shadow-md">
+            <div className="flex justify-between text-[7px] text-emerald-300 font-bold">
+              <span>$10,000</span>
+              <span>USD</span>
+            </div>
+            <div className="text-[8px] text-center font-black text-emerald-200">FEDERAL RESERVE</div>
+            <div className="text-[6px] text-emerald-400 text-center">DEPRECIATING</div>
+            <div
+              className="absolute inset-y-0 right-0 bg-gradient-to-l from-black via-rose-950/90 to-transparent border-l border-amber-500 shadow-[inset_0_0_10px_rgba(239,68,68,0.8)] flex items-center justify-center transition-all duration-300"
+              style={{ width: isHovered ? "60%" : "45%" }}
+            >
+              <span className="text-[8px] font-bold text-rose-400 -rotate-12">🔥 -50%</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 5. Banking Push Notification
+    if (resId.includes("banking") || resId.includes("notification")) {
+      return (
+        <div className="w-full h-full p-2 flex items-center justify-center bg-gradient-to-br from-neutral-950 to-slate-900 relative overflow-hidden select-none font-sans">
+          <div className="w-28 rounded-xl bg-slate-900/90 border border-white/10 p-2 shadow-lg space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="w-3.5 h-3.5 rounded bg-emerald-500 text-black text-[7px] font-black flex items-center justify-center">$</span>
+              <span className="text-[6px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1 rounded">DIVIDEND</span>
+            </div>
+            <div className="text-[8px] font-bold text-white truncate">Direct Deposit</div>
+            <div className="text-[10px] font-mono font-black text-emerald-400 text-right">+$4,250</div>
+          </div>
+        </div>
+      );
+    }
+
+    // 6. Budget Waterfall
+    if (resId.includes("waterfall") || resId.includes("50-30-20") || resId.includes("budget")) {
+      return (
+        <div className="w-full h-full p-2 flex items-center justify-center bg-gradient-to-br from-neutral-950 to-emerald-950/20 relative overflow-hidden select-none font-mono">
+          <div className="flex items-end justify-center gap-1.5 h-14 w-28">
+            <div className="w-8 h-12 bg-neutral-900 border border-slate-700 rounded p-0.5 flex flex-col justify-between text-center">
+              <span className="text-[6px] text-neutral-400">50%</span>
+              <div className="h-6 bg-slate-500/40 rounded-sm" />
+              <span className="text-[6px] text-white font-bold">$2.5K</span>
+            </div>
+            <div className="w-8 h-12 bg-neutral-900 border border-rose-500/30 rounded p-0.5 flex flex-col justify-between text-center">
+              <span className="text-[6px] text-rose-400">30%</span>
+              <div className="h-4 bg-rose-500/40 rounded-sm" />
+              <span className="text-[6px] text-rose-300 font-bold">$1.5K</span>
+            </div>
+            <div className="w-8 h-12 bg-emerald-950/60 border border-emerald-400 rounded p-0.5 flex flex-col justify-between text-center shadow-[0_0_8px_rgba(16,185,129,0.3)]">
+              <span className="text-[6px] text-emerald-300 font-bold">20%</span>
+              <div className="h-8 bg-emerald-500/50 rounded-sm" />
+              <span className="text-[6px] text-emerald-400 font-black">$1.0K</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 7. Debt Payoff Tracker
+    if (resId.includes("debt")) {
+      return (
+        <div className="w-full h-full p-2 flex flex-col justify-center items-center bg-gradient-to-br from-neutral-950 to-rose-950/20 relative overflow-hidden select-none font-mono">
+          <div className="w-28 space-y-1.5">
+            <div className="bg-emerald-500/10 border border-emerald-500/40 rounded p-1 flex items-center justify-between">
+              <span className="text-[7px] text-white font-bold">Credit Card</span>
+              <span className="border border-emerald-400 text-emerald-300 text-[6px] font-black px-1 rounded -rotate-3">PAID</span>
+            </div>
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded p-1 flex items-center justify-between">
+              <span className="text-[7px] text-neutral-400">Loan</span>
+              <span className="text-[7px] text-neutral-200 font-bold">$9.8K</span>
+            </div>
+            <div className="text-[7px] text-emerald-400 bg-emerald-500/10 text-center py-0.5 rounded font-bold">
+              +$650/MO FREED
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 8. ROI Balance Scale
+    if (resId.includes("roi") || resId.includes("scale")) {
+      return (
+        <div className="w-full h-full p-2 flex items-center justify-center bg-gradient-to-br from-neutral-950 to-amber-950/20 relative overflow-hidden select-none font-mono">
+          <div className="w-28 flex items-center justify-between gap-1">
+            <div className="flex-1 bg-rose-500/10 border border-rose-500/30 rounded p-1 text-center">
+              <div className="text-[6px] text-rose-400">CAR</div>
+              <div className="text-[7px] font-bold text-white">$14K</div>
+            </div>
+            <span className="text-amber-400 text-[10px] font-bold">⚖️</span>
+            <div className="flex-1 bg-emerald-500/15 border border-emerald-400 rounded p-1 text-center shadow-[0_0_8px_rgba(16,185,129,0.3)]">
+              <div className="text-[6px] text-emerald-300 font-bold">S&P</div>
+              <div className="text-[7px] font-black text-emerald-400">$184K</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 9. Wealth Flywheel
+    if (resId.includes("flywheel")) {
+      return (
+        <div className="w-full h-full p-2 flex items-center justify-center bg-gradient-to-br from-neutral-950 to-emerald-950/20 relative overflow-hidden select-none font-mono">
+          <div className="relative w-14 h-14 rounded-full border border-dashed border-emerald-400/60 flex items-center justify-center animate-spin-slow">
+            <div className="w-7 h-7 rounded-full bg-emerald-500 text-black flex items-center justify-center text-[10px] font-black shadow-[0_0_10px_#34d399]">
+              ⚡
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 10. Battle Chart (Buffett vs Hedge Funds)
+    if (resId.includes("battle-chart") || resId.includes("buffett")) {
+      return (
+        <div className="w-full h-full p-2 flex flex-col justify-center items-center bg-gradient-to-br from-neutral-950 to-emerald-950/20 relative overflow-hidden select-none font-mono">
+          <div className="w-28 space-y-1">
+            <div className="text-[7px] font-bold text-white text-center">BUFFETT $1M CHALLENGE</div>
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] text-emerald-400 w-8">S&P 500</span>
+              <div className="flex-1 h-2 bg-emerald-500 rounded" />
+              <span className="text-[7px] font-black text-emerald-400">+126%</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] text-rose-400 w-8">HEDGE</span>
+              <div className="w-10 h-2 bg-rose-500 rounded" />
+              <span className="text-[7px] font-bold text-rose-400">+36%</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // 2a. Rising Growth Chart
     if (resId.includes("growth-chart") || resId.includes("chart") || resId.includes("graph")) {
       const h1 = isHovered ? 25 + ((waveSeed * 7) % 35) : 30;
@@ -1231,7 +1453,7 @@ export function ResourceVisualPreview({
         {/* Duration badge */}
         <div className="absolute bottom-1.5 right-1.5 z-10">
           <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-black/70 text-neutral-300 backdrop-blur-md border border-white/10">
-            {resource.duration ?? resource.defaultDuration}s
+            {(resource as any).duration ?? (resource as any).defaultDuration ?? 4.0}s
           </span>
         </div>
       </div>

@@ -172,3 +172,27 @@ def test_copilot_whole_video_endpoint_with_transcript_context():
     # 4. Zero destructive cuts
     destructive_edits = [e for e in edits if e.get("is_destructive") is True]
     assert len(destructive_edits) == 0
+
+
+def test_finance_whole_video_plan_generation():
+    """Verify finance script beats and prompts correctly map to finance motion graphics."""
+    finance_beats = [
+        {"start": 1.0, "end": 4.5, "role": "hook", "text": "Bitcoin and crypto markets just broke out"},
+        {"start": 12.0, "end": 15.5, "role": "solution", "text": "The exponential snowball compounding effect works"},
+        {"start": 25.0, "end": 28.5, "role": "metric", "text": "Rebalancing your portfolio asset allocation"},
+        {"start": 38.0, "end": 41.5, "role": "stat", "text": "Wire deposit payout cleared directly"},
+    ]
+
+    plan = coordinate_whole_video_plan(
+        total_duration=50.0,
+        prompt="Create an engaging finance breakdown video with motion graphics",
+        transcript_beats=finance_beats,
+    )
+
+    mg_edits = [e for e in plan.edits if e.action == "motion_graphics"]
+    assert len(mg_edits) >= 2
+
+    # Check that finance composition IDs are used
+    mg_types = [e.motion_graphics_type for e in mg_edits]
+    assert any("candlestick" in t or "compound" in t or "portfolio" in t or "banking" in t for t in mg_types)
+

@@ -706,5 +706,99 @@ describe("Shared Asset Resource Library Foundation & First Working Packs", () =>
         expect(textTrack[0].stylePreset).toBe("tiktok_yellow");
       });
     });
+
+    it("renders Finance category tab and displays all 10 finance motion graphic cards", () => {
+      render(<ResourceLibraryDrawer initialCategory="Finance" />);
+
+      expect(screen.getByTestId("library-resource-card-mg-candlestick-hud")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-compound-growth-curve")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-portfolio-donut")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-inflation-cash-burn")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-banking-notification")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-budget-waterfall")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-debt-payoff-tracker")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-roi-balance-scale")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-wealth-flywheel")).toBeDefined();
+      expect(screen.getByTestId("library-resource-card-mg-battle-chart")).toBeDefined();
+    });
+
+    it("adds a finance motion graphic to timeline graphicsTrack on Add button click", async () => {
+      render(<ResourceLibraryDrawer initialCategory="Finance" />);
+
+      const candleCard = screen.getByTestId("library-resource-card-mg-candlestick-hud");
+      const addBtn = within(candleCard).getByTitle("Insert at Playhead");
+
+      fireEvent.click(addBtn);
+
+      await waitFor(() => {
+        const graphics = useTimelineStore.getState().project.tracks.graphicsTrack;
+        expect(graphics.length).toBe(1);
+        expect(graphics[0].compositionId).toBe("candlestick-hud");
+        expect(graphics[0].props?.symbol).toBe("BTC / USD");
+        expect(graphics[0].start).toBe(3.0);
+        expect(graphics[0].end).toBe(8.0);
+      });
+    });
+  });
+
+  describe("5. Pack Finance: Registry & Operations Verification", () => {
+    const expectedFinanceIds = [
+      "mg-candlestick-hud",
+      "mg-compound-growth-curve",
+      "mg-portfolio-donut",
+      "mg-inflation-cash-burn",
+      "mg-banking-notification",
+      "mg-budget-waterfall",
+      "mg-debt-payoff-tracker",
+      "mg-roi-balance-scale",
+      "mg-wealth-flywheel",
+      "mg-battle-chart",
+    ];
+
+    it("ensures all 10 finance resources exist in RESOURCE_CATALOG and validate cleanly", () => {
+      expectedFinanceIds.forEach((id) => {
+        const res = getResourceById(id);
+        expect(res).toBeDefined();
+        expect(res?.category).toBe("Finance");
+        expect(res?.type).toBe("motion_graphic");
+        expect(res?.targetTrack).toBe("graphic");
+        expect(res?.defaultDuration).toBe(5.0);
+        expect(() => validateResource(res!)).not.toThrow();
+      });
+    });
+
+    it("filters finance resources via searchResources category and tags", () => {
+      const financeOnly = searchResources("", { category: "Finance" });
+      expect(financeOnly.length).toBe(10);
+      expect(financeOnly.every((r) => r.category === "Finance")).toBe(true);
+
+      const cryptoSearch = searchResources("crypto");
+      expect(cryptoSearch.some((r) => r.id === "mg-candlestick-hud")).toBe(true);
+
+      const dalioSearch = searchResources("dalio");
+      expect(dalioSearch.some((r) => r.id === "mg-portfolio-donut")).toBe(true);
+
+      const buffettSearch = searchResources("buffett");
+      expect(buffettSearch.some((r) => r.id === "mg-battle-chart")).toBe(true);
+    });
+
+    it("creates valid add_element edit operations for finance graphics", () => {
+      const res = getResourceById("mg-compound-growth-curve")!;
+      const result = createOperationFromResource(res, {
+        timestamp: 4.5,
+        targetTrack: "graphic",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.operation?.type).toBe("add_element");
+
+      if (result.operation && result.operation.type === "add_element") {
+        expect(result.operation.track).toBe("graphic");
+        expect(result.operation.element.compositionId).toBe("compound-growth-curve");
+        expect(result.operation.element.start).toBe(4.5);
+        expect(result.operation.element.end).toBe(9.5);
+        expect((result.operation.element.props as any).title).toBe("THE EXPONENTIAL SNOWBALL EFFECT");
+      }
+    });
   });
 });

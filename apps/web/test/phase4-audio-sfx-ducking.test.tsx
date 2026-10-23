@@ -288,6 +288,175 @@ describe("Phase 4: Audio Engineering, SFX Placement, & Narration Ducking", () =>
           }),
         })
       );
+
+      // Verify new finance SFX presets (riser & impact) are rendered
+      expect(screen.getByTestId("sfx-preset-riser-edit-sfx-1")).toBeInTheDocument();
+      expect(screen.getByTestId("sfx-preset-impact-edit-sfx-1")).toBeInTheDocument();
+
+      // Click on impact preset
+      fireEvent.click(screen.getByTestId("sfx-preset-impact-edit-sfx-1"));
+      expect(onUpdateEdit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: expect.objectContaining({
+            element: expect.objectContaining({
+              sourceUrl: "/assets/audio/impact.mp3",
+              name: "Impact SFX",
+            }),
+          }),
+        })
+      );
+    });
+  });
+
+  describe("4. Phase 5: Finance Motion Graphics Signature SFX Pairing", () => {
+    const financeProject: TimelineProject = {
+      ...initialProject,
+      tracks: {
+        ...initialProject.tracks,
+        graphicsTrack: [
+          {
+            id: "graphic-candle",
+            name: "Bitcoin Candlestick HUD",
+            compositionId: "candlestick-hud",
+            start: 4.5,
+            end: 9.0,
+            props: { ticker: "BTC/USD", currentPrice: 94500 },
+          },
+          {
+            id: "graphic-bank",
+            name: "Chase Wire Notification",
+            compositionId: "banking-notification",
+            start: 14.2,
+            end: 18.5,
+            props: { bankName: "CHASE", amount: "$15,400" },
+          },
+          {
+            id: "graphic-debt",
+            name: "Credit Card Debt Tracker",
+            compositionId: "debt-payoff-tracker",
+            start: 22.0,
+            end: 27.5,
+            props: { initialDebt: 12500, paidAmount: 12500 },
+          },
+          {
+            id: "graphic-burn",
+            name: "Inflation Cash Burn",
+            compositionId: "inflation-cash-burn",
+            start: 28.0,
+            end: 32.0,
+            props: { initialAmount: 100000, purchasingPowerLoss: 38 },
+          },
+        ],
+      },
+    };
+
+    it("pairs cash register sound effect with banking notification graphic entrance", () => {
+      const context = assembleEditorContext(financeProject, 0.0, null);
+      const res = parseLocalCommand(
+        "Add cash register sound when banking notification appears",
+        context
+      );
+
+      expect(res.matched).toBe(true);
+      expect(res.operation?.type).toBe("add_element");
+      const op = res.operation as any;
+      expect(op.track).toBe("audio");
+      expect(op.element.start).toBe(14.2);
+      expect(op.element.end).toBe(15.0);
+      expect(op.element.name).toBe("Cash Register SFX");
+      expect(op.element.sourceUrl).toBe("/assets/audio/chime.mp3");
+    });
+
+    it("pairs stamp sound effect with debt payoff tracker graphic entrance", () => {
+      const context = assembleEditorContext(financeProject, 0.0, null);
+      const res = parseLocalCommand(
+        "Add stamp sound when debt payoff enters",
+        context
+      );
+
+      expect(res.matched).toBe(true);
+      expect(res.operation?.type).toBe("add_element");
+      const op = res.operation as any;
+      expect(op.track).toBe("audio");
+      expect(op.element.start).toBe(22.0);
+      expect(op.element.name).toBe("Stamp Thud SFX");
+      expect(op.element.sourceUrl).toBe("/assets/audio/impact.mp3");
+    });
+
+    it("pairs fire sizzle sound effect with inflation cash burn graphic entrance", () => {
+      const context = assembleEditorContext(financeProject, 0.0, null);
+      const res = parseLocalCommand(
+        "Add fire sizzle when inflation cash burn appears",
+        context
+      );
+
+      expect(res.matched).toBe(true);
+      expect(res.operation?.type).toBe("add_element");
+      const op = res.operation as any;
+      expect(op.track).toBe("audio");
+      expect(op.element.start).toBe(28.0);
+      expect(op.element.name).toBe("Fire Sizzle SFX");
+      expect(op.element.sourceUrl).toBe("/assets/audio/whoosh.mp3");
+    });
+
+    it("pairs subtle whoosh sound effect at candlestick hud entrance", () => {
+      const context = assembleEditorContext(financeProject, 0.0, null);
+      const res = parseLocalCommand(
+        "Add subtle whoosh at candlestick hud",
+        context
+      );
+
+      expect(res.matched).toBe(true);
+      const op = res.operation as any;
+      expect(op.track).toBe("audio");
+      expect(op.element.start).toBe(4.5);
+      expect(op.element.name).toBe("Subtle Whoosh SFX");
+      expect(op.element.volume).toBe(65);
+    });
+
+    it("auto-pairs signature SFX when generic sound cue is requested for finance graphic", () => {
+      const context = assembleEditorContext(financeProject, 0.0, null);
+      const res = parseLocalCommand(
+        "Add a sound effect when banking notification appears",
+        context
+      );
+
+      expect(res.matched).toBe(true);
+      const op = res.operation as any;
+      expect(op.track).toBe("audio");
+      expect(op.element.start).toBe(14.2);
+      expect(op.element.name).toBe("Cash Register SFX");
+    });
+
+    it("coexists cleanly with BGM speech ducking at -14dB", () => {
+      const context = assembleEditorContext(financeProject, 0.0, null);
+
+      // 1. Add BGM with narration ducking
+      const bgmRes = parseLocalCommand(
+        "Add chill background music and duck it whenever I speak",
+        context
+      );
+      const { nextProject: projWithBgm } = executeOperation(financeProject, bgmRes.operation!);
+      expect(projWithBgm.tracks.audioTrack).toHaveLength(1);
+      expect(projWithBgm.tracks.audioTrack[0].ducking).toBe(true);
+      expect(projWithBgm.tracks.audioTrack[0].duckingDb).toBe(-14.0);
+
+      // 2. Add finance SFX
+      const sfxContext = assembleEditorContext(projWithBgm, 0.0, null);
+      const sfxRes = parseLocalCommand(
+        "Add cash register sound when banking notification appears",
+        sfxContext
+      );
+      const { nextProject: projWithBoth } = executeOperation(projWithBgm, sfxRes.operation!);
+
+      expect(projWithBoth.tracks.audioTrack).toHaveLength(2);
+      const bgm = projWithBoth.tracks.audioTrack.find((a) => a.isBgm);
+      const sfx = projWithBoth.tracks.audioTrack.find((a) => !a.isBgm);
+
+      expect(bgm?.duckingDb).toBe(-14.0);
+      expect(sfx?.name).toBe("Cash Register SFX");
+      expect(sfx?.start).toBe(14.2);
     });
   });
 });
+
