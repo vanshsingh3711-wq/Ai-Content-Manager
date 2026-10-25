@@ -60,6 +60,18 @@ ALLOWED_TEMPLATES = {
     "tactile_checklist_stamp",
     # Universal Phase 8: Split Slider Comparison & Transformation Wipe
     "split_slider_comparison",
+    # Deep Visual Rhetoric Explainer Pack
+    "architecture_pipeline",
+    "todo_list",
+    "causal_loop",
+    "exploded_layer_stack",
+    "bottleneck_constriction",
+    "trilemma_tradeoff",
+    "scale_zoom_ladder",
+    "decision_tree_fork",
+    "radar_spider_chart",
+    "pareto_power_law",
+    "chrono_dial_clock",
 }
 
 # These are Remotion compositions
@@ -111,6 +123,18 @@ REMOTION_ONLY_TEMPLATES = {
     "roi-balance-scale",
     "wealth_flywheel",
     "wealth-flywheel",
+    # Deep Visual Rhetoric Explainer Pack
+    "architecture_pipeline",
+    "todo_list",
+    "causal_loop",
+    "exploded_layer_stack",
+    "bottleneck_constriction",
+    "trilemma_tradeoff",
+    "scale_zoom_ladder",
+    "decision_tree_fork",
+    "radar_spider_chart",
+    "pareto_power_law",
+    "chrono_dial_clock",
 }
 
 def generate_motion_graphics_plan(unified_analysis_json: str, ai_model_pref: str = "Claude Opus 5.5", style_pref: str = "viral") -> EditList:

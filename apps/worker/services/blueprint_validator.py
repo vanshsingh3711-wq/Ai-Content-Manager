@@ -30,6 +30,9 @@ class ValidationReport(BaseModel):
     issues: List[ValidationIssue] = []
     broll_budget_used: float = 0.0  # seconds of B-roll in validated blueprint
     broll_budget_max: float = 0.0   # maximum allowed seconds
+    mg_budget_max: int = 0          # maximum allowed motion graphic cards
+    mg_count_used: int = 0          # motion graphic cards in validated blueprint
+    mg_downgraded_count: int = 0    # motion graphics downgraded to B-roll to preserve pacing
 
 
 def validate_blueprint(
@@ -38,6 +41,9 @@ def validate_blueprint(
     video_duration: float,
     config: Optional[Any] = None,
     is_faceless: bool = False,
+    enforce_pacing: Optional[bool] = None,
+    style: str = "viral",
+    topic: str = "technology",
 ) -> Tuple[List[Dict[str, Any]], ValidationReport]:
     """
     Validates and filters AI-generated editing decisions.
@@ -48,6 +54,9 @@ def validate_blueprint(
         video_duration: Total duration of the original video in seconds.
         config: Optional EditingConfig override (uses EDITING_CONFIG singleton by default).
         is_faceless: True if the video is faceless (allows higher B-roll budgets).
+        enforce_pacing: If True, activates the Phase 3 Motion Graphic Pacing & Budget Gatekeeper.
+        style: Narrative style (e.g., 'viral', 'minimal').
+        topic: Overall domain topic (e.g., 'technology', 'finance', 'psychology').
 
     Returns:
         Tuple of (validated_edits, validation_report).
@@ -151,18 +160,26 @@ def validate_blueprint(
             continue
 
         # ── Validate trigger_id exists in timestamp_map ───────────────
-        if trigger_id not in timestamp_map:
-            report.issues.append(ValidationIssue(
-                trigger_id=trigger_id,
-                action=action,
-                issue=f"trigger_id '{trigger_id}' not found in timestamp_map",
-            ))
-            report.rejected_count += 1
-            continue
+        base_id = trigger_id.split("_cut")[0]
+        if trigger_id not in timestamp_map and base_id not in timestamp_map:
+            # sfx and transition can be synthetic timeline events
+            if action in ("sfx", "transition"):
+                chunk_start = float(edit.get("start", 0.0))
+                chunk_end = float(edit.get("end", chunk_start + 0.5))
+                chunk = {"start": chunk_start, "end": chunk_end}
+            else:
+                report.issues.append(ValidationIssue(
+                    trigger_id=trigger_id,
+                    action=action,
+                    issue=f"trigger_id '{trigger_id}' not found in timestamp_map",
+                ))
+                report.rejected_count += 1
+                continue
+        else:
+            chunk = timestamp_map.get(trigger_id) or timestamp_map.get(base_id, {})
 
-        chunk = timestamp_map[trigger_id]
-        chunk_start = chunk.get("start", 0.0)
-        chunk_end = chunk.get("end", 0.0)
+        chunk_start = float(edit.get("start") if edit.get("start") is not None else chunk.get("start", 0.0))
+        chunk_end = float(edit.get("end") if edit.get("end") is not None else chunk.get("end", 0.0))
         chunk_duration = chunk_end - chunk_start
 
         # ── Validate timestamps are within video duration ─────────────
@@ -287,8 +304,8 @@ def validate_blueprint(
             report.accepted_count += 1
             continue
 
-        # ── zoom_in / sfx / character — lightweight validation ────────────────────
-        if action in ("zoom_in", "sfx", "character"):
+        # ── zoom_in / sfx / character / transition — lightweight validation ────────────────────
+        if action in ("zoom_in", "sfx", "character", "transition"):
             validated.append(edit)
             report.accepted_count += 1
             continue
@@ -560,6 +577,50 @@ def validate_blueprint(
         ))
         report.rejected_count += 1
 
+    # ── Phase 3: Motion Graphic Pacing & Budget Gatekeeper ─────────────
+    should_enforce_pacing = enforce_pacing if enforce_pacing is not None else getattr(cfg, "ENFORCE_MG_PACING", False)
+    if should_enforce_pacing:
+        try:
+            from services.pacing_gatekeeper import (
+                prune_motion_graphics_by_pacing_and_budget,
+                get_motion_graphic_budget,
+            )
+            max_mg = getattr(cfg, "get_max_mg_count", None)
+            max_mg_count = max_mg(video_duration, style=style) if max_mg else get_motion_graphic_budget(video_duration, style=style)
+            min_mg_spacing = getattr(cfg, "MIN_MG_SPACING_SEC", 3.5)
+
+            gated_edits, gate_issues, gate_metrics = prune_motion_graphics_by_pacing_and_budget(
+                edits=validated,
+                timestamp_map=timestamp_map,
+                video_duration=video_duration,
+                max_mg_count=max_mg_count,
+                min_spacing_sec=min_mg_spacing,
+                style=style,
+                topic=topic,
+                downgrade_to_broll=True,
+            )
+            for g_iss in gate_issues:
+                report.issues.append(ValidationIssue(
+                    trigger_id=g_iss["trigger_id"],
+                    action=g_iss["action"],
+                    issue=g_iss["issue"],
+                    severity=g_iss.get("severity", "modified"),
+                ))
+                report.modified_count += 1
+
+            report.mg_budget_max = gate_metrics["budget_max"]
+            report.mg_count_used = gate_metrics["retained_mg_count"]
+            report.mg_downgraded_count = gate_metrics["downgraded_count"]
+            validated = gated_edits
+        except Exception as e:
+            print(f"[Blueprint Validator] Pacing Gatekeeper pass failed: {e}")
+    else:
+        # Pacing not strictly enforced: record existing motion graphic metrics
+        from services.pacing_gatekeeper import get_motion_graphic_budget
+        mg_in_validated = [e for e in validated if e.get("action") == "motion_graphics"]
+        report.mg_count_used = len(mg_in_validated)
+        report.mg_budget_max = get_motion_graphic_budget(video_duration, style=style)
+
     # ── Phase 3: Anti-AI Quality Guardian & Pacing Linter ──────────────
     try:
         from services.ai_tells_linter import lint_and_guard_blueprint
@@ -595,7 +656,9 @@ def format_validation_report(report: ValidationReport) -> str:
         f"{report.accepted_count} accepted, {report.rejected_count} rejected, "
         f"{report.modified_count} modified",
         f"B-roll budget: {report.broll_budget_used:.1f}s / {report.broll_budget_max:.1f}s",
+        f"Motion Graphic budget: {report.mg_count_used} used / {report.mg_budget_max} max (Downgraded: {report.mg_downgraded_count})",
     ]
     for issue in report.issues:
         lines.append(f"  [{issue.severity.upper()}] {issue.trigger_id} ({issue.action}): {issue.issue}")
     return "\n".join(lines)
+

@@ -57,6 +57,19 @@ class EditingConfig:
     # If audio_duration / video_duration < this value, flag as failure
     MIN_AUDIO_DURATION_RATIO: float = 0.8
 
+    # ── Motion Graphic Pacing & Budget Guardrails (Phase 3) ────────────
+    MAX_MG_COUNT_60S: int = 4            # Max 3-4 motion graphics in a 60s reel
+    MAX_MG_COUNT_EXPLAINER: int = 9      # Max 7-9 motion graphics in a 3-4m explainer
+    MIN_MG_SPACING_SEC: float = 3.5      # Minimum seconds of B-roll between motion graphics
+    MIN_MG_HOLD_SEC: float = 2.5         # Minimum display hold (seconds)
+    MAX_MG_HOLD_SEC: float = 4.0         # Maximum display hold (seconds)
+    ENFORCE_MG_PACING: bool = False      # Config toggle for blueprint validator
+
+    def get_max_mg_count(self, video_duration: float, style: str = "viral") -> int:
+        """Dynamically calculates maximum motion graphic cards allowed for video runtime."""
+        from services.pacing_gatekeeper import get_motion_graphic_budget
+        return get_motion_graphic_budget(video_duration, style=style)
+
 
 # Singleton instance used throughout the pipeline
 EDITING_CONFIG = EditingConfig()

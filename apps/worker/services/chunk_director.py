@@ -10,9 +10,19 @@ Directs individual 1-2 sentence script chunks (3.0s - 5.5s) with high precision:
 
 import os
 import re
-from typing import Any, Dict, List, Optional
+import json
+from typing import Any, Dict, List, Optional, Tuple
 from services.ai_director import EditDecision, EditList
 from services.script_chunker import ScriptChunk
+from services.director_taxonomy import (
+    VisualArchetype,
+    ARCHETYPE_REGISTRY,
+    classify_chunk_by_heuristics,
+    build_classification_system_prompt,
+    build_classification_user_prompt,
+    build_prop_extraction_prompt,
+    sanitize_and_fill_defaults,
+)
 
 # High-frequency keywords mapped to specialized visual templates with strict context gating
 TEMPLATE_MAPPINGS = [
@@ -1168,11 +1178,109 @@ def build_dynamic_motion_graphic_targets(
     return targets
 
 
+def call_director_llm(system_prompt: str, user_prompt: str, timeout: float = 8.0) -> Optional[Dict[str, Any]]:
+    """
+    Calls configured LLM provider (DeepSeek, OpenAI, Mistral) to return structured JSON.
+    Returns parsed dictionary on success, or None on failure/offline.
+    """
+    deepseek_key = os.getenv("DEEPSEEK_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not deepseek_key and not openai_key:
+        return None
+
+    try:
+        from openai import OpenAI
+        if deepseek_key:
+            client = OpenAI(api_key=deepseek_key, base_url="https://api.deepseek.com/v1", timeout=timeout)
+            model = "deepseek-chat"
+        else:
+            client = OpenAI(api_key=openai_key, timeout=timeout)
+            model = "gpt-4o-mini"
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=800
+        )
+        content = response.choices[0].message.content
+        return json.loads(content)
+    except Exception as e:
+        print(f"  [ChunkDirector:LLM_FALLBACK] LLM call bypassed ({e})")
+        return None
+
+
+def resolve_archetype_for_chunk(
+    chunk: ScriptChunk,
+    context_before: str = "",
+    context_after: str = "",
+    topic: str = "technology",
+    use_llm: bool = False
+) -> Tuple[VisualArchetype, float, Optional[str], Optional[Dict[str, Any]], str]:
+    """
+    Evaluates a ScriptChunk through the 2-Stage Visual Taxonomy:
+      Stage 1: Intent & Significance Classification (LLM with Heuristic fallback)
+      Stage 2: Entity & Dynamic Prop Extraction (LLM with Slot-filling & Default fallback)
+
+    Returns:
+      (archetype, confidence, primary_template, dynamic_props, reason)
+    """
+    # 1. Stage 1: Intent Classification via LLM (if enabled)
+    classification = None
+    if use_llm:
+        sys_p = build_classification_system_prompt()
+        user_p = build_classification_user_prompt(chunk.text, context_before, context_after, niche=topic)
+        classification = call_director_llm(sys_p, user_p, timeout=6.0)
+
+    if classification and isinstance(classification, dict):
+        is_sig = classification.get("is_significant", False)
+        arch_str = str(classification.get("archetype", "NONE")).upper().strip()
+        conf = float(classification.get("confidence", 0.9))
+        reason = classification.get("reason", "LLM Intent Classification")
+
+        if is_sig and arch_str in VisualArchetype.__members__ and arch_str != "NONE":
+            archetype = VisualArchetype[arch_str]
+            spec = ARCHETYPE_REGISTRY[archetype]
+            tmpl = spec.primary_template
+
+            # Stage 2: Dynamic Prop Extraction via LLM
+            ext_props = None
+            if use_llm:
+                prop_p = build_prop_extraction_prompt(chunk.text, archetype, niche=topic)
+                ext_props = call_director_llm("You are an accurate visual data extractor. Output valid JSON.", prop_p, timeout=6.0)
+
+            # Sanitize and fill defaults
+            sanitized = sanitize_and_fill_defaults(tmpl, ext_props or {})
+            return archetype, conf, tmpl, sanitized, reason
+        elif not is_sig or arch_str == "NONE":
+            return VisualArchetype.NONE, conf, None, None, reason
+
+    # 2. Stage 1 Heuristic Fallback (0ms 100% reliable)
+    arch, conf, match_info = classify_chunk_by_heuristics(chunk.text)
+    if arch != VisualArchetype.NONE and conf >= 0.70:
+        spec = ARCHETYPE_REGISTRY[arch]
+        tmpl = spec.primary_template
+        # Extract slot-filled dynamic props from chunk
+        slot_targets = build_dynamic_motion_graphic_targets(tmpl, chunk, spec.default_props)
+        sanitized = sanitize_and_fill_defaults(tmpl, slot_targets)
+        return arch, conf, tmpl, sanitized, f"Heuristic Match: {match_info}"
+
+    return VisualArchetype.NONE, 0.2, None, None, "Conversational / B-roll line"
+
+
 def direct_micro_chunk(
     chunk: ScriptChunk,
     topic: str = "technology",
     style: str = "viral",
-    allow_motion_graphic: bool = True
+    allow_motion_graphic: bool = True,
+    context_before: str = "",
+    context_after: str = "",
+    use_llm: bool = False,
 ) -> List[EditDecision]:
     """
     Directs a single ScriptChunk.
@@ -1184,16 +1292,15 @@ def direct_micro_chunk(
     c_start = chunk.start
     c_end = chunk.end
     c_dur = chunk.duration
-
     selected_mg = None
     if allow_motion_graphic:
-        # Check explicit template mappings
+        # 1. First check explicit template mappings (high precision exact keywords)
         for mapping in TEMPLATE_MAPPINGS:
             if any(k in chunk_text_lower for k in mapping["keywords"]):
                 selected_mg = mapping
                 break
 
-        # Priority check: Does the chunk explicitly contain a list of points?
+        # 2. Priority check: Does the chunk explicitly contain a list of points?
         if not selected_mg:
             detected_list = detect_script_list_points(chunk.text)
             if detected_list:
@@ -1203,6 +1310,37 @@ def direct_micro_chunk(
                     "personality": "technical",
                     "keywords": ["list_points_detected"]
                 }
+
+        # 3. Dynamic evaluation through the Visual Rhetoric Taxonomy (LLM + Semantic Archetypes)
+        if not selected_mg:
+            arch, conf, tmpl, dynamic_props, reason = resolve_archetype_for_chunk(
+                chunk=chunk,
+                context_before=context_before,
+                context_after=context_after,
+                topic=topic,
+                use_llm=use_llm
+            )
+
+            if arch != VisualArchetype.NONE and tmpl:
+                hold_dur = min(3.5, max(2.5, c_dur))
+                mg_end = round(min(c_end, c_start + hold_dur), 2)
+                spec = ARCHETYPE_REGISTRY.get(arch)
+                personality = spec.default_props.get("personality", "technical") if spec else "technical"
+
+                decisions.append(
+                    EditDecision(
+                        action="motion_graphics",
+                        trigger_id=chunk.chunk_id,
+                        start=c_start,
+                        end=mg_end,
+                        motion_graphics_type=tmpl,
+                        motion_graphics_targets=dynamic_props,
+                        motion_graphics_personality=personality,
+                        reason=f"Taxonomy [{arch.value}]: {reason}",
+                        layer="front"
+                    )
+                )
+                return decisions
 
     if selected_mg:
         # Motion Graphic decision with dynamic slot-filled props
@@ -1286,6 +1424,7 @@ def direct_all_chunks(
     topic: str = "technology",
     style: str = "viral",
     min_mg_spacing: float = 3.0,
+    use_llm: bool = False,
 ) -> EditList:
     """
     Directs all micro-chunks in sequence.
@@ -1295,15 +1434,20 @@ def direct_all_chunks(
     all_edits: List[EditDecision] = []
     last_mg_end = -999.0
 
-    for chunk in chunks:
+    for idx, chunk in enumerate(chunks):
         # Check if enough time has elapsed since previous motion graphic
         can_use_mg = (chunk.start - last_mg_end >= min_mg_spacing)
-        
+        context_before = chunks[idx - 1].text if idx > 0 else ""
+        context_after = chunks[idx + 1].text if idx < len(chunks) - 1 else ""
+
         chunk_edits = direct_micro_chunk(
             chunk=chunk,
             topic=topic,
             style=style,
-            allow_motion_graphic=can_use_mg
+            allow_motion_graphic=can_use_mg,
+            context_before=context_before,
+            context_after=context_after,
+            use_llm=use_llm,
         )
 
         for edit in chunk_edits:
@@ -1322,6 +1466,7 @@ def stitch_micro_scenes_to_blueprint(
     style: str = "viral",
     is_faceless: bool = True,
     min_mg_spacing: float = 3.5,
+    use_llm: bool = False,
 ) -> EditList:
     """
     Stitches directed micro-scenes into a production-ready Master Edit Decision List (EDL).
@@ -1333,10 +1478,28 @@ def stitch_micro_scenes_to_blueprint(
       4. Cinematic transitions: inserted at major narrative progression marks.
     """
     # 1. Direct all individual micro-chunks
-    raw_plan = direct_all_chunks(chunks, topic=topic, style=style, min_mg_spacing=min_mg_spacing)
+    raw_plan = direct_all_chunks(chunks, topic=topic, style=style, min_mg_spacing=min_mg_spacing, use_llm=use_llm)
 
-    brolls = [e for e in raw_plan.edits if e.action == "b_roll"]
-    mgs = [e for e in raw_plan.edits if e.action == "motion_graphics"]
+    # 1b. Enforce Phase 3 Pacing & Budget Gatekeeper
+    from services.pacing_gatekeeper import prune_motion_graphics_by_pacing_and_budget
+    timestamp_map = {c.chunk_id: {"start": c.start, "end": c.end, "text": c.text} for c in chunks}
+    pacing_edits, _, _ = prune_motion_graphics_by_pacing_and_budget(
+        edits=[e.model_dump() for e in raw_plan.edits],
+        timestamp_map=timestamp_map,
+        video_duration=total_duration,
+        min_spacing_sec=min_mg_spacing,
+        style=style,
+        topic=topic,
+        downgrade_to_broll=True,
+    )
+    allowed_fields = set(EditDecision.model_fields.keys())
+    validated_raw_edits = [
+        EditDecision(**{k: v for k, v in e.items() if k in allowed_fields})
+        for e in pacing_edits
+    ]
+
+    brolls = [e for e in validated_raw_edits if e.action == "b_roll"]
+    mgs = [e for e in validated_raw_edits if e.action == "motion_graphics"]
 
     final_edits: List[EditDecision] = []
 
