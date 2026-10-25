@@ -13,39 +13,92 @@ import {
   TrendingUp,
   Loader2,
   FileVideo,
-  Circle,
   Scissors,
+  Zap,
+  Upload,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TimelineProject } from "@/lib/timeline-types";
 
-type VideoStatus = "QUEUED" | "DOWNLOADING" | "TRANSCRIBING" | "AI_DIRECTING" | "RENDERING" | "COMPLETED" | "FAILED";
+/* ── Types ──────────────────────────────────────────── */
+type VideoStatus =
+  | "QUEUED"
+  | "DOWNLOADING"
+  | "TRANSCRIBING"
+  | "AI_DIRECTING"
+  | "RENDERING"
+  | "COMPLETED"
+  | "FAILED";
 
-// Mock data for recent videos — in production this comes from your API
-const MOCK_RECENT_VIDEOS: Array<{ id: string; title: string; status: VideoStatus; duration: number; createdAt: string }> = [
+const MOCK_RECENT_VIDEOS: Array<{
+  id: string;
+  title: string;
+  status: VideoStatus;
+  duration: number;
+  createdAt: string;
+}> = [
   { id: "v1", title: "Why Compound Interest Grows Fast", status: "COMPLETED", duration: 32, createdAt: "2026-09-21T14:30:00Z" },
-  { id: "v2", title: "Honey Never Spoils — Fun Facts", status: "COMPLETED", duration: 28, createdAt: "2026-09-20T09:15:00Z" },
-  { id: "v3", title: "Top 5 Productivity Hacks", status: "RENDERING", duration: 45, createdAt: "2026-09-22T08:00:00Z" },
+  { id: "v2", title: "Honey Never Spoils — Fun Facts",   status: "COMPLETED", duration: 28, createdAt: "2026-09-20T09:15:00Z" },
+  { id: "v3", title: "Top 5 Productivity Hacks",         status: "RENDERING", duration: 45, createdAt: "2026-09-22T08:00:00Z" },
 ];
 
+/* ── Helpers ─────────────────────────────────────────── */
 function formatRelativeTime(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function StatusDot({ status }: { status: VideoStatus }) {
-  const color =
-    status === "COMPLETED" ? "bg-white" :
-    status === "FAILED" ? "bg-neutral-500" :
-    "bg-neutral-400 animate-pulse";
-  return <span className={cn("inline-block w-1.5 h-1.5 rounded-full", color)} />;
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+/* ── Status pill (inline) ────────────────────────────── */
+function StatusBadge({ status }: { status: VideoStatus }) {
+  if (status === "COMPLETED") {
+    return (
+      <span className="status-pill status-pill-done">
+        <span className="status-dot status-dot-online" />
+        Done
+      </span>
+    );
+  }
+  if (status === "FAILED") {
+    return (
+      <span className="status-pill status-pill-failed">
+        <span className="status-dot status-dot-failed" />
+        Failed
+      </span>
+    );
+  }
+  return (
+    <span className="status-pill status-pill-rendering">
+      <span className="status-dot status-dot-rendering animate-pulse" />
+      {status.toLowerCase().replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   PAGE
+══════════════════════════════════════════════════════ */
 export default function DashboardOverviewPage() {
   const [stats, setStats] = useState({
     totalVideos: 0,
@@ -54,10 +107,10 @@ export default function DashboardOverviewPage() {
     apiStatus: "checking" as "checking" | "online" | "offline",
   });
   const [draftProject, setDraftProject] = useState<TimelineProject | null>(null);
-  const [videos, setVideos] = useState(MOCK_RECENT_VIDEOS);
+  const [videos] = useState(MOCK_RECENT_VIDEOS);
 
+  /* — Load draft ─────────────────────────────────── */
   useEffect(() => {
-    // Load draft from localStorage
     try {
       const stored = localStorage.getItem("video-editor-draft");
       if (stored) {
@@ -66,11 +119,10 @@ export default function DashboardOverviewPage() {
           setDraftProject(parsed.state.project);
         }
       }
-    } catch (e) {
-      console.error("Failed to load draft from localStorage", e);
-    }
+    } catch {}
   }, []);
 
+  /* — Fetch stats ────────────────────────────────── */
   useEffect(() => {
     async function fetchStats() {
       try {
@@ -80,10 +132,8 @@ export default function DashboardOverviewPage() {
           fetch(`${apiUrl}/api/v1/system/stats`),
         ]);
 
-        let apiOnline = false;
-        if (healthRes.status === "fulfilled" && healthRes.value.ok) {
-          apiOnline = true;
-        }
+        const apiOnline =
+          healthRes.status === "fulfilled" && healthRes.value.ok;
 
         let totalJobs = 0;
         if (statsRes.status === "fulfilled" && statsRes.value.ok) {
@@ -92,217 +142,361 @@ export default function DashboardOverviewPage() {
         }
 
         setStats({
-          totalVideos: totalJobs || MOCK_RECENT_VIDEOS.filter(v => v.status === "COMPLETED").length,
-          inProcess: MOCK_RECENT_VIDEOS.filter(v => v.status !== "COMPLETED" && v.status !== "FAILED").length,
+          totalVideos: totalJobs || videos.filter((v) => v.status === "COMPLETED").length,
+          inProcess: videos.filter((v) => v.status !== "COMPLETED" && v.status !== "FAILED").length,
           drafts: draftProject ? 1 : 0,
           apiStatus: apiOnline ? "online" : "offline",
         });
       } catch {
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
-          totalVideos: MOCK_RECENT_VIDEOS.filter(v => v.status === "COMPLETED").length,
-          inProcess: MOCK_RECENT_VIDEOS.filter(v => v.status !== "COMPLETED" && v.status !== "FAILED").length,
+          totalVideos: videos.filter((v) => v.status === "COMPLETED").length,
+          inProcess: videos.filter((v) => v.status !== "COMPLETED" && v.status !== "FAILED").length,
           drafts: draftProject ? 1 : 0,
           apiStatus: "offline",
         }));
       }
     }
     fetchStats();
-  }, [draftProject]);
+  }, [draftProject, videos]);
 
+  /* — Stat card data ─────────────────────────────── */
+  const statCards = [
+    {
+      label:    "Total Videos",
+      value:    stats.totalVideos,
+      sub:      "all time",
+      icon:     Film,
+      iconColor: "#a78bfa",
+      glowClass: "gradient-border-violet",
+    },
+    {
+      label:    "Rendering",
+      value:    stats.inProcess,
+      sub:      "in pipeline",
+      icon:     Loader2,
+      iconColor: "#67e8f9",
+      glowClass: stats.inProcess > 0 ? "gradient-border-cyan" : "",
+      spinning: stats.inProcess > 0,
+    },
+    {
+      label:    "Drafts",
+      value:    stats.drafts,
+      sub:      "unsaved",
+      icon:     FileVideo,
+      iconColor: "#fbbf24",
+      glowClass: "",
+    },
+    {
+      label:    "Backend",
+      value:    stats.apiStatus === "online" ? "Online" : stats.apiStatus === "offline" ? "Offline" : "…",
+      sub:      "API status",
+      icon:     stats.apiStatus === "online" ? CheckCircle2 : stats.apiStatus === "offline" ? AlertCircle : Loader2,
+      iconColor: stats.apiStatus === "online" ? "#34d399" : stats.apiStatus === "offline" ? "#f87171" : "#a78bfa",
+      glowClass: stats.apiStatus === "online" ? "gradient-border-white" : "",
+    },
+  ] as const;
+
+  /* ─────────────────────────────────────────────────── */
   return (
-    <div className="space-y-10">
+    <div className="space-y-9 animate-children">
 
-      {/* ─── HEADER ─── */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      {/* ════════════════════════════════════════════
+          GREETING HEADER
+      ════════════════════════════════════════════ */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">
-            Dashboard
-          </p>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white leading-tight">
-            Overview
+          <p className="text-label mb-2">{formatDate()}</p>
+          <h1 className="text-page-title">
+            {getGreeting()},{" "}
+            <span className="text-gradient-violet">Vansh.</span>
           </h1>
+          <p className="text-sm text-white/35 mt-2">
+            Here&apos;s what&apos;s happening with your content pipeline today.
+          </p>
         </div>
+
         <Link
           href="/dashboard/videos"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 transition-colors"
+          className={cn(
+            "shrink-0 inline-flex items-center gap-1.5 h-9 px-4",
+            "text-[13px] font-semibold text-white rounded-lg",
+            "bg-violet-600 hover:bg-violet-500",
+            "shadow-[0_0_14px_rgba(124,58,237,0.35)]",
+            "hover:shadow-[0_0_22px_rgba(124,58,237,0.55)]",
+            "transition-all duration-150"
+          )}
         >
-          <Plus className="w-4 h-4" />
-          Create Video
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+          New Video
         </Link>
       </div>
 
-      {/* ─── STATS GRID ─── */}
+      {/* ════════════════════════════════════════════
+          METRIC CARDS
+      ════════════════════════════════════════════ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">Total Created</span>
-            <Film className="w-4 h-4 text-neutral-600" />
-          </div>
-          <div className="text-3xl font-semibold text-white tabular-nums">{stats.totalVideos}</div>
-          <div className="text-xs text-neutral-500">All time</div>
-        </div>
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className={cn(
+                "gradient-border p-5 space-y-3 transition-all duration-200",
+                card.glowClass
+              )}
+            >
+              {/* Top row */}
+              <div className="flex items-center justify-between">
+                <span className="text-label">{card.label}</span>
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: "rgba(255,255,255,0.05)" }}
+                >
+                  <Icon
+                    className={cn("w-3.5 h-3.5", "spinning" in card && card.spinning && "animate-spin")}
+                    style={{ color: card.iconColor }}
+                    strokeWidth={1.8}
+                  />
+                </div>
+              </div>
 
-        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">In Process</span>
-            <Loader2 className={cn("w-4 h-4 text-neutral-600", stats.inProcess > 0 && "animate-spin text-white")} />
-          </div>
-          <div className="text-3xl font-semibold text-white tabular-nums">{stats.inProcess}</div>
-          <div className="text-xs text-neutral-500">Currently rendering</div>
-        </div>
+              {/* Value */}
+              <div className="text-3xl font-semibold text-white tabular-nums tracking-tight">
+                {card.value}
+              </div>
 
-        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">Drafts</span>
-            <FileVideo className="w-4 h-4 text-neutral-600" />
-          </div>
-          <div className="text-3xl font-semibold text-white tabular-nums">{stats.drafts}</div>
-          <div className="text-xs text-neutral-500">Unsaved projects</div>
-        </div>
-
-        <div className="p-5 rounded-xl border border-neutral-800 bg-neutral-950 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">System</span>
-            <Circle className={cn(
-              "w-3 h-3",
-              stats.apiStatus === "online" ? "fill-white text-white" :
-              stats.apiStatus === "offline" ? "fill-neutral-600 text-neutral-600" :
-              "fill-neutral-500 text-neutral-500 animate-pulse"
-            )} />
-          </div>
-          <div className="text-3xl font-semibold text-white capitalize">{stats.apiStatus}</div>
-          <div className="text-xs text-neutral-500">Backend API</div>
-        </div>
+              {/* Sub */}
+              <div className="text-xs text-white/25 font-medium">{card.sub}</div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* ─── PENDING DRAFTS ─── */}
+      {/* ════════════════════════════════════════════
+          CONTINUE EDITING (draft card)
+      ════════════════════════════════════════════ */}
       {draftProject && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white tracking-tight">Pending Draft</h2>
+            <h2 className="text-section-title">Continue Editing</h2>
             <button
               onClick={() => {
                 localStorage.removeItem("video-editor-draft");
                 setDraftProject(null);
               }}
-              className="text-xs text-neutral-500 hover:text-white flex items-center gap-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/70 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Discard
+              Discard draft
             </button>
           </div>
 
-          <div className="flex items-center justify-between p-5 rounded-xl border border-neutral-800 bg-neutral-950">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-neutral-500" />
+          {/* Hero draft card */}
+          <div className="gradient-border gradient-border-violet rounded-xl overflow-hidden">
+            <div className="flex items-center gap-5 p-5">
+              {/* Thumbnail placeholder */}
+              <div className={cn(
+                "shrink-0 w-24 h-16 rounded-lg",
+                "flex items-center justify-center",
+                "bg-violet-500/10 border border-violet-500/20"
+              )}>
+                <Play className="w-6 h-6 text-violet-400/70 fill-violet-400/70" />
               </div>
-              <div>
-                <div className="text-sm font-medium text-white">{draftProject.title || "Untitled Project"}</div>
-                <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-3">
-                  <span>{draftProject.duration?.toFixed(1)}s</span>
-                  <span className="text-neutral-700">·</span>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate">
+                  {draftProject.title || "Untitled Project"}
+                </div>
+                <div className="flex items-center gap-3 mt-1.5 text-xs text-white/35">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {draftProject.duration?.toFixed(1)}s
+                  </span>
+                  <span className="text-white/15">·</span>
                   <span>{draftProject.aspectRatio}</span>
-                  <span className="text-neutral-700">·</span>
-                  <span>{draftProject.tracks?.videoTrack?.length || 0} clips</span>
+                  <span className="text-white/15">·</span>
+                  <span>{draftProject.tracks?.videoTrack?.length ?? 0} clips</span>
+                </div>
+                <div className="mt-2">
+                  <span className="status-pill status-pill-queued">
+                    <span className="status-dot status-dot-queued" />
+                    Draft saved
+                  </span>
                 </div>
               </div>
+
+              {/* Resume button */}
+              <Link
+                href={`/dashboard/editor/${draftProject.id || "new"}`}
+                className={cn(
+                  "shrink-0 inline-flex items-center gap-1.5 h-9 px-4",
+                  "text-[13px] font-semibold text-white rounded-lg",
+                  "bg-violet-600 hover:bg-violet-500",
+                  "shadow-[0_0_12px_rgba(124,58,237,0.3)]",
+                  "hover:shadow-[0_0_18px_rgba(124,58,237,0.5)]",
+                  "transition-all duration-150"
+                )}
+              >
+                <Scissors className="w-3.5 h-3.5" />
+                Resume
+              </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          PROCESSING VIDEOS
+      ════════════════════════════════════════════ */}
+      {videos.filter((v) => v.status !== "COMPLETED" && v.status !== "FAILED").length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-section-title">Currently Processing</h2>
             <Link
-              href={`/dashboard/editor/${draftProject.id || "new"}`}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-black hover:bg-neutral-200 inline-flex items-center gap-2 transition-colors"
+              href="/dashboard/queue"
+              className="text-xs text-white/30 hover:text-white/70 inline-flex items-center gap-1 transition-colors"
             >
-              <Play className="w-3.5 h-3.5 fill-black" />
-              Resume
+              View queue
+              <ArrowUpRight className="w-3 h-3" />
             </Link>
           </div>
-        </div>
-      )}
 
-      {/* ─── IN-PROCESS VIDEOS ─── */}
-      {videos.filter(v => v.status !== "COMPLETED" && v.status !== "FAILED").length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-white tracking-tight">Currently Processing</h2>
           <div className="space-y-2">
-            {videos.filter(v => v.status !== "COMPLETED" && v.status !== "FAILED").map(video => (
-              <div key={video.id} className="flex items-center justify-between p-4 rounded-xl border border-neutral-800 bg-neutral-950">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+            {videos
+              .filter((v) => v.status !== "COMPLETED" && v.status !== "FAILED")
+              .map((video) => (
+                <div
+                  key={video.id}
+                  className="glass-card flex items-center gap-4 px-5 py-4 rounded-xl"
+                >
+                  {/* Spinning icon */}
+                  <div className="shrink-0 w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-white">{video.title}</div>
-                    <div className="text-xs text-neutral-500 mt-0.5">{video.duration}s · {formatRelativeTime(video.createdAt)}</div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{video.title}</div>
+                    <div className="text-xs text-white/30 mt-0.5">
+                      {video.duration}s · {formatRelativeTime(video.createdAt)}
+                    </div>
+                  </div>
+
+                  {/* Animated progress bar */}
+                  <div className="shrink-0 w-32 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-white/30 uppercase tracking-wider">
+                        {video.status.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <div className="progress-track">
+                      <div className="progress-fill progress-fill-animate" style={{ width: "60%" }} />
+                    </div>
                   </div>
                 </div>
-                <span className="text-xs font-mono text-neutral-400 uppercase tracking-wider">{video.status}</span>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       )}
 
-      {/* ─── RECENT VIDEOS ─── */}
-      <div className="space-y-4">
+      {/* ════════════════════════════════════════════
+          RECENT VIDEOS TABLE
+      ════════════════════════════════════════════ */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white tracking-tight">Recent Videos</h2>
+          <h2 className="text-section-title">Recent Videos</h2>
           <Link
             href="/dashboard/videos"
-            className="text-xs text-neutral-500 hover:text-white inline-flex items-center gap-1 transition-colors"
+            className="text-xs text-white/30 hover:text-white/70 inline-flex items-center gap-1 transition-colors"
           >
             View all
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <ArrowUpRight className="w-3 h-3" />
           </Link>
         </div>
 
         {videos.length === 0 ? (
-          <div className="p-12 rounded-xl border border-neutral-800 bg-neutral-950 flex flex-col items-center justify-center text-center">
-            <Film className="w-8 h-8 text-neutral-700 mb-3" />
-            <p className="text-sm text-neutral-500">No videos yet.</p>
-            <p className="text-xs text-neutral-600 mt-1">Create your first AI video to get started.</p>
+          /* Empty state */
+          <div className="glass-card rounded-xl p-14 flex flex-col items-center justify-center text-center space-y-3">
+            <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
+              <Film className="w-5 h-5 text-white/20" />
+            </div>
+            <p className="text-sm font-medium text-white/40">No videos yet</p>
+            <p className="text-xs text-white/20">Create your first AI video to get started.</p>
+            <Link
+              href="/dashboard/videos"
+              className="mt-1 inline-flex items-center gap-1.5 h-8 px-4 text-xs font-semibold text-white rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Create Video
+            </Link>
           </div>
         ) : (
-          <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-neutral-900/50 text-xs text-neutral-500 font-medium uppercase tracking-wider">
-              <div className="col-span-4">Title</div>
-              <div className="col-span-2">Status</div>
-              <div className="col-span-2">Duration</div>
-              <div className="col-span-2">Created</div>
-              <div className="col-span-2 text-right">Action</div>
+          /* Table */
+          <div className="rounded-xl overflow-hidden border border-white/[0.05]">
+            {/* Header */}
+            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-white/[0.02] border-b border-white/[0.04]">
+              {[
+                { label: "Title",    cols: "col-span-5" },
+                { label: "Status",   cols: "col-span-2" },
+                { label: "Duration", cols: "col-span-2" },
+                { label: "Created",  cols: "col-span-2" },
+                { label: "Action",   cols: "col-span-1 text-right" },
+              ].map((h) => (
+                <div key={h.label} className={cn("text-label", h.cols)}>
+                  {h.label}
+                </div>
+              ))}
             </div>
 
-            {/* Table Rows */}
-            {videos.map(video => (
+            {/* Rows */}
+            {videos.map((video, i) => (
               <div
                 key={video.id}
-                className="grid grid-cols-12 gap-4 px-5 py-4 items-center bg-neutral-950 hover:bg-neutral-900/50 transition-colors cursor-pointer group"
+                className={cn(
+                  "grid grid-cols-12 gap-4 px-5 py-4 items-center",
+                  "hover:bg-white/[0.02] transition-colors duration-150",
+                  "cursor-pointer group",
+                  i < videos.length - 1 && "border-b border-white/[0.04]"
+                )}
               >
-                <div className="col-span-4 text-sm font-medium text-white group-hover:text-neutral-200 truncate">
+                {/* Title */}
+                <div className="col-span-5 text-sm font-medium text-white truncate group-hover:text-violet-300 transition-colors">
                   {video.title}
                 </div>
-                <div className="col-span-2 flex items-center gap-2">
-                  <StatusDot status={video.status} />
-                  <span className="text-xs text-neutral-400 capitalize">
-                    {video.status === "COMPLETED" ? "Done" : video.status.toLowerCase().replace("_", " ")}
-                  </span>
+
+                {/* Status */}
+                <div className="col-span-2">
+                  <StatusBadge status={video.status} />
                 </div>
-                <div className="col-span-2 text-sm text-neutral-400 tabular-nums font-mono">
+
+                {/* Duration */}
+                <div className="col-span-2 text-mono-sm">
                   {video.duration}s
                 </div>
-                <div className="col-span-2 text-sm text-neutral-500">
+
+                {/* Created */}
+                <div className="col-span-2 text-xs text-white/25">
                   {formatRelativeTime(video.createdAt)}
                 </div>
-                <div className="col-span-2 flex justify-end">
+
+                {/* Action */}
+                <div className="col-span-1 flex justify-end">
                   <Link
                     href={`/dashboard/editor/${video.id}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors inline-flex items-center gap-1.5 shadow-sm"
-                    title="Edit in Studio"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md",
+                      "text-[11px] font-medium",
+                      "bg-white/[0.04] border border-white/[0.06]",
+                      "text-white/40 hover:text-white hover:bg-white/[0.08]",
+                      "hover:border-violet-500/30",
+                      "transition-all duration-150",
+                      "opacity-0 group-hover:opacity-100"
+                    )}
                   >
-                    <Scissors className="w-3 h-3 text-yellow-400" />
-                    <span>Edit</span>
+                    <Scissors className="w-3 h-3 text-yellow-400/80" />
+                    Edit
                   </Link>
                 </div>
               </div>
@@ -311,36 +505,59 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
-      {/* ─── QUICK ACTIONS ─── */}
+      {/* ════════════════════════════════════════════
+          QUICK ACTIONS
+      ════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Faceless video */}
         <Link
           href="/dashboard/videos"
-          className="group p-6 rounded-xl border border-neutral-800 bg-neutral-950 hover:border-neutral-700 transition-colors"
+          className="group gradient-border gradient-border-violet rounded-xl p-6 block transition-all duration-200 hover:shadow-[0_0_28px_rgba(124,58,237,0.15)]"
         >
-          <div className="flex items-center justify-between mb-3">
-            <Layers className="w-5 h-5 text-neutral-500" />
-            <ArrowUpRight className="w-4 h-4 text-neutral-700 group-hover:text-neutral-400 transition-colors" />
+          <div className="flex items-center justify-between mb-5">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-violet-400" />
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-white/20 group-hover:text-violet-400 transition-colors" />
           </div>
-          <h3 className="text-sm font-medium text-white mb-1">Create Faceless Video</h3>
-          <p className="text-xs text-neutral-500 leading-relaxed">
-            Paste a script, choose a character, pick a theme, and let AI generate your video automatically.
+          <h3 className="text-sm font-semibold text-white mb-2">
+            Create Faceless Video
+          </h3>
+          <p className="text-xs text-white/35 leading-relaxed">
+            Paste a script, choose a character and theme — the AI generates your complete video automatically.
           </p>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {["Script", "Character", "Theme", "Auto-Generated"].map((t) => (
+              <span key={t} className="tag">{t}</span>
+            ))}
+          </div>
         </Link>
 
+        {/* Upload & enhance */}
         <Link
           href="/dashboard/videos"
-          className="group p-6 rounded-xl border border-neutral-800 bg-neutral-950 hover:border-neutral-700 transition-colors"
+          className="group gradient-border gradient-border-cyan rounded-xl p-6 block transition-all duration-200 hover:shadow-[0_0_28px_rgba(6,182,212,0.12)]"
         >
-          <div className="flex items-center justify-between mb-3">
-            <TrendingUp className="w-5 h-5 text-neutral-500" />
-            <ArrowUpRight className="w-4 h-4 text-neutral-700 group-hover:text-neutral-400 transition-colors" />
+          <div className="flex items-center justify-between mb-5">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+              <Upload className="w-5 h-5 text-cyan-400" />
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-white/20 group-hover:text-cyan-400 transition-colors" />
           </div>
-          <h3 className="text-sm font-medium text-white mb-1">Upload & Enhance Video</h3>
-          <p className="text-xs text-neutral-500 leading-relaxed">
-            Upload your own footage and let the AI Director add B-roll, motion graphics, SFX, and captions.
+          <h3 className="text-sm font-semibold text-white mb-2">
+            Upload & Enhance Video
+          </h3>
+          <p className="text-xs text-white/35 leading-relaxed">
+            Upload your footage and let the AI Director add B-roll, motion graphics, SFX, and captions.
           </p>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {["Your Footage", "AI B-Roll", "SFX", "Captions"].map((t) => (
+              <span key={t} className="tag">{t}</span>
+            ))}
+          </div>
         </Link>
       </div>
+
     </div>
   );
 }

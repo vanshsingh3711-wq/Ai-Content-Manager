@@ -873,12 +873,16 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
         };
       } else {
         // badge, graphic, card, or specific motion graphic template
+        const combinedPromptText = `${elementType} ${explicitText || ""}`.trim().toLowerCase();
         const targetSearch = (explicitText || elementType).toLowerCase().trim();
         const matchedConfig = GRAPHIC_CONFIGS.find(
           (c) =>
+            c.compositionId === combinedPromptText ||
             c.compositionId === targetSearch ||
+            c.compositionId.replace(/-/g, "_") === combinedPromptText.replace(/-/g, "_") ||
+            c.triggers.some((t) => combinedPromptText === t || combinedPromptText.includes(t)) ||
             (explicitText && (c.compositionId === explicitText || c.triggers.some((t) => explicitText === t || explicitText.includes(t)))) ||
-            (elementType !== "graphic" && (c.compositionId === elementType || elementType.includes(c.compositionId))) ||
+            (elementType !== "graphic" && (c.compositionId === elementType || elementType.includes(c.compositionId) || c.triggers.some((t) => elementType === t || elementType.includes(t)))) ||
             (targetSearch !== "graphic" && c.triggers.some((t) => targetSearch === t || (t.length > 3 && targetSearch.includes(t))))
         );
 

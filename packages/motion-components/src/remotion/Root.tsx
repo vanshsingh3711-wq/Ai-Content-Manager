@@ -49,6 +49,17 @@ import { QuadrantMatrix } from './compositions/QuadrantMatrix';
 import { SpectrumContinuum } from './compositions/SpectrumContinuum';
 import { IcebergModel } from './compositions/IcebergModel';
 import { ProsConsComparison } from './compositions/ProsConsComparison';
+import { TodoList } from './compositions/TodoList';
+import { ArchitecturePipeline } from './compositions/ArchitecturePipeline';
+import { CausalLoop } from './compositions/CausalLoop';
+import { ExplodedLayerStack } from './compositions/ExplodedLayerStack';
+import { BottleneckConstriction } from './compositions/BottleneckConstriction';
+import { TrilemmaTradeoff } from './compositions/TrilemmaTradeoff';
+import { ScaleZoomLadder } from './compositions/ScaleZoomLadder';
+import { DecisionTreeFork } from './compositions/DecisionTreeFork';
+import { RadarSpiderChart } from './compositions/RadarSpiderChart';
+import { ParetoPowerLaw } from './compositions/ParetoPowerLaw';
+import { ChronoDialClock } from './compositions/ChronoDialClock';
 
 // Remotion Root — all compositions registered here
 // Python calls: npx remotion render src/remotion/Root.tsx <ID> --props='{}' out.mov
@@ -66,9 +77,267 @@ const getMeta = ({ props }: { props: any }) => {
 
 export const RemotionRoot: React.FC = () => (
   <>
+    <Composition id="chrono-dial-clock" component={ChronoDialClock as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'AI HISTORY IN 24 HOURS',
+        subtitle: '1950 TO 2026 COMPRESSED INTO A SINGLE 24-HOUR CHRONOMETER',
+        badge: '24-HOUR CHRONOMETER',
+        synthesis: 'If the entire history of modern AI were compressed into a 24-hour day, generative foundation models and autonomous swarms only emerged in the final 4 seconds.',
+        currentTime: '23:59:56',
+        timeframe: '1950 — 2026 (76 Years)',
+        epoch1Time: '00:00',
+        epoch1Title: 'Turing Test & Perceptron',
+        epoch1Desc: '1950: Foundational symbolic AI logic, Turing computability thesis, and initial artificial neurons.',
+        epoch1Badge: 'GENESIS // T=0h',
+        epoch2Time: '18:30',
+        epoch2Title: 'Deep Learning Resurgence',
+        epoch2Desc: '2012: AlexNet & GPU-accelerated backpropagation prove deep convolutional nets crush legacy heuristics.',
+        epoch2Badge: 'CONVOLUTION // T=18.5h',
+        epoch3Time: '22:45',
+        epoch3Title: 'Attention & Transformer Core',
+        epoch3Desc: '2017: Attention Is All You Need shifts the computational paradigm to massively parallel matrix self-attention.',
+        epoch3Badge: 'TRANSFORMER // T=22.7h',
+        epoch4Time: '23:59:56',
+        epoch4Title: 'Autonomous Reasoning Swarms',
+        epoch4Desc: '2026: Multi-agent autonomous swarms, self-healing code loops, and stateful recursive inference.',
+        epoch4Badge: 'EXPONENTIAL // T=23.99h',
+        accentColor: '#00E5FF',
+        activeColor: '#10B981',
+        personality: 'technical',
+      }} />
+    <Composition id="pareto-power-law" component={ParetoPowerLaw as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'THE PARETO PRINCIPLE',
+        subtitle: '80/20 POWER LAW DISTRIBUTION & ASYMMETRIC SYSTEMIC LEVERAGE',
+        badge: 'POWER LAW DYNAMICS',
+        synthesis: 'In nonlinear complex systems, 80% of systemic yield is driven by 20% of critical architectural primitives.',
+        vitalPct: '20%',
+        vitalLabel: 'THE VITAL FEW',
+        vitalDesc: 'Core architectural primitives, foundational models & automated CI/CD pipelines',
+        vitalReturn: '80% SYSTEM IMPACT',
+        vitalColor: '#00E5FF',
+        trivialPct: '80%',
+        trivialLabel: 'THE TRIVIAL MANY (LONG TAIL)',
+        trivialDesc: 'Marginal feature edge-cases, manual configuration toil & vanity optimizations',
+        trivialReturn: '20% RESIDUAL VALUE',
+        trivialColor: '#F59E0B',
+        accentColor: '#00E5FF',
+        personality: 'technical',
+      }} />
+    <Composition id="radar-spider-chart" component={RadarSpiderChart as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'FRONTIER MODEL BENCHMARK',
+        subtitle: 'MULTI-DIMENSIONAL PERFORMANCE & ARCHITECTURAL TRADEOFF MATRIX',
+        badge: 'POLYGONAL RADAR BENCHMARK',
+        synthesis: 'Radar evaluations reveal asymmetric trade-offs: cognitive swarms sacrifice raw inference speed for epistemic accuracy.',
+        axis1: 'Reasoning Depth',
+        axis2: 'Inference Speed',
+        axis3: 'Context Coherence',
+        axis4: 'Cost Efficiency',
+        axis5: 'Autonomous Agency',
+        entity1Name: 'Autonomous Agent System',
+        entity1Score1: 96,
+        entity1Score2: 72,
+        entity1Score3: 98,
+        entity1Score4: 86,
+        entity1Score5: 94,
+        entity1Badge: 'STATEFUL SWARM',
+        entity1Color: '#00E5FF',
+        entity2Name: 'Monolithic Base LLM',
+        entity2Score1: 68,
+        entity2Score2: 94,
+        entity2Score3: 70,
+        entity2Score4: 64,
+        entity2Score5: 52,
+        entity2Badge: 'ZERO-SHOT PROMPT',
+        entity2Color: '#F59E0B',
+        accentColor: '#00E5FF',
+        personality: 'technical',
+      }} />
+    <Composition id="decision-tree-fork" component={DecisionTreeFork as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'THE ARCHITECTURAL BIFURCATION',
+        subtitle: 'HOW EARLY TECHNICAL DECISIONS LOCK IN IRREVERSIBLE SYSTEMIC TRAJECTORIES',
+        badge: 'BIFURCATION DECISION FORK',
+        synthesis: 'Path dependency is the silent killer in technology: choices made at the root dictate limits at the leaves.',
+        rootTitle: 'FOUNDATION MODEL ARCHITECTURE',
+        rootDesc: 'Initial engineering fork between proprietary API lock-in vs open-weights autonomous infrastructure.',
+        rootBadge: 'DECISION FORK // T=0',
+        branch1Title: 'Path A: Proprietary Closed API',
+        branch1Desc: 'Vendor lock-in, recurring token marginal costs, and strict upstream rate limit constraints.',
+        branch1Badge: 'WALLED GARDEN',
+        branch1Metric: 'HIGH INITIAL MARGIN // ZERO MIGRATION FLEXIBILITY',
+        branch1Color: '#F43F5E',
+        branch2Title: 'Path B: Open-Weights Swarm',
+        branch2Desc: 'Self-hosted distilled models, zero marginal API taxes, and deterministic horizontal scale.',
+        branch2Badge: 'AUTONOMOUS SWARM',
+        branch2Metric: 'INFINITE SCALING // 100% OWNED INFRASTRUCTURE',
+        branch2Color: '#10B981',
+        accentColor: '#00E5FF',
+        personality: 'technical',
+      }} />
+    <Composition id="scale-zoom-ladder" component={ScaleZoomLadder as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'THE ILLUSION OF SCALE',
+        subtitle: 'HOW HUMAN INTUITION FAILS AT ORDERS OF MAGNITUDE EXPANSION',
+        badge: 'EXPONENTIAL MAGNITUDE LADDER',
+        synthesis: 'The difference between a million and a billion is approximately one billion. Intuition flattens exponential scale.',
+        step1Value: '$1 MILLION',
+        step1Label: '11.5 DAYS',
+        step1Desc: '1 Million seconds elapsed in real time',
+        step1Metric: '1x (BASE UNIT)',
+        step2Value: '$1 BILLION',
+        step2Label: '31.7 YEARS',
+        step2Desc: '1 Billion seconds elapsed (entire career)',
+        step2Metric: '1,000x MULTIPLIER',
+        step3Value: '$1 TRILLION',
+        step3Label: '31,700 YEARS',
+        step3Desc: '1 Trillion seconds (before recorded civilization)',
+        step3Metric: '1,000,000x MONOLITH',
+        accentColor: '#00E5FF',
+        step1Color: '#38BDF8',
+        step2Color: '#818CF8',
+        step3Color: '#F43F5E',
+        personality: 'technical',
+      }} />
+    <Composition id="trilemma-tradeoff" component={TrilemmaTradeoff as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'THE BLOCKCHAIN TRILEMMA',
+        subtitle: 'YOU CAN ONLY OPTIMIZE TWO VERTICES. THE THIRD IS INEVITABLY SACRIFICED.',
+        badge: 'ARCHITECTURAL TRADE-OFF THEOREM',
+        axiom: 'Any attempt to forcefully scale throughput degrades either decentralized trust or consensus integrity.',
+        vertex1Title: 'Decentralization',
+        vertex1Desc: 'Distributed nodes worldwide with zero central point of failure',
+        vertex1Metric: '100% PRESERVED',
+        vertex2Title: 'Security',
+        vertex2Desc: 'Cryptographic proof-of-work consensus protecting state history',
+        vertex2Metric: '100% PRESERVED',
+        vertex3Title: 'Scalability',
+        vertex3Desc: 'High transaction throughput and low latency confirmation',
+        vertex3Metric: '15 TPS (SACRIFICED)',
+        sacrificedVertex: 3,
+        accentColor: '#00E5FF',
+        activeColor: '#10B981',
+        sacrificedColor: '#F43F5E',
+        personality: 'technical',
+      }} />
+    <Composition id="bottleneck-constriction" component={BottleneckConstriction as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'THE COMPUTE MEMORY WALL',
+        subtitle: 'WHY RAW FLOP CAPACITY IS CONSTRAINED BY INTERCONNECT BANDWIDTH',
+        badge: 'THROUGHPUT CAPACITY FUNNEL',
+        inputLabel: 'INCOMING CAPACITY',
+        inputMetric: '1,000 TFLOPS',
+        inputDesc: 'Peak GPU arithmetic core saturation',
+        chokeLabel: 'HBM INTERCONNECT BANDWIDTH',
+        chokeMetric: 'CHOKE POINT: 3.2 TB/S',
+        chokeDesc: 'Off-chip pin density & memory bus limit',
+        restrictionPct: '-98.8%',
+        outputLabel: 'EFFECTIVE OUTPUT',
+        outputMetric: '12 TFLOPS',
+        outputDesc: 'Sustained throughput under starvation',
+        efficiency: '1.2% YIELD',
+        synthesis: "Amdahl's Law in practice: Scaling raw processing power yields zero benefit when the communication bus cannot feed the execution units.",
+        personality: 'technical',
+      }} />
+    <Composition id="exploded-layer-stack" component={ExplodedLayerStack as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'THE AUTONOMOUS AGENT STACK',
+        subtitle: 'DECONSTRUCTED COMPUTE ANATOMY & MULTI-TIER EXECUTION PIPELINE',
+        badge: 'ISOMETRIC SYSTEM ARCHITECTURE',
+        synthesis: 'Upper tiers inherit latency constraints and epistemic coherence directly from the foundational substrate below.',
+        layer1Title: 'Foundational Neural Weights',
+        layer1Desc: 'Quantized FP8 parameter clusters bound to ultra-dense HBM memory bandwidth.',
+        layer1Badge: 'HARDWARE SUBSTRATE',
+        layer1Metric: '4.8 TB/S BANDWIDTH',
+        layer2Title: 'Context Window Orchestration',
+        layer2Desc: 'Attention routing, KV-cache compression, and speculative token draft verification.',
+        layer2Badge: 'NEURAL LATENT CORE',
+        layer2Metric: '128K TOKENS / SEC',
+        layer3Title: 'Long-Term Memory & Graph RAG',
+        layer3Desc: 'Hierarchical vector indexing and real-time knowledge graph traversal.',
+        layer3Badge: 'EPISTEMIC STATE',
+        layer3Metric: '1.2M EMBEDDINGS',
+        layer4Title: 'Autonomous Tool Execution',
+        layer4Desc: 'Sandboxed agent synthesis, deterministic code interpreter, and external API invocation.',
+        layer4Badge: 'COGNITIVE RUNTIME',
+        layer4Metric: '< 150ms LATENCY',
+        personality: 'technical',
+      }} />
+    <Composition id="causal-loop" component={CausalLoop as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'THE SYSTEMIC FEEDBACK LOOP',
+        subtitle: 'HOW TRIGGER ACTIONS AMPLIFY CASCADING SECOND-ORDER CONSEQUENCES',
+        badge: '🔄 REINFORCING FLYWHEEL (+)',
+        loopType: 'reinforcing',
+        centerLabel: 'REINFORCING LOOP',
+        centerSub: 'COMPOUNDING DRIFT',
+        synthesis: 'Each phase intensifies the subsequent shock, locking the architecture into an accelerating trajectory.',
+        node1Title: 'Aggressive Capital Injection',
+        node1Desc: 'Unprecedented stimulus liquidity floods market sectors.',
+        node1Badge: 'TRIGGER CAUSE',
+        node1Metric: '+$5.2T EXPANSION',
+        node2Title: 'Asset Price Inflation',
+        node2Desc: 'Equities and real estate valuations decouple from fundamentals.',
+        node2Badge: 'AMPLIFICATION',
+        node2Metric: '+48% RUN-UP',
+        node3Title: 'Aggressive Rate Hikes',
+        node3Desc: 'Central banks overtighten into overleveraged balance sheets.',
+        node3Badge: 'SECONDARY SHOCK',
+        node3Metric: '+525 BPS SURGE',
+        node4Title: 'Cascading Liquidity Crunch',
+        node4Desc: 'Forced deleveraging triggers emergency bailout demands.',
+        node4Badge: 'FEEDBACK CLOSURE',
+        node4Metric: 'CYCLE RE-IGNITED',
+        personality: 'technical',
+      }} />
+    <Composition id="architecture-pipeline" component={ArchitecturePipeline as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'AUTONOMOUS REASONING ARCHITECTURE',
+        subtitle: 'END-TO-END DATA FLOW & VERIFICATION ENGINE',
+        badge: '⚡ SYSTEM ARCHITECTURE',
+        stage1Title: 'Multimodal Telemetry',
+        stage1Desc: 'Parallel ingestion of streaming logs, user signals, and system metrics.',
+        stage1Badge: 'INGEST',
+        stage1Metric: '100K EVT/S',
+        stage2Title: 'Vector Knowledge Core',
+        stage2Desc: 'Dense hybrid retrieval anchoring contextual relevance with sub-millisecond lookups.',
+        stage2Badge: 'EMBED & RAG',
+        stage2Metric: '4.2ms LATENCY',
+        stage3Title: 'Recursive Agent Loop',
+        stage3Desc: 'Autonomous multi-hop hypothesis testing and self-correcting tool execution.',
+        stage3Badge: 'REASONING',
+        stage3Metric: '99.4% RELIABILITY',
+        stage4Title: 'Deterministic Gate',
+        stage4Desc: 'Zero-regression assertion barrier validating compliance prior to production release.',
+        stage4Badge: 'VERIFY',
+        stage4Metric: '100% AUDIT PASS',
+        personality: 'technical',
+      }} />
+    <Composition id="todo-list" component={TodoList as any} durationInFrames={150} fps={FPS} width={W} height={H}
+      calculateMetadata={getMeta}
+      defaultProps={{
+        title: 'EXECUTION DIRECTIVES',
+        badge: '📋 ACTION PROTOCOL',
+        format: 'todo',
+        point1: 'Automate Diagnostic Friction Audits',
+        point2: 'Deploy Scoped Autonomous Agents',
+        point3: 'Anchor to Deterministic Verification Gates',
+        personality: 'technical'
+      }} />
     <Composition id="hero-reveal" component={HeroReveal as any} durationInFrames={150} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}
-      defaultProps={{ label: 'LABEL', headline: 'Headline', supporting: 'Detail', personality: 'premium' }} />
+      defaultProps={{ label: 'PARADIGM SHIFT', headline: 'Autonomous Architecture', supporting: 'Orchestrated swarms compound output.', personality: 'premium' }} />
     <Composition id="animated-counter" component={(props: any) => <CookedMotionCard type="likes" props={props} />} durationInFrames={150} fps={FPS} width={W} height={H}
       calculateMetadata={getMeta}
       defaultProps={{ label: 'SUBSCRIBERS', from: 0, to: 50000 }} />

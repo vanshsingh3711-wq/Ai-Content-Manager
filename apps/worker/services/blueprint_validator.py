@@ -54,7 +54,10 @@ def validate_blueprint(
         validated_edits contains only the edits that passed validation.
     """
     cfg = config or EDITING_CONFIG
-    max_broll_count = getattr(cfg, "MAX_BROLL_COUNT_FACELESS", 20) if is_faceless else cfg.MAX_BROLL_COUNT
+    if hasattr(cfg, "get_max_broll_count"):
+        max_broll_count = cfg.get_max_broll_count(video_duration, is_faceless=is_faceless)
+    else:
+        max_broll_count = getattr(cfg, "MAX_BROLL_COUNT_FACELESS", 20) if is_faceless else cfg.MAX_BROLL_COUNT
     report = ValidationReport(original_count=len(edits))
 
     # Calculate B-roll budget
@@ -206,11 +209,12 @@ def validate_blueprint(
                 continue
 
             # 3. Individual duration limits
-            if chunk_duration < cfg.MIN_BROLL_DURATION_SEC:
+            min_broll_dur = getattr(cfg, "MIN_BROLL_DURATION_SEC_FACELESS", 1.2) if is_faceless else cfg.MIN_BROLL_DURATION_SEC
+            if chunk_duration < min_broll_dur:
                 report.issues.append(ValidationIssue(
                     trigger_id=trigger_id,
                     action=action,
-                    issue=f"B-roll duration {chunk_duration:.2f}s below minimum {cfg.MIN_BROLL_DURATION_SEC}s",
+                    issue=f"B-roll duration {chunk_duration:.2f}s below minimum {min_broll_dur:.2f}s",
                 ))
                 report.rejected_count += 1
                 continue
@@ -298,6 +302,17 @@ def validate_blueprint(
                 "metric_reveal":       {"label", "metric"},
                 "quote_reveal":        {"quote"},
                 "step_sequence":       {"title", "step1", "step2"},
+                "todo_list":           {"title", "point1"},
+                "architecture_pipeline": {"title", "stage1Title"},
+                "causal_loop":           {"title", "node1Title"},
+                "exploded_layer_stack":  {"title", "layer1Title"},
+                "bottleneck_constriction": {"title", "inputMetric"},
+                "trilemma_tradeoff":     {"title", "vertex1Title"},
+                "scale_zoom_ladder":     {"title", "step1Value"},
+                "decision_tree_fork":    {"title", "branch1Title"},
+                "radar_spider_chart":    {"title", "axis1"},
+                "pareto_power_law":      {"title", "vitalReturn"},
+                "chrono_dial_clock":     {"title", "epoch1Title"},
                 "before_after":        {"beforeLabel", "before", "afterLabel", "after"},
                 "chart_reveal":        {"title", "dataPoint1"},
                 "icon_reveal":         {"concept", "label"},
@@ -514,7 +529,7 @@ def validate_blueprint(
                 UNSUITABLE_FOR_BEHIND = {
                     "cooked_terminal", "cooked_chat", "cooked_notes",
                     "code_reveal", "vscode_code_typing", "quote_reveal",
-                    "step_sequence", "kinetic_text", "browser_walkthrough",
+                    "step_sequence", "todo_list", "architecture_pipeline", "causal_loop", "exploded_layer_stack", "bottleneck_constriction", "trilemma_tradeoff", "scale_zoom_ladder", "decision_tree_fork", "radar_spider_chart", "pareto_power_law", "chrono_dial_clock", "kinetic_text", "browser_walkthrough",
                     "newspaper_highlighter", "magnifying_glass_zoom",
                     "urgency_dial_gauge", "mind_map_node_web",
                     "timeline_roadmap", "hierarchy_pyramid",

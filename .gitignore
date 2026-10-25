@@ -67,3 +67,4 @@ packages/motion-components/chrome/
 data/
 sample_video
 testing_video/
+*.tsbuildinfo

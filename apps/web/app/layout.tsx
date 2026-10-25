@@ -6,16 +6,20 @@ import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "AI Content Manager & Automated Video Editor",
-  description: "Automated AI video editing and multi-platform social media publishing pipeline",
+  title: "AI Director — Automated Video Content Engine",
+  description:
+    "Autonomous AI video pipeline: transcription, B-roll, motion graphics, captions, SFX, and multi-platform publishing — in one click.",
+  keywords: ["AI video editor", "automated editing", "content manager", "faceless video"],
 };
 
 export default function RootLayout({
@@ -26,9 +30,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full dark antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#090a0f] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
+      <body className="min-h-full flex flex-col bg-[--bg-base] text-[--foreground]">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

@@ -69,9 +69,15 @@ export function PlayerMonitor() {
   const outgoingVideoRef = useRef<HTMLVideoElement | null>(null);
   const incomingVideoRef = useRef<HTMLVideoElement | null>(null);
   const brollVideoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Derive active Audio clip directly
+  const activeAudio = (project.tracks.audioTrack || []).find(
+    (a) => playheadTime >= a.start && playheadTime < a.end
+  ) || null;
 
   // Find the active main video clip at current playhead
   const activeVideoClip = project.tracks.videoTrack.find(
@@ -373,7 +379,18 @@ export function PlayerMonitor() {
       broll.volume = Math.max(0, Math.min(1, brollVolume / 100));
       broll.muted = brollVolume === 0 || activeBroll.muted !== false;
     }
-  }, [playheadTime, activeVideoClip, activeTransition, activeBroll]);
+
+    // 4. Audio track synchronization
+    const audio = audioRef.current;
+    if (audio && activeAudio) {
+      const audioOffset = Math.max(0, playheadTime - activeAudio.start);
+      if (Math.abs(audio.currentTime - audioOffset) > 0.15) {
+        audio.currentTime = audioOffset;
+      }
+      const vol = (activeAudio.volume ?? 75) / 100;
+      audio.volume = Math.max(0, Math.min(1, vol));
+    }
+  }, [playheadTime, activeVideoClip, activeTransition, activeBroll, activeAudio]);
 
   // Play / Pause handling
   useEffect(() => {
@@ -381,17 +398,20 @@ export function PlayerMonitor() {
     const outVideo = outgoingVideoRef.current;
     const inVideo = incomingVideoRef.current;
     const broll = brollVideoRef.current;
+    const audio = audioRef.current;
 
     if (isPlaying) {
       if (video) video.play().catch(() => {});
       if (outVideo) outVideo.play().catch(() => {});
       if (inVideo) inVideo.play().catch(() => {});
       if (broll) broll.play().catch(() => {});
+      if (audio) audio.play().catch(() => {});
     } else {
       try { video?.pause(); } catch {}
       try { outVideo?.pause(); } catch {}
       try { inVideo?.pause(); } catch {}
       try { broll?.pause(); } catch {}
+      try { audio?.pause(); } catch {}
     }
   }, [isPlaying, !!activeTransition]);
 
@@ -610,10 +630,9 @@ export function PlayerMonitor() {
           }
         }}
         className={cn(
-          "relative bg-black rounded-xl overflow-hidden shadow-2xl border flex items-center justify-center transition-all duration-300",
-          isDragOver
-            ? "border-yellow-400 ring-4 ring-yellow-400/20"
-            : "border-neutral-900",
+          "relative bg-black rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-300",
+          "border-2 border-violet-500/80 shadow-[0_0_35px_rgba(124,58,237,0.3)]",
+          isDragOver && "border-yellow-400 ring-4 ring-yellow-400/20",
           getAspectRatioClasses(project.aspectRatio)
         )}
       >
@@ -723,12 +742,18 @@ export function PlayerMonitor() {
               <video
                 ref={videoRef}
                 src={activeVideoClip.proxyUrl || activeVideoClip.sourceUrl}
+                poster="/demo_thumbs/thumb_friends.jpg"
                 muted={isMuted}
                 playsInline
                 preload="auto"
                 autoPlay={isPlaying}
                 onLoadedMetadata={(e) => {
-                  if (isPlaying) (e.target as HTMLVideoElement).play().catch(() => {});
+                  const v = e.target as HTMLVideoElement;
+                  if (isPlaying) {
+                    v.play().catch(() => {});
+                  } else {
+                    v.currentTime = 0.001;
+                  }
                 }}
                 className="w-full h-full object-cover"
               />
@@ -763,8 +788,10 @@ export function PlayerMonitor() {
               <video
                 ref={brollVideoRef}
                 src={activeBroll.proxyUrl || activeBroll.sourceUrl}
+                poster="/demo_thumbs/thumb_walk.jpg"
                 muted={activeBroll.volume === undefined || activeBroll.volume === 0 || activeBroll.muted !== false}
                 playsInline
+                preload="auto"
                 className={cn(
                   "w-full h-full",
                   activeBroll.fitMode === "contain" ? "object-contain" : "object-cover"
@@ -781,7 +808,14 @@ export function PlayerMonitor() {
             type="caption"
             clip={activeCaption}
             positionX={activeCaption.positionX ?? activeCaption.position?.x ?? 50}
-            positionY={activeCaption.positionY ?? activeCaption.position?.y ?? ((project as any)?.videoType === "faceless_short" || (project as any)?.isFaceless ? 50 : 75)}
+            positionY={
+              activeCaption.positionY ??
+              activeCaption.position?.y ??
+              ((project as unknown as { videoType?: string; isFaceless?: boolean }).videoType === "faceless_short" ||
+              (project as unknown as { videoType?: string; isFaceless?: boolean }).isFaceless
+                ? 50
+                : 75)
+            }
             scale={activeCaption.scale ?? 1.0}
             rotation={activeCaption.rotation ?? 0}
             isSelected={selectedItem?.id === activeCaption.id}
@@ -804,11 +838,11 @@ export function PlayerMonitor() {
               const totalWords = wordCounter;
 
               let activeWordIdx = -1;
-              const captionWords = (activeCaption as any).words;
+              const captionWords = (activeCaption as unknown as { words?: { start?: number; end?: number }[] }).words;
               if (Array.isArray(captionWords) && captionWords.length > 0) {
                 // Precise word-level timestamps if available from Whisper
                 activeWordIdx = captionWords.findIndex(
-                  (w: any) =>
+                  (w: { start?: number; end?: number }) =>
                     playheadTime >= (w.start ?? 0) &&
                     playheadTime <= (w.end ?? activeCaption.end)
                 );
@@ -835,7 +869,7 @@ export function PlayerMonitor() {
                 activeWordIdx = Math.floor(progress * totalWords);
               }
 
-              const wordsPerWindow = (project as any)?.videoType === "faceless_short" || (project as any)?.isFaceless ? 3 : 3;
+              const wordsPerWindow = 3;
 
               // Rolling window matching subtitle_generator.py (3 words per screen)
               let windowStart = 0;
@@ -1009,23 +1043,55 @@ export function PlayerMonitor() {
 
         {/* Snap Guides Overlay (Magnetic alignment lines & center crosshair) */}
         <SnapGuidesOverlay />
+
+        {/* Audio Track Element */}
+        {activeAudio && (
+          <audio
+            ref={audioRef}
+            src={activeAudio.sourceUrl}
+            preload="auto"
+            muted={isMuted}
+          />
+        )}
+      </div>
+
+      {/* Horizontal Scrubber Line (Matching Mockup) */}
+      <div className="w-full max-w-md px-2 mt-3 flex items-center">
+        <input
+          type="range"
+          min={0}
+          max={project.duration || 12}
+          step={0.01}
+          value={playheadTime}
+          onChange={(e) => setPlayheadTime(parseFloat(e.target.value))}
+          className="w-full h-1 bg-white/[0.15] rounded-full appearance-none cursor-pointer accent-white hover:accent-violet-400 transition-all"
+          title="Scrub Playhead"
+        />
       </div>
 
       {/* Playback Controls Bar */}
-      <div className="mt-3 flex items-center justify-between w-full max-w-md px-4 py-1.5 bg-neutral-950/90 backdrop-blur-md rounded-xl border border-neutral-900 text-neutral-400 shadow-lg">
+      <div className="mt-2 flex items-center justify-between w-full max-w-md px-4 py-2 glass-card rounded-2xl border-white/[0.08] text-white/50 shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
         {/* Timestamp */}
-        <div className="font-mono text-xs text-neutral-500 tabular-nums">
+        <div className="font-mono text-xs text-white/40 tabular-nums">
           <span className="text-white font-semibold">{formatTime(playheadTime)}</span>
-          <span className="mx-1 text-neutral-500">/</span>
+          <span className="mx-1 text-white/20">/</span>
           <span>{formatTime(project.duration)}</span>
         </div>
 
-        {/* Center transport buttons */}
+        {/* Center transport buttons: |<<  <<  ▶  >>  >>| */}
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setPlayheadTime(0)}
+            title="Jump to Start"
+            className="p-1.5 text-white/40 hover:text-white rounded-lg hover:bg-white/[0.06] transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+          </button>
+
           <button
             onClick={() => setPlayheadTime(Math.max(0, playheadTime - 1))}
             title="Step backward 1s (Left Arrow)"
-            className="p-1.5 text-neutral-500 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors"
+            className="p-1.5 text-white/50 hover:text-white rounded-lg hover:bg-white/[0.06] transition-colors"
           >
             <SkipBack className="w-3.5 h-3.5" />
           </button>
@@ -1033,15 +1099,15 @@ export function PlayerMonitor() {
           <button
             onClick={togglePlay}
             title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-            className="h-8 w-8 rounded-full bg-white hover:bg-neutral-200 hover:scale-105 active:scale-95 text-black flex items-center justify-center shadow-md shadow-white/10 transition-transform"
+            className="h-8 w-8 rounded-full bg-gradient-to-r from-violet-600 to-cyan-500 hover:from-violet-500 hover:to-cyan-400 hover:scale-105 active:scale-95 text-white flex items-center justify-center shadow-[0_0_16px_rgba(124,58,237,0.35)] transition-all"
           >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+            {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
           </button>
 
           <button
             onClick={() => setPlayheadTime(Math.min(project.duration, playheadTime + 1))}
             title="Step forward 1s (Right Arrow)"
-            className="p-1.5 text-neutral-500 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors"
+            className="p-1.5 text-white/50 hover:text-white rounded-lg hover:bg-white/[0.06] transition-colors"
           >
             <SkipForward className="w-3.5 h-3.5" />
           </button>

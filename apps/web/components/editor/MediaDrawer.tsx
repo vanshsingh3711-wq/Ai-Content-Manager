@@ -3,16 +3,11 @@
 import React, { useState } from "react";
 import {
   Upload,
-  Type,
-  Film,
-  Music,
+  Play,
   Plus,
-  Search,
   X,
   Sparkles,
   GripVertical,
-  Mic,
-  Shapes,
   Check,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
@@ -38,106 +33,19 @@ interface MediaDrawerProps {
   onCloseMobile?: () => void;
 }
 
-const STOCK_BROLL = [
-  {
-    name: "Cyberpunk City Lights",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    tag: "City",
-  },
-  {
-    name: "Developer Coding Screen",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    tag: "Tech",
-  },
-  {
-    name: "Cinematic Nature Drone",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-    tag: "Nature",
-  },
-];
-
 const PRESET_MUSIC = [
   {
     name: "Chill Lofi Morning Beat",
-    url: "https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg",
+    url: "/assets/audio/chill-bgm.mp3",
     duration: 30,
   },
   {
-    name: "Upbeat Motivational Tech",
-    url: "https://actions.google.com/sounds/v1/ambiences/rain_heavy.ogg",
+    name: "Ambient Shimmer Synth",
+    url: "/assets/audio/chill-bgm.mp3",
     duration: 25,
   },
 ];
 
-const MOTION_GRAPHIC_PRESETS = [
-  {
-    name: "Rising Growth Chart",
-    compositionId: "chart-reveal",
-    description: "Rising animated multi-stage growth graph",
-    badge: "Chart",
-    duration: 4.0,
-    props: {
-      title: "GROWTH TREND",
-      badgeText: "SURGE +165%",
-      dataPoint1: "Stage 1: Baseline",
-      val1: "1.0x",
-      dataPoint2: "Stage 2: +85%",
-      val2: "1.85x",
-      dataPoint3: "Stage 3: +165% Surge",
-      val3: "2.65x 🔥",
-      accentColor: "#22d3ee",
-      personality: "technical",
-    },
-  },
-  {
-    name: "Animated Counter",
-    compositionId: "animated_counter",
-    description: "Numeric growth ticker & KPI stat",
-    badge: "Counter",
-    duration: 4.0,
-    props: { startValue: 0, endValue: 100, prefix: "$", suffix: "k" },
-  },
-  {
-    name: "Animated KPI",
-    compositionId: "animated_kpi",
-    description: "Metric card with percentage trend",
-    badge: "Metric",
-    duration: 4.0,
-    props: { title: "MRR Growth", value: "$48,500", change: "+32%" },
-  },
-  {
-    name: "Animated Arrow",
-    compositionId: "animated_arrow",
-    description: "Curved highlight arrow callout",
-    badge: "Attention",
-    duration: 3.5,
-    props: { label: "Look Here" },
-  },
-  {
-    name: "Hero Reveal Card",
-    compositionId: "hero_reveal",
-    description: "Punchy headline & title overlay",
-    badge: "Headline",
-    duration: 4.0,
-    props: { title: "NEXT-GEN CREATION" },
-  },
-  {
-    name: "Metric Reveal Card",
-    compositionId: "metric_reveal",
-    description: "Progress indicator card",
-    badge: "Progress",
-    duration: 4.0,
-    props: { progress: 85 },
-  },
-  {
-    name: "Cooked Motion Card",
-    compositionId: "cooked_card",
-    description: "Modern card with sleek glow borders",
-    badge: "Card",
-    duration: 4.5,
-    props: { headline: "Pro Feature" },
-  },
-];
 
 export function MediaDrawer({
   activeTab = "media",
@@ -146,7 +54,6 @@ export function MediaDrawer({
   onCloseMobile,
 }: MediaDrawerProps) {
   const [currentTab, setCurrentTab] = useState<MediaDrawerTab>(activeTab);
-  const [brollSearch, setBrollSearch] = useState("");
   const [captionInput, setCaptionInput] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<CaptionPreset>("tiktok_yellow");
   const [captionFeedback, setCaptionFeedback] = useState<string | null>(null);
@@ -158,10 +65,7 @@ export function MediaDrawer({
     addCaption,
     updateCaption,
     dispatchOperation,
-    addBRollClip,
     addAudioClip,
-    addGraphicElement,
-    setPlayheadTime,
   } = useTimelineStore(
     useShallow((state) => ({
       project: state.project,
@@ -170,10 +74,7 @@ export function MediaDrawer({
       addCaption: state.addCaption,
       updateCaption: state.updateCaption,
       dispatchOperation: state.dispatchOperation,
-      addBRollClip: state.addBRollClip,
       addAudioClip: state.addAudioClip,
-      addGraphicElement: state.addGraphicElement,
-      setPlayheadTime: state.setPlayheadTime,
     }))
   );
 
@@ -292,146 +193,61 @@ export function MediaDrawer({
   return (
     <aside
       className={cn(
-        "w-72 md:w-80 border-r border-neutral-900 bg-neutral-950 flex flex-col z-30 transition-transform select-none shadow-2xl",
+        "w-72 md:w-80 border-r border-white/[0.06] bg-[#0d1017] flex flex-col z-30 transition-transform select-none shadow-2xl",
         isOpenMobile ? "fixed inset-y-0 left-0 translate-x-0" : "hidden md:flex"
       )}
     >
       {/* Mobile Close Bar */}
       {isOpenMobile && (
-        <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-900 bg-neutral-950 md:hidden">
-          <span className="text-xs font-bold text-neutral-400 capitalize">{currentTab} Studio</span>
+        <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06] bg-[#090b10] md:hidden">
+          <span className="text-xs font-bold text-white/70 capitalize">{currentTab} Studio</span>
           <button
             onClick={onCloseMobile}
-            className="p-1 text-neutral-500 hover:text-white rounded cursor-pointer"
+            className="p-1 text-white/40 hover:text-white rounded cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Top Tabs */}
-      <div className="flex items-center border-b border-neutral-900 p-1 gap-0.5 bg-neutral-950 overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => handleTabSelect("library")}
-          className={cn(
-            "flex-1 py-1.5 px-1.5 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
-            currentTab === "library"
-              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
-          )}
-          title="Shared Resource Library (Shapes, Captions, Transitions, SFX)"
-        >
-          <Shapes className="w-3 h-3 text-emerald-400" />
-          <span>Library</span>
-        </button>
-
-        <button
-          onClick={() => handleTabSelect("media")}
-          className={cn(
-            "flex-1 py-1.5 px-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
-            currentTab === "media"
-              ? "bg-white/10 text-white border border-neutral-700"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
-          )}
-          title="Video Media"
-        >
-          <Upload className="w-3 h-3" />
-          <span>Media</span>
-        </button>
-
-        <button
-          onClick={() => handleTabSelect("captions")}
-          className={cn(
-            "flex-1 py-1.5 px-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
-            currentTab === "captions"
-              ? "bg-white/10 text-white border border-neutral-700"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
-          )}
-          title="Captions & Text"
-        >
-          <Type className="w-3 h-3" />
-          <span>Text</span>
-        </button>
-
-        <button
-          onClick={() => handleTabSelect("broll")}
-          className={cn(
-            "flex-1 py-1.5 px-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
-            currentTab === "broll"
-              ? "bg-white/10 text-white border border-neutral-700"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
-          )}
-          title="B-Roll Footage"
-        >
-          <Film className="w-3 h-3" />
-          <span>B-Roll</span>
-        </button>
-
-        <button
-          onClick={() => handleTabSelect("graphics")}
-          className={cn(
-            "flex-1 py-1.5 px-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
-            currentTab === "graphics"
-              ? "bg-yellow-400/10 text-yellow-400 border border-yellow-400/30"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
-          )}
-          title="Motion Graphics Cards"
-        >
-          <Sparkles className="w-3 h-3 text-yellow-400" />
-          <span>Cards</span>
-        </button>
-
-        <button
-          onClick={() => handleTabSelect("audio")}
-          className={cn(
-            "flex-1 py-1.5 px-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
-            currentTab === "audio"
-              ? "bg-white/10 text-white border border-neutral-700"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
-          )}
-          title="Royalty-Free Music"
-        >
-          <Music className="w-3 h-3" />
-          <span>Audio</span>
-        </button>
-
-        <button
-          onClick={() => handleTabSelect("transcript")}
-          className={cn(
-            "flex-1 py-1.5 px-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0",
-            currentTab === "transcript"
-              ? "bg-yellow-400/10 text-yellow-400 border border-yellow-400/30"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900/50"
-          )}
-          title="Word-level Transcript & Beats"
-        >
-          <Mic className="w-3 h-3 text-yellow-400" />
-          <span>Script</span>
-        </button>
+      {/* Top Tabs matching Mockup: Media | Audio | B-Roll | Text | Graphics */}
+      <div className="flex items-center border-b border-white/[0.06] px-3 py-2.5 gap-4 bg-[#0d1017]">
+        {[
+          { id: "media", label: "Media" },
+          { id: "audio", label: "Audio" },
+          { id: "broll", label: "B-Roll" },
+          { id: "captions", label: "Text" },
+          { id: "graphics", label: "Graphics" },
+        ].map((tab) => {
+          const isActive = currentTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabSelect(tab.id as MediaDrawerTab)}
+              className={cn(
+                "text-xs font-semibold pb-1.5 transition-all cursor-pointer relative",
+                isActive
+                  ? "text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-violet-500 after:rounded-full"
+                  : "text-white/40 hover:text-white"
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Drawer Content */}
-      <div className={cn("flex-1 overflow-y-auto text-neutral-300", (currentTab === "library" || currentTab === "broll" || currentTab === "graphics") ? "p-0" : "p-3")}>
-        {/* TAB 0: RESOURCE LIBRARY */}
-        {currentTab === "library" && <ResourceLibraryDrawer />}
-
-        {/* TAB 1: MEDIA UPLOAD */}
+      <div className="flex-1 overflow-y-auto text-neutral-300 p-3">
+        {/* TAB 1: MEDIA 3-COLUMN ASSET GRID (MATCHES MOCKUP) */}
         {currentTab === "media" && (
           <div className="space-y-4">
-            <div>
-              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
-                Project Footage
-              </h3>
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-neutral-700 hover:border-white/60 rounded-xl p-5 cursor-pointer bg-neutral-900/40 hover:bg-neutral-900/70 transition-all group">
-                <div className="h-10 w-10 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center mb-2 transition-colors">
-                  <Upload className="w-5 h-5 text-white" />
+            <div className="grid grid-cols-3 gap-2">
+              {/* Card 1: Upload / Folder card with glowing violet border */}
+              <label className="aspect-square rounded-xl border-2 border-violet-500/70 bg-violet-950/20 hover:bg-violet-950/40 hover:border-violet-400 hover:shadow-[0_0_16px_rgba(124,58,237,0.35)] flex flex-col items-center justify-center cursor-pointer transition-all group">
+                <div className="w-8 h-8 rounded-lg bg-violet-600/30 flex items-center justify-center text-violet-300 group-hover:scale-105 transition-transform">
+                  <Upload className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-neutral-300 group-hover:text-white">
-                  Pick Video File
-                </span>
-                <span className="text-[10px] text-neutral-500 mt-0.5 text-center">
-                  Instant local load (MP4, MOV, WebM)
-                </span>
                 <input
                   type="file"
                   accept="video/*"
@@ -439,29 +255,126 @@ export function MediaDrawer({
                   className="hidden"
                 />
               </label>
-            </div>
 
-            {project.tracks.videoTrack.length > 0 && (
-              <div>
-                <h4 className="text-[11px] font-semibold text-neutral-500 mb-2">Clips on Timeline</h4>
-                <div className="space-y-1.5">
-                  {project.tracks.videoTrack.map((clip, i) => (
-                    <div
-                      key={clip.id}
-                      onClick={() => setPlayheadTime(clip.start)}
-                      className="flex items-center justify-between p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 cursor-pointer text-xs"
-                    >
-                      <span className="truncate max-w-[140px] font-medium text-neutral-300">
-                        {clip.name || `Clip ${i + 1}`}
-                      </span>
-                      <span className="font-mono text-[10px] text-neutral-400">
-                        {(clip.end - clip.start).toFixed(1)}s
-                      </span>
-                    </div>
-                  ))}
+              {/* Card 2: Minimalist Exponential Curve (Matches Mockup) */}
+              <div
+                draggable
+                onDragStart={(e) =>
+                  handleDragStart(e, {
+                    type: "graphic",
+                    compositionId: "chart-reveal",
+                    name: "Growth Curve",
+                    duration: 4.0,
+                    props: { title: "GROWTH TREND", badgeText: "SURGE +165%" },
+                  })
+                }
+                className="aspect-square rounded-xl bg-[#10131a] border border-white/[0.08] hover:border-violet-500/60 p-2 flex flex-col justify-center items-center cursor-grab transition-all group overflow-hidden"
+              >
+                <svg viewBox="0 0 40 24" className="w-full h-8 text-neutral-300 stroke-current fill-none stroke-[2]">
+                  <path d="M4 22 C 18 21, 26 15, 36 3" />
+                </svg>
+              </div>
+
+              {/* Card 3: Compound Interest Chart Card (Matches Mockup) */}
+              <div
+                draggable
+                onDragStart={(e) =>
+                  handleDragStart(e, {
+                    type: "graphic",
+                    compositionId: "animated_counter",
+                    name: "Compound Interest",
+                    duration: 4.0,
+                    props: { startValue: 0, endValue: 100, prefix: "$" },
+                  })
+                }
+                className="aspect-square rounded-xl bg-white/[0.04] border border-white/[0.08] hover:border-violet-500/60 p-1.5 flex flex-col justify-between cursor-grab transition-all group overflow-hidden"
+              >
+                <div className="text-[7px] font-mono text-neutral-400 font-bold truncate">Compound Interest</div>
+                <div className="h-9 w-full bg-white/95 rounded p-1 flex flex-col justify-between shadow-xs">
+                  <div className="flex justify-between items-center text-[5px] text-neutral-600 font-bold">
+                    <span>Capital</span>
+                    <span className="text-violet-600">+12%</span>
+                  </div>
+                  <svg viewBox="0 0 36 16" className="w-full h-5 text-purple-600 stroke-current fill-none stroke-[1.8]">
+                    <path d="M2 14 C 12 13, 20 8, 34 2" />
+                  </svg>
                 </div>
               </div>
-            )}
+
+              {/* Cards 4-9: Video Clip Thumbnails with Play Badges (Matches Mockup) */}
+              {[
+                { name: "Coffee Talk", url: "/demo_media/friends.mp4", thumb: "/demo_thumbs/thumb_friends.jpg", dur: "10s" },
+                { name: "Golden Walk", url: "/demo_media/walk.mp4", thumb: "/demo_thumbs/thumb_walk.jpg", dur: "10s" },
+                { name: "Scenic Loft", url: "/demo_media/mindful.mp4", thumb: "/demo_thumbs/thumb_mindful.jpg", dur: "30s" },
+                { name: "NYC Skyline", url: "/demo_media/skyline.mp4", thumb: "/demo_thumbs/thumb_skyline.jpg", dur: "18s" },
+                { name: "Campus Life", url: "/demo_media/hall.mp4", thumb: "/demo_thumbs/thumb_hall.jpg", dur: "10s" },
+                { name: "Creative Desk", url: "/demo_media/desk.mp4", thumb: "/demo_thumbs/thumb_desk.jpg", dur: "15s" },
+              ].map((clip, i) => (
+                <div
+                  key={i}
+                  draggable
+                  onDragStart={(e) =>
+                    handleDragStart(e, {
+                      type: "broll",
+                      sourceUrl: clip.url,
+                      name: clip.name,
+                      duration: 4.0,
+                      fitMode: "cover",
+                    })
+                  }
+                  className="aspect-square rounded-xl bg-neutral-900 border border-white/[0.08] hover:border-violet-500/80 flex flex-col items-center justify-center relative cursor-grab group overflow-hidden transition-all shadow-sm"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={clip.thumb}
+                    alt={clip.name}
+                    className="absolute inset-0 w-full h-full object-cover opacity-75 group-hover:opacity-100 group-hover:scale-105 transition-all"
+                  />
+                  <div className="absolute inset-0 bg-black/25 group-hover:bg-transparent transition-colors" />
+                  <div className="relative w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+                    <Play className="w-2.5 h-2.5 text-white fill-white ml-0.5" />
+                  </div>
+                  <span className="absolute bottom-1 right-1 text-[8px] font-mono px-1 rounded bg-black/80 backdrop-blur-xs text-white/90">
+                    {clip.dur}
+                  </span>
+                </div>
+              ))}
+
+              {/* Cards 10-12: Glowing Cyan Waveform Audio Cards */}
+              {[
+                { name: "Audio clip 1", dur: "30s" },
+                { name: "Audio clip 2", dur: "25s" },
+                { name: "Audio clip 3", dur: "18s" },
+              ].map((aud, i) => (
+                <div
+                  key={i}
+                  draggable
+                  onDragStart={(e) =>
+                    handleDragStart(e, {
+                      type: "audio",
+                      sourceUrl: PRESET_MUSIC[0].url,
+                      name: aud.name,
+                      duration: 15,
+                      volume: 80,
+                    })
+                  }
+                  className="aspect-square rounded-xl bg-[#09151e] border border-cyan-500/30 hover:border-cyan-400 p-1.5 flex flex-col justify-between cursor-grab transition-all group overflow-hidden shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                >
+                  <div className="h-6 flex items-center justify-center gap-0.5">
+                    {[3, 7, 5, 9, 6, 8, 4, 10, 6, 8, 5].map((h, idx) => (
+                      <div
+                        key={idx}
+                        className="w-1 bg-cyan-400 rounded-full"
+                        style={{ height: `${h * 2}px` }}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[9px] font-semibold text-cyan-300 truncate text-center block">
+                    {aud.name}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

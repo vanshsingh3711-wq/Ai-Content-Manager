@@ -8,15 +8,9 @@ import {
   ZoomOut,
   Type,
   Film,
-  Music,
-  Zap,
-  Sparkles,
-  UserCheck,
-  Shapes,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
-import { cn } from "@/lib/utils";
 import { MediaDrawerTab } from "./MediaDrawer";
 
 interface TimelineToolbarProps {
@@ -34,21 +28,19 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
     addBRollClip,
     addAudioClip,
     playheadTime,
-    subjectOverlayVisible,
-    toggleSubjectOverlay,
-  } = useTimelineStore(useShallow((state) => ({
-    selectedItem: state.selectedItem,
-    zoomLevel: state.zoomLevel,
-    setZoomLevel: state.setZoomLevel,
-    splitClipAtPlayhead: state.splitClipAtPlayhead,
-    deleteClip: state.deleteClip,
-    addCaption: state.addCaption,
-    addBRollClip: state.addBRollClip,
-    addAudioClip: state.addAudioClip,
-    playheadTime: state.playheadTime,
-    subjectOverlayVisible: state.subjectOverlayVisible,
-    toggleSubjectOverlay: state.toggleSubjectOverlay,
-  })));
+  } = useTimelineStore(
+    useShallow((state) => ({
+      selectedItem: state.selectedItem,
+      zoomLevel: state.zoomLevel,
+      setZoomLevel: state.setZoomLevel,
+      splitClipAtPlayhead: state.splitClipAtPlayhead,
+      deleteClip: state.deleteClip,
+      addCaption: state.addCaption,
+      addBRollClip: state.addBRollClip,
+      addAudioClip: state.addAudioClip,
+      playheadTime: state.playheadTime,
+    }))
+  );
 
   const handleSplit = () => {
     if (selectedItem) {
@@ -70,12 +62,13 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
 
   const handleAddBRoll = () => {
     addBRollClip({
-      sourceUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+      sourceUrl:
+        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
       name: "Stock B-Roll",
       start: playheadTime,
       end: playheadTime + 3,
       opacity: 100,
-      fitMode: "cover"
+      fitMode: "cover",
     });
   };
 
@@ -106,106 +99,80 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
   };
 
   return (
-    <div className="h-10 border-b border-neutral-900 bg-neutral-950 px-3 flex items-center justify-between select-none text-neutral-400">
-      {/* Left Editing Tools */}
-      <div className="flex items-center gap-1">
-        {/* Split Button */}
-        <button
-          onClick={handleSplit}
-          title="Split clip at playhead (S)"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-white/10 text-white border border-white/20 hover:bg-white hover:text-black transition-all active:scale-95"
-        >
-          <Scissors className="w-3.5 h-3.5" />
-          <span>Split</span>
-        </button>
+    <div className="h-10 border-b border-white/[0.06] bg-[#0d1017] px-4 flex items-center justify-between select-none text-white/70">
+      {/* Left Editing Tools matching Image 2 mockup */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-medium text-neutral-300 tracking-tight">Timeline ruler</span>
 
-        {/* Delete Button */}
-        <button
-          onClick={handleDelete}
-          disabled={!selectedItem}
-          title="Delete selected clip (Del)"
-          className={cn(
-            "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border transition-all",
-            selectedItem
-              ? "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-600 hover:text-white cursor-pointer active:scale-95"
-              : "border-neutral-800 text-neutral-500 opacity-40 cursor-not-allowed"
-          )}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>Delete</span>
-        </button>
-
-        <div className="h-3.5 w-[1px] bg-neutral-800 mx-1 shrink-0" />
-
-        {/* Quick Add Buttons */}
-        <div className="flex items-center gap-1 overflow-x-auto shrink-0 max-w-[150px] sm:max-w-none [scrollbar-width:none]">
+        <div className="flex items-center gap-1">
+          {/* Split Button (II / Scissors) */}
           <button
-            onClick={() => onOpenDrawer?.("library")}
-            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-emerald-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
-            title="Open Resource Library (Shapes, Captions, Transitions, SFX)"
+            onClick={handleSplit}
+            title="Split clip at playhead (S)"
+            className="p-1.5 rounded hover:bg-white/[0.08] text-neutral-400 hover:text-white transition-colors active:scale-95 cursor-pointer"
           >
-            <Shapes className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span className="hidden sm:inline">Library</span>
+            <Scissors className="w-3.5 h-3.5" />
           </button>
+
+          {/* Add Text (T) */}
           <button
             onClick={handleAddText}
-            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
+            title="Add Caption Text (T)"
+            className="p-1.5 rounded hover:bg-white/[0.08] text-neutral-400 hover:text-white transition-colors active:scale-95 cursor-pointer"
           >
-            <Type className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-            <span className="hidden sm:inline">Add Text</span>
+            <Type className="w-3.5 h-3.5" />
           </button>
+
+          {/* Add Overlay / Media (+) */}
           <button
             onClick={handleAddBRoll}
-            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
+            title="Add B-Roll Overlay"
+            className="p-1.5 rounded hover:bg-white/[0.08] text-neutral-400 hover:text-white transition-colors active:scale-95 cursor-pointer"
           >
-            <Film className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            <span className="hidden sm:inline">Add B-Roll</span>
+            <Film className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => onOpenDrawer?.("graphics")}
-            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-            <span className="hidden sm:inline">Add Card</span>
-          </button>
-          <button
-            onClick={handleAddAudio}
-            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
-          >
-            <Music className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span className="hidden sm:inline">Add Audio</span>
-          </button>
-          <button
-            onClick={handleAddSFX}
-            className="flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap text-neutral-400 hover:text-white hover:bg-neutral-900 rounded transition-colors"
-          >
-            <Zap className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-            <span className="hidden sm:inline">Add SFX</span>
-          </button>
+
+          {/* Delete Button */}
+          {selectedItem && (
+            <button
+              onClick={handleDelete}
+              title="Delete selected clip (Del)"
+              className="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition-colors active:scale-95 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Quick Add B-Roll / SFX / Library pills */}
+          <div className="hidden lg:flex items-center gap-1 ml-2">
+            <button
+              onClick={() => onOpenDrawer?.("library")}
+              className="px-2 py-0.5 text-[11px] text-neutral-400 hover:text-white rounded hover:bg-white/[0.06] transition-colors"
+            >
+              Library
+            </button>
+            <button
+              onClick={handleAddAudio}
+              className="px-2 py-0.5 text-[11px] text-neutral-400 hover:text-white rounded hover:bg-white/[0.06] transition-colors"
+            >
+              + Audio
+            </button>
+            <button
+              onClick={handleAddSFX}
+              className="px-2 py-0.5 text-[11px] text-neutral-400 hover:text-white rounded hover:bg-white/[0.06] transition-colors"
+            >
+              + SFX
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Right Controls: Safe Zones & Zoom Slider */}
+      {/* Right Controls: Zoom Slider matching Image 2 */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={toggleSubjectOverlay}
-          title={subjectOverlayVisible ? "Hide Presenter Safe Zones" : "Show Presenter Safe Zones"}
-          className={cn(
-            "flex items-center gap-1 px-2 py-1 text-xs font-mono rounded transition-colors",
-            subjectOverlayVisible
-              ? "text-emerald-400 bg-emerald-950/60 border border-emerald-500/40"
-              : "text-neutral-500 hover:text-white hover:bg-neutral-900"
-          )}
-        >
-          <UserCheck className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Safe Zones</span>
-        </button>
-
-        <div className="h-3.5 w-[1px] bg-neutral-800 mx-0.5" />
-
+        <span className="text-xs text-neutral-400 font-medium">Zoom</span>
         <button
           onClick={() => setZoomLevel(zoomLevel - 10)}
-          className="p-1 text-neutral-500 hover:text-white rounded hover:bg-neutral-900 transition-colors"
+          className="p-1 text-neutral-400 hover:text-white rounded hover:bg-white/[0.06] transition-colors"
           title="Zoom Out"
         >
           <ZoomOut className="w-3.5 h-3.5" />
@@ -217,13 +184,13 @@ export function TimelineToolbar({ onOpenDrawer }: TimelineToolbarProps) {
           max="120"
           value={zoomLevel}
           onChange={(e) => setZoomLevel(Number(e.target.value))}
-          className="w-16 md:w-24 h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-white"
+          className="w-20 md:w-28 h-1 bg-white/[0.12] rounded-lg appearance-none cursor-pointer accent-violet-500"
           title="Timeline Zoom"
         />
 
         <button
           onClick={() => setZoomLevel(zoomLevel + 10)}
-          className="p-1 text-neutral-500 hover:text-white rounded hover:bg-neutral-900 transition-colors"
+          className="p-1 text-neutral-400 hover:text-white rounded hover:bg-white/[0.06] transition-colors"
           title="Zoom In"
         >
           <ZoomIn className="w-3.5 h-3.5" />

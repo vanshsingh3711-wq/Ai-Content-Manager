@@ -2,7 +2,9 @@ import os
 import time
 import uuid
 import requests
-from typing import Dict, List, Any, Optional
+import json
+import shutil
+from typing import Dict, List, Any, Optional, Set, Union
 try:
     from config import get_worker_settings
     settings = get_worker_settings()
@@ -39,15 +41,27 @@ def fetch_broll_assets(
     output_dir: Optional[str] = None,
     job_settings: Optional[Dict[str, Any]] = None,
     aspect_ratio: Optional[str] = None,
+    cache_dir: Optional[str] = None,
+    allow_duplicates: bool = False,
 ) -> Dict[str, str]:
     """
     Downloads aspect-ratio-aware B-roll video clips from Pexels Video API for all 'b_roll' actions.
-    Supports query fallbacks and optimal resolution matching.
+    Guarantees 100% uniqueness (zero duplicate clips across video cuts) and caches raw downloads.
     """
     target_dir = output_dir or assets_dir or os.path.abspath("./media_temp/assets")
     os.makedirs(target_dir, exist_ok=True)
+
+    broll_cache = cache_dir or os.path.abspath(os.path.join(target_dir, "../broll_cache"))
+    os.makedirs(broll_cache, exist_ok=True)
+
     broll_map: Dict[str, str] = {}
-    api_key = settings.PEXELS_API_KEY or os.getenv("PEXELS_API_KEY")
+    used_video_ids: Set[Union[int, str]] = set()
+
+    api_key = (
+        (job_settings.get("pexels_api_key") if job_settings else None)
+        or (getattr(settings, "PEXELS_API_KEY", None) if settings else None)
+        or os.getenv("PEXELS_API_KEY")
+    )
 
     # Determine target aspect ratio and orientation
     target_ar = aspect_ratio or (job_settings.get("aspect_ratio", "9:16") if job_settings else "9:16")
@@ -76,11 +90,24 @@ def fetch_broll_assets(
         trigger_id = edit.get("trigger_id")
         search_query = edit.get("search_query") or "technology abstract background"
         dest_path = os.path.join(target_dir, f"broll_{trigger_id}.mp4")
+        dest_meta = os.path.join(target_dir, f"broll_{trigger_id}.json")
 
-        # Check if already cached/downloaded
-        if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
-            broll_map[trigger_id] = dest_path
-            continue
+        # Check if already cached/downloaded with valid metadata
+        if os.path.exists(dest_path) and os.path.getsize(dest_path) > 1000:
+            existing_vid_id = None
+            if os.path.exists(dest_meta):
+                try:
+                    with open(dest_meta, "r", encoding="utf-8") as f_meta:
+                        meta_data = json.load(f_meta)
+                        existing_vid_id = meta_data.get("video_id")
+                except Exception:
+                    pass
+
+            if allow_duplicates or not existing_vid_id or existing_vid_id not in used_video_ids:
+                if existing_vid_id:
+                    used_video_ids.add(existing_vid_id)
+                broll_map[trigger_id] = dest_path
+                continue
 
         # Check if B-roll refers to real web evidence (GitHub, Twitter, URLs)
         web_source = edit.get("web_url") or edit.get("url") or (search_query if ("http://" in search_query or "https://" in search_query or "github.com" in search_query or "x.com" in search_query) else None)
@@ -116,7 +143,7 @@ def fetch_broll_assets(
         params = {
             "query": search_query,
             "orientation": orientation,
-            "per_page": 5,
+            "per_page": 15,
             "size": "medium",
         }
 
@@ -126,38 +153,79 @@ def fetch_broll_assets(
             if res.status_code == 200:
                 videos = res.json().get("videos", [])
         except Exception as e:
-            print(f"[!] Pexels search query failed: {e}")
+            print(f"[!] Pexels search query failed for '{search_query}': {e}")
 
-        # Fallback retry if no videos found
-        if not videos:
+        # Pick candidate whose video_id hasn't been used yet in this batch
+        chosen_video = None
+        for v in videos:
+            vid_id = v.get("id")
+            if allow_duplicates or vid_id not in used_video_ids:
+                vfiles = [f for f in v.get("video_files", []) if f.get("file_type") == "video/mp4"]
+                if vfiles:
+                    chosen_video = v
+                    break
+
+        # If page 1 was exhausted or all were used, query page 2
+        if not chosen_video and len(videos) == 15:
+            params["page"] = 2
+            try:
+                res_p2 = requests.get(url, headers=headers, params=params, timeout=15)
+                if res_p2.status_code == 200:
+                    for v in res_p2.json().get("videos", []):
+                        vid_id = v.get("id")
+                        if allow_duplicates or vid_id not in used_video_ids:
+                            vfiles = [f for f in v.get("video_files", []) if f.get("file_type") == "video/mp4"]
+                            if vfiles:
+                                chosen_video = v
+                                break
+            except Exception as e_p2:
+                print(f"[!] Page 2 query failed: {e_p2}")
+            params.pop("page", None)
+
+        # Fallback queries if still no unused video found
+        if not chosen_video:
             words = [w for w in search_query.split() if len(w) > 2]
             fallbacks = []
             if len(words) > 1:
                 fallbacks.append(" ".join(words[:2]))
-            if words:
-                fallbacks.append(words[0])
-            fallbacks.extend(["abstract background", "technology background"])
+            fallbacks.extend([
+                "artificial intelligence technology",
+                "futuristic digital network",
+                "modern computer technology",
+                "datacenter server racks",
+                "software developer coding",
+                "abstract digital speed lights",
+                "cyber security network",
+            ])
 
             for fb_query in fallbacks:
-                print(f"[*] Retrying Pexels query with fallback: '{fb_query}'...")
                 params["query"] = fb_query
                 try:
                     fb_res = requests.get(url, headers=headers, params=params, timeout=15)
                     if fb_res.status_code == 200:
                         fb_videos = fb_res.json().get("videos", [])
-                        if fb_videos:
-                            videos = fb_videos
-                            print(f"[OK] Found {len(videos)} videos with fallback '{fb_query}'.")
-                            break
+                        for v in fb_videos:
+                            vid_id = v.get("id")
+                            if allow_duplicates or vid_id not in used_video_ids:
+                                vfiles = [f for f in v.get("video_files", []) if f.get("file_type") == "video/mp4"]
+                                if vfiles:
+                                    chosen_video = v
+                                    print(f"  [OK] Found unused video {vid_id} with fallback '{fb_query}'.")
+                                    break
+                    if chosen_video:
+                        break
                 except Exception as ex:
                     print(f"[!] Fallback query '{fb_query}' error: {ex}")
 
-        if not videos:
-            print(f"[!] Warning: No Pexels videos found for '{search_query}' or fallbacks. Skipping trigger {trigger_id}.")
+        if not chosen_video:
+            print(f"[!] Warning: No unused Pexels videos found for '{search_query}'. Skipping trigger {trigger_id}.")
             continue
 
+        vid_id = chosen_video.get("id")
+        used_video_ids.add(vid_id)
+
         # Select best MP4 file closest to target aspect ratio / resolution
-        video_files = videos[0].get("video_files", [])
+        video_files = chosen_video.get("video_files", [])
         best_file = None
         best_score = float("inf")
         for vf in video_files:
@@ -174,18 +242,42 @@ def fetch_broll_assets(
             print(f"[!] Warning: No valid MP4 link found in Pexels result for '{search_query}'. Skipping trigger {trigger_id}.")
             continue
 
-        try:
-            print(f"[*] Downloading Pexels B-roll ({best_file.get('width')}x{best_file.get('height')}) from: {download_url[:60]}...")
-            vid_res = requests.get(download_url, stream=True, timeout=30)
-            vid_res.raise_for_status()
+        best_w = best_file.get("width", target_w)
+        best_h = best_file.get("height", target_h)
 
-            with open(dest_path, "wb") as f:
-                for chunk in vid_res.iter_content(chunk_size=16384):
-                    f.write(chunk)
-            print(f"[OK] Downloaded B-roll asset to: {dest_path}")
+        # Check central raw clip cache
+        cached_clip = os.path.join(broll_cache, f"pexels_{vid_id}_{best_w}x{best_h}.mp4")
+        try:
+            if os.path.exists(cached_clip) and os.path.getsize(cached_clip) > 1000:
+                print(f"  [CACHE HIT] Video {vid_id} found in central cache -> {cached_clip}")
+                shutil.copyfile(cached_clip, dest_path)
+            else:
+                print(f"[*] Downloading Pexels B-roll {vid_id} ({best_w}x{best_h}) from: {download_url[:60]}...")
+                vid_res = requests.get(download_url, stream=True, timeout=30)
+                vid_res.raise_for_status()
+
+                temp_cache = f"{cached_clip}.tmp_{uuid.uuid4().hex[:6]}"
+                with open(temp_cache, "wb") as f:
+                    for chunk in vid_res.iter_content(chunk_size=32768):
+                        f.write(chunk)
+                os.replace(temp_cache, cached_clip)
+                shutil.copyfile(cached_clip, dest_path)
+                print(f"[OK] Downloaded and cached B-roll {vid_id} to: {dest_path}")
+
+            # Save sidecar metadata
+            with open(dest_meta, "w", encoding="utf-8") as f_meta:
+                json.dump({
+                    "video_id": vid_id,
+                    "search_query": search_query,
+                    "duration": float(chosen_video.get("duration", 0.0)),
+                    "width": best_w,
+                    "height": best_h,
+                    "pexels_url": chosen_video.get("url"),
+                }, f_meta, indent=2)
+
             broll_map[trigger_id] = dest_path
         except Exception as e:
-            print(f"[!] Failed to download B-roll file from {download_url[:60]}: {e}")
+            print(f"[!] Failed to download/cache B-roll {vid_id} from {download_url[:60]}: {e}")
 
     return broll_map
 

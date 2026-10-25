@@ -14,8 +14,17 @@ class EditingConfig:
 
     # ── B-roll Guardrails ──────────────────────────────────────────────
     # Maximum number of B-roll events allowed in a single video
-    MAX_BROLL_COUNT: int = 10           # Default for talking head
-    MAX_BROLL_COUNT_FACELESS: int = 20  # Faceless videos need B-roll as primary visual
+    MAX_BROLL_COUNT: int = 10           # Default for talking head (short)
+    MAX_BROLL_COUNT_FACELESS: int = 20  # Minimum default for faceless short
+    MAX_BROLL_PER_MINUTE: int = 24      # Fast-paced reel logic: 1 cut every 2.5s
+
+    def get_max_broll_count(self, video_duration: float, is_faceless: bool = False) -> int:
+        """Dynamically scales allowed B-roll cuts with video duration for reel-paced editing."""
+        if not is_faceless:
+            return self.MAX_BROLL_COUNT
+        base_rate = self.MAX_BROLL_PER_MINUTE
+        calculated = int(max(1.0, video_duration / 60.0) * base_rate)
+        return max(self.MAX_BROLL_COUNT_FACELESS, calculated)
 
     # Maximum total B-roll duration as a fraction of final video duration
     # 0.50 = B-roll can occupy at most 50% of the final video for talking head
@@ -24,6 +33,7 @@ class EditingConfig:
 
     # Minimum duration for a single B-roll clip (seconds)
     MIN_BROLL_DURATION_SEC: float = 2.0
+    MIN_BROLL_DURATION_SEC_FACELESS: float = 1.2
 
     # Maximum duration for a single B-roll clip (seconds)
     MAX_BROLL_DURATION_SEC: float = 8.0

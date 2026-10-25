@@ -14,6 +14,108 @@ def format_ass_time(seconds: float) -> str:
     return f"{hours}:{minutes:02d}:{secs:02d}.{centis:02d}"
 
 
+def reconcile_transcript_words(raw_words: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Sanitizes and reconciles Whisper word tokens:
+    1. Stitches split hyphenated words (e.g. 're' + '-executes' -> 're-executes', '50' + '-person' -> '50-person').
+    2. Stitches split numbers and commas (e.g. '10' + ',000' -> '10,000' or '10,' + '000' -> '10,000').
+    3. Merges trailing hyphen words with subsequent token (e.g. 'self-' + 'healing' -> 'self-healing').
+    4. Strips leading or trailing orphan punctuation characters like lone hyphens or stray dashes.
+    5. Preserves correct timing boundaries (start = first_token['start'], end = last_token['end']).
+    """
+    if not raw_words:
+        return []
+
+    cleaned: List[Dict[str, Any]] = []
+    i = 0
+    n = len(raw_words)
+
+    while i < n:
+        curr = dict(raw_words[i])
+        curr_text = curr.get("word", "").strip()
+
+        # Skip pure empty or whitespace tokens
+        if not curr_text:
+            i += 1
+            continue
+
+        # Check if curr is an orphan hyphen / dash
+        if curr_text in ("-", "--", "—"):
+            if cleaned and i + 1 < n:
+                prev = cleaned[-1]
+                nxt = raw_words[i + 1]
+                nxt_text = nxt.get("word", "").strip().lstrip("-")
+                prev["word"] = f"{prev['word'].rstrip('-')}-{nxt_text}"
+                prev["end"] = max(prev.get("end", 0.0), nxt.get("end", prev.get("end", 0.0)))
+                i += 2
+                continue
+            else:
+                i += 1
+                continue
+
+        # Look ahead for split patterns
+        while i + 1 < n:
+            nxt = raw_words[i + 1]
+            nxt_text = nxt.get("word", "").strip()
+            if not nxt_text:
+                i += 1
+                continue
+
+            # Case A: Number comma split, e.g. "10" and ",000" or ",000x"
+            if curr_text.isdigit() and (
+                nxt_text.startswith(",")
+                and len(nxt_text) > 1
+                and nxt_text[1:].replace("x", "").replace("X", "").isdigit()
+            ):
+                curr_text = f"{curr_text}{nxt_text}"
+                curr["word"] = curr_text
+                curr["end"] = nxt.get("end", curr["end"])
+                i += 1
+                continue
+
+            # Case B: Number comma split, e.g. "10," and "000"
+            if (
+                curr_text.rstrip(",").isdigit()
+                and curr_text.endswith(",")
+                and (nxt_text.isdigit() or nxt_text.rstrip("xX").isdigit())
+            ):
+                curr_text = f"{curr_text}{nxt_text}"
+                curr["word"] = curr_text
+                curr["end"] = nxt.get("end", curr["end"])
+                i += 1
+                continue
+
+            # Case C: Next word starts with a hyphen, e.g. "-executes", "-person", "-healing", "-weight", "-speed", "-10", "-level", "-specific"
+            # Unless curr_text ends with sentence terminators (. ! ?)
+            if nxt_text.startswith("-") and len(nxt_text) > 1 and not curr_text.endswith((".", "!", "?")):
+                clean_curr = curr_text.rstrip(",;:- ")
+                clean_nxt = nxt_text.lstrip("-")
+                curr_text = f"{clean_curr}-{clean_nxt}"
+                curr["word"] = curr_text
+                curr["end"] = nxt.get("end", curr["end"])
+                i += 1
+                continue
+
+            # Case D: Current word ends with hyphen, e.g. "self-", "multi-", "re-"
+            if curr_text.endswith("-") and len(curr_text) > 1 and not nxt_text.startswith((".", "!", "?")):
+                clean_curr = curr_text.rstrip("-")
+                clean_nxt = nxt_text.lstrip("-")
+                curr_text = f"{clean_curr}-{clean_nxt}"
+                curr["word"] = curr_text
+                curr["end"] = nxt.get("end", curr["end"])
+                i += 1
+                continue
+
+            break
+
+        curr["word"] = curr_text
+        cleaned.append(curr)
+        i += 1
+
+    return cleaned
+
+
+
 PRESET_CONFIGS = {
     "tiktok_yellow": {
         "fontname": "DejaVu Sans",
@@ -188,8 +290,13 @@ def generate_ass_subtitles(
         eff_alignment = alignment
         margin_v = 0 if eff_alignment == 5 else (160 if play_res_y > 1500 else 110)
     elif is_faceless or kwargs.get("is_faceless", False):
+        # Faceless videos (9:16, 16:9, etc.) place dynamic viral captions in the exact center
         eff_alignment = 5
         margin_v = 0
+    elif aspect_ratio == "16:9":
+        # Talking head 16:9 widescreen videos use lower-third (bottom-center)
+        eff_alignment = 2
+        margin_v = 90
     else:
         eff_alignment = 2
         margin_v = 160 if play_res_y > 1500 else 110
@@ -264,12 +371,13 @@ def generate_ass_subtitles(
         """
         Suppresses subtitles during motion graphic intervals so motion graphics
         have exclusive, unobstructed visual focus on screen.
+        Includes a 0.1s buffer to prevent edge collisions or lingering transitions.
         """
         for mg_start, mg_end in mg_intervals:
-            mapped_mg_s = _map_time(mg_start)
-            mapped_mg_e = _map_time(mg_end)
+            mapped_mg_s = _map_time(mg_start) - 0.1
+            mapped_mg_e = _map_time(mg_end) + 0.1
             overlap = max(0.0, min(e, mapped_mg_e) - max(s, mapped_mg_s))
-            if overlap > 0.05:
+            if overlap > 0.0:
                 return True
         return False
 
@@ -323,6 +431,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         raw_words = chunk_data.get("words", [])
         words = [w for w in raw_words if w.get("word", "").strip() and not _is_inside_cut(w["start"], w["end"])]
+        words = reconcile_transcript_words(words)
 
         if not words:
             text = chunk_data.get("text", "").strip()

@@ -6,12 +6,7 @@ import {
   ArrowLeft,
   Undo2,
   Redo2,
-  Smartphone,
-  Monitor,
-  Square,
   Download,
-  ShieldCheck,
-  PanelLeft,
   Sparkles,
   History,
 } from "lucide-react";
@@ -34,8 +29,6 @@ interface EditorTopNavProps {
 export function EditorTopNav({
   onExport,
   isExporting,
-  isDrawerOpen,
-  onToggleDrawer,
   isAssistantOpen,
   onToggleAssistant,
   isHistoryOpen,
@@ -51,196 +44,197 @@ export function EditorTopNav({
     redo,
     setAspectRatio,
     setSafeZoneVisible,
-  } = useTimelineStore(useShallow((state) => ({
-    project: state.project,
-    aspectRatio: state.project.aspectRatio,
-    safeZoneVisible: state.safeZoneVisible,
-    past: state.past,
-    future: state.future,
-    undo: state.undo,
-    redo: state.redo,
-    setAspectRatio: state.setAspectRatio,
-    setSafeZoneVisible: state.setSafeZoneVisible,
-  })));
+  } = useTimelineStore(
+    useShallow((state) => ({
+      project: state.project,
+      aspectRatio: state.project.aspectRatio,
+      safeZoneVisible: state.safeZoneVisible,
+      past: state.past,
+      future: state.future,
+      undo: state.undo,
+      redo: state.redo,
+      setAspectRatio: state.setAspectRatio,
+      setSafeZoneVisible: state.setSafeZoneVisible,
+    }))
+  );
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [title, setTitle] = useState(project.title);
+  const [editTitle, setEditTitle] = useState("");
 
-  const ratios: { label: string; value: AspectRatio; icon: typeof Smartphone }[] = [
-    { label: "9:16 (TikTok/Reels)", value: "9:16", icon: Smartphone },
-    { label: "16:9 (YouTube)", value: "16:9", icon: Monitor },
-    { label: "1:1 (Square)", value: "1:1", icon: Square },
-  ];
+  const displayTitle = project.title || "Compound Interest Explained";
+
+  const startEditing = () => {
+    setEditTitle(displayTitle);
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleSubmit = () => {
+    setIsEditingTitle(false);
+    if (editTitle.trim()) {
+      useTimelineStore.setState((state) => ({
+        project: { ...state.project, title: editTitle.trim() },
+      }));
+    }
+  };
 
   return (
-    <header className="h-14 border-b border-neutral-900 bg-black/95 backdrop-blur-md px-3 md:px-5 flex items-center justify-between z-40 select-none">
-      {/* Left section: Back + Title */}
-      <div className="flex items-center gap-2 md:gap-4">
+    <header className="h-14 glass-panel bg-[#0d1017]/90 backdrop-blur-xl border-b border-white/[0.06] px-3 md:px-5 flex items-center justify-between z-40 select-none">
+      {/* Left section: Back [ < ] + Title + Undo/Redo */}
+      <div className="flex items-center gap-3">
         <Link
           href="/dashboard"
-          className="p-1.5 text-neutral-500 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors flex items-center gap-1 text-xs font-medium"
+          className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/70 hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-xs"
+          title="Back to Dashboard"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Exit Studio</span>
         </Link>
 
-        {onToggleDrawer && (
-          <button
-            onClick={onToggleDrawer}
-            className="p-1.5 text-neutral-500 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors hidden md:flex items-center justify-center"
-            title="Toggle Sidebar"
-          >
-            <PanelLeft className={cn("w-4 h-4 transition-transform", isDrawerOpen ? "text-white" : "")} />
-          </button>
-        )}
-
-        <div className="h-4 w-[1px] bg-neutral-800 hidden sm:block" />
-
-        <div className="flex items-center gap-2">
+        {/* Project Title */}
+        <div className="flex items-center">
           {isEditingTitle ? (
             <input
               type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={() => setIsEditingTitle(false)}
-              onKeyDown={(e) => e.key === "Enter" && setIsEditingTitle(false)}
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleTitleSubmit}
+              onKeyDown={(e) => e.key === "Enter" && handleTitleSubmit()}
               autoFocus
-              className="bg-neutral-900 border border-neutral-700 rounded px-2 py-0.5 text-xs text-white outline-none font-medium max-w-[150px] md:max-w-[220px]"
+              className="bg-white/[0.06] border border-violet-500/50 rounded-lg px-2.5 py-1 text-xs text-white outline-none font-semibold max-w-[200px]"
             />
           ) : (
             <button
-              onClick={() => setIsEditingTitle(true)}
-              className="text-xs md:text-sm font-semibold text-neutral-300 hover:text-white truncate max-w-[140px] md:max-w-[240px] text-left"
-              title="Click to rename"
+              onClick={startEditing}
+              className="text-xs md:text-sm font-semibold text-white/95 hover:text-violet-300 truncate max-w-[220px] text-left transition-colors cursor-pointer"
+              title="Click to rename project"
             >
-              {title || "Untitled Project"}
+              {displayTitle}
             </button>
           )}
-
-          <span className="hidden md:inline-block text-[10px] px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800 font-mono">
-            CapCut Mode
-          </span>
         </div>
-      </div>
 
-      {/* Center: Undo/Redo + Aspect Ratio */}
-      <div className="flex items-center gap-1.5 md:gap-3">
-        {/* Undo / Redo */}
-        <div className="flex items-center bg-neutral-950 border border-neutral-900 rounded-lg p-0.5">
+        {/* Grouped Undo / Redo */}
+        <div className="flex items-center bg-white/[0.03] border border-white/[0.08] rounded-xl p-0.5 ml-1">
           <button
             onClick={undo}
             disabled={past.length === 0}
             title="Undo (Ctrl+Z)"
             className={cn(
-              "p-1.5 rounded text-neutral-500 transition-colors",
-              past.length > 0 ? "hover:text-white hover:bg-neutral-900 cursor-pointer" : "opacity-35 cursor-not-allowed"
+              "p-1.5 rounded-lg text-white/60 transition-colors",
+              past.length > 0
+                ? "hover:text-white hover:bg-white/[0.08] cursor-pointer"
+                : "opacity-30 cursor-not-allowed"
             )}
           >
             <Undo2 className="w-3.5 h-3.5" />
           </button>
+          <div className="w-[1px] h-3 bg-white/[0.08]" />
           <button
             onClick={redo}
             disabled={future.length === 0}
             title="Redo (Ctrl+Y)"
             className={cn(
-              "p-1.5 rounded text-neutral-500 transition-colors",
-              future.length > 0 ? "hover:text-white hover:bg-neutral-900 cursor-pointer" : "opacity-35 cursor-not-allowed"
+              "p-1.5 rounded-lg text-white/60 transition-colors",
+              future.length > 0
+                ? "hover:text-white hover:bg-white/[0.08] cursor-pointer"
+                : "opacity-30 cursor-not-allowed"
             )}
           >
             <Redo2 className="w-3.5 h-3.5" />
           </button>
         </div>
+      </div>
 
-        {/* Aspect Ratio Selector */}
-        <div className="hidden sm:flex items-center bg-neutral-950 border border-neutral-900 rounded-lg p-0.5">
-          {ratios.map((r) => {
-            const Icon = r.icon;
-            const active = aspectRatio === r.value;
+      {/* Center: Segmented Aspect Ratio Control + Safe Zone Switch */}
+      <div className="flex items-center gap-3">
+        {/* Aspect Ratio Segmented Pills */}
+        <div className="flex items-center bg-white/[0.03] border border-white/[0.08] rounded-xl p-1 gap-1">
+          {(["9:16", "16:9", "1:1"] as AspectRatio[]).map((ratio) => {
+            const active = aspectRatio === ratio;
             return (
               <button
-                key={r.value}
-                onClick={() => setAspectRatio(r.value)}
+                key={ratio}
+                onClick={() => setAspectRatio(ratio)}
                 className={cn(
-                  "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all",
+                  "px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                   active
-                    ? "bg-white text-black shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900"
+                    ? "bg-violet-600 text-white shadow-[0_0_12px_rgba(124,58,237,0.35)]"
+                    : "text-white/40 hover:text-white hover:bg-white/[0.04]"
                 )}
-                title={r.label}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{r.value}</span>
+                {ratio}
               </button>
             );
           })}
         </div>
 
-        {/* Safe Zone Toggle */}
+        {/* Safe Zone iOS-style Switch */}
         <button
           onClick={() => setSafeZoneVisible(!safeZoneVisible)}
-          className={cn(
-            "p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-all",
-            safeZoneVisible
-              ? "bg-white/10 border-neutral-700 text-white"
-              : "border-neutral-900 bg-neutral-950 text-neutral-500 hover:text-neutral-300"
-          )}
-          title="Toggle Social UI Safe Zone"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer"
+          title="Toggle Social Safe Zone Guides"
         >
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline text-[11px]">Safe Zone</span>
+          <span className="text-xs text-white/60 font-medium">Safe zone</span>
+          <div
+            className={cn(
+              "w-8 h-4 rounded-full relative transition-colors duration-200",
+              safeZoneVisible ? "bg-violet-600" : "bg-white/15"
+            )}
+          >
+            <div
+              className={cn(
+                "w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform duration-200 shadow-sm",
+                safeZoneVisible ? "translate-x-4.5" : "translate-x-0.5"
+              )}
+            />
+          </div>
         </button>
       </div>
 
-      {/* Right: History, AI Copilot & Export Buttons */}
-      <div className="flex items-center gap-2">
-        {onToggleHistory && (
-          <button
-            onClick={onToggleHistory}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-sm",
-              isHistoryOpen
-                ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-emerald-500/10"
-                : "border-neutral-800 bg-neutral-900/80 text-neutral-300 hover:text-white hover:border-neutral-700"
-            )}
-            title="Project Version History & Checkpoints"
-          >
-            <History className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Versions</span>
-          </button>
-        )}
-
+      {/* Right: AI Copilot + History + Export */}
+      <div className="flex items-center gap-2.5">
         {onToggleAssistant && (
           <button
             onClick={onToggleAssistant}
             className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-sm",
+              "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer",
               isAssistantOpen
-                ? "bg-yellow-400/20 border-yellow-400 text-yellow-400 shadow-yellow-400/10"
-                : "border-neutral-800 bg-neutral-900/80 text-neutral-300 hover:text-white hover:border-neutral-700"
+                ? "bg-violet-600/30 border-violet-500 text-violet-200 shadow-[0_0_16px_rgba(124,58,237,0.35)]"
+                : "bg-violet-600/15 border-violet-500/40 text-violet-300 hover:bg-violet-600/25 shadow-[0_0_12px_rgba(124,58,237,0.2)]"
             )}
-            title="Toggle AI Assistant (Cmd+K)"
+            title="Toggle AI Copilot (Cmd+K)"
           >
-            <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-            <span className="hidden sm:inline">AI Copilot</span>
-            <kbd className="hidden md:inline-block text-[9px] px-1 py-0.2 rounded bg-neutral-800/80 text-neutral-400 font-mono">
-              ⌘K
-            </kbd>
+            <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+            <span>AI Copilot</span>
+          </button>
+        )}
+
+        {onToggleHistory && (
+          <button
+            onClick={onToggleHistory}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] text-white/70 hover:text-white transition-all cursor-pointer",
+              isHistoryOpen && "bg-white/[0.08] text-white border-white/20"
+            )}
+            title="Project Version History & Checkpoints"
+          >
+            <History className="w-3.5 h-3.5 text-white/50" />
+            <span>Versions</span>
           </button>
         )}
 
         <button
           onClick={onExport}
           disabled={isExporting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-black hover:bg-neutral-200 shadow-md shadow-white/5 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+          className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 hover:opacity-90 active:scale-95 text-white px-4 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-[0_0_20px_rgba(124,58,237,0.45)] transition-all cursor-pointer disabled:opacity-50"
         >
           {isExporting ? (
             <>
-              <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               <span>Rendering...</span>
             </>
           ) : (
             <>
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5 fill-white" />
               <span>Export</span>
             </>
           )}

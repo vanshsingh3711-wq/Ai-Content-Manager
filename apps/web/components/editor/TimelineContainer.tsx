@@ -20,6 +20,23 @@ import {
 } from "@/lib/editor/drag-drop-types";
 import { isEffectGraphic } from "@/lib/editor/video-effects";
 
+interface TimelineKeyframe {
+  time: number;
+  value: number;
+  interpolation?: "linear" | "easeIn" | "easeOut" | "easeInOut";
+}
+
+interface TimelinePropertyAnimation {
+  keyframes?: TimelineKeyframe[];
+}
+
+interface KeyframeClip {
+  id: string;
+  start: number;
+  end: number;
+  animation?: Record<string, TimelinePropertyAnimation>;
+}
+
 const KeyframeDiamond = ({
   time,
   leftPosition,
@@ -30,7 +47,7 @@ const KeyframeDiamond = ({
   time: number;
   leftPosition: number;
   isActive: boolean;
-  clip: any;
+  clip: KeyframeClip;
   trackType: "video" | "broll" | "caption" | "audio";
 }) => {
   const handleDrag = (e: React.PointerEvent) => {
@@ -44,8 +61,8 @@ const KeyframeDiamond = ({
     // Determine which properties have this keyframe exactly at this time
     const animatedProps: string[] = [];
     if (clip.animation) {
-      Object.entries(clip.animation).forEach(([prop, propState]: [string, any]) => {
-        if (propState?.keyframes?.some((kf: any) => Math.abs(kf.time - initialTime) <= 0.05)) {
+      Object.entries(clip.animation).forEach(([prop, propState]) => {
+        if (propState?.keyframes?.some((kf) => Math.abs(kf.time - initialTime) <= 0.05)) {
           animatedProps.push(prop);
         }
       });
@@ -66,7 +83,7 @@ const KeyframeDiamond = ({
       if (Math.abs(finalTime - initialTime) > 0.1) {
         // Find existing keyframes and move them
         animatedProps.forEach((prop) => {
-          const kf = clip.animation[prop].keyframes.find((k: any) => Math.abs(k.time - initialTime) <= 0.05);
+          const kf = clip.animation?.[prop]?.keyframes?.find((k) => Math.abs(k.time - initialTime) <= 0.05);
           if (kf) {
             store.removeKeyframe(trackType, clip.id, prop, initialTime);
             store.setKeyframe(trackType, clip.id, prop, finalTime, kf.value, false, kf.interpolation);
@@ -92,12 +109,22 @@ const KeyframeDiamond = ({
   );
 };
 
-const ClipKeyframes = ({ clip, trackType, playheadTime, zoomLevel }: { clip: any, trackType: any, playheadTime: number, zoomLevel: number }) => {
+const ClipKeyframes = ({
+  clip,
+  trackType,
+  playheadTime,
+  zoomLevel,
+}: {
+  clip: KeyframeClip;
+  trackType: "video" | "broll" | "caption" | "audio";
+  playheadTime: number;
+  zoomLevel: number;
+}) => {
   if (!clip.animation) return null;
   
   const times = new Set<number>();
-  Object.values(clip.animation).forEach((propState: any) => {
-    propState?.keyframes?.forEach((kf: any) => times.add(kf.time));
+  Object.values(clip.animation).forEach((propState) => {
+    propState?.keyframes?.forEach((kf) => times.add(kf.time));
   });
 
   const duration = clip.end - clip.start;
@@ -138,7 +165,6 @@ export function TimelineContainer() {
     selectedItem,
     setPlayheadTime,
     setSelectedItem,
-    trimVideoClip,
     dispatchOperation,
   } = useTimelineStore(useShallow((state) => ({
     project: state.project,
@@ -147,7 +173,6 @@ export function TimelineContainer() {
     selectedItem: state.selectedItem,
     setPlayheadTime: state.setPlayheadTime,
     setSelectedItem: state.setSelectedItem,
-    trimVideoClip: state.trimVideoClip,
     dispatchOperation: state.dispatchOperation,
   })));
 
@@ -159,8 +184,9 @@ export function TimelineContainer() {
 
   const handleTrackDrop = (
     e: React.DragEvent,
-    targetTrackHint?: "caption" | "graphic" | "broll" | "video" | "audio"
+    _targetTrackHint?: "caption" | "graphic" | "broll" | "video" | "audio"
   ) => {
+    void _targetTrackHint;
     e.preventDefault();
     setDropTargetTrack(null);
 
@@ -241,10 +267,10 @@ export function TimelineContainer() {
     dispatchOperation(operation);
     setPlayheadTime(dropTimestamp);
 
-    if ((operation as any).element?.id) {
+    if ("element" in operation && operation.element && typeof operation.element === "object" && "id" in operation.element) {
       setSelectedItem({
-        type: payload.type as any,
-        id: (operation as any).element.id,
+        type: payload.type as "caption" | "broll" | "audio" | "graphic" | "video",
+        id: (operation.element as { id: string }).id,
       });
     }
   };
@@ -436,7 +462,7 @@ export function TimelineContainer() {
       const x = timeToPixels(sec);
       const mins = Math.floor(sec / 60);
       const secs = sec % 60;
-      const formatted = `${mins}:${secs.toString().padStart(2, "0")}`;
+      const formatted = `00:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 
       markers.push(
         <div
@@ -457,10 +483,45 @@ export function TimelineContainer() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex flex-col bg-black select-none relative overflow-hidden"
+      className="flex-1 flex flex-row bg-[#080a0f] select-none relative overflow-hidden"
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
+      {/* Fixed Left Track Headers Column (Mockup Image 2) */}
+      <div className="w-20 md:w-24 shrink-0 bg-[#0a0d14] border-r border-white/[0.06] flex flex-col pt-6 z-20 select-none">
+        {/* Track 1: Video */}
+        <div className="h-11 my-1.5 flex items-center px-1.5">
+          <div className="w-full flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-md bg-[#7c3aed] text-white text-[11px] font-semibold shadow-md shadow-violet-950/40">
+            <Video className="w-3 h-3 shrink-0" />
+            <span>Video</span>
+          </div>
+        </div>
+
+        {/* Track 2: Audio */}
+        <div className="h-9 my-1.5 flex items-center px-1.5">
+          <div className="w-full flex items-center justify-center gap-1 px-1.5 py-1 rounded-md bg-[#06b6d4] text-black text-[11px] font-semibold shadow-md shadow-cyan-950/30">
+            <Music className="w-3 h-3 shrink-0 text-black" />
+            <span>Audio</span>
+          </div>
+        </div>
+
+        {/* Track 3: Overlay (B-Roll & Graphics) */}
+        <div className="h-9 my-1.5 flex items-center px-1.5">
+          <div className="w-full flex items-center justify-center gap-1 px-1.5 py-1 rounded-md bg-[#10b981] text-black text-[11px] font-semibold shadow-md shadow-emerald-950/30">
+            <Film className="w-3 h-3 shrink-0 text-black" />
+            <span>Overlay</span>
+          </div>
+        </div>
+
+        {/* Track 4: Caption */}
+        <div className="h-9 my-1.5 flex items-center px-1.5">
+          <div className="w-full flex items-center justify-center gap-1 px-1.5 py-1 rounded-md bg-[#f59e0b] text-black text-[11px] font-semibold shadow-md shadow-amber-950/30">
+            <Type className="w-3 h-3 shrink-0 text-black" />
+            <span>Caption</span>
+          </div>
+        </div>
+      </div>
+
       {/* Scrollable Timeline Viewport */}
       <div
         ref={scrollRef}
@@ -473,305 +534,21 @@ export function TimelineContainer() {
           style={{ width: `${timelineWidth}px` }}
         >
           {/* Ruler Bar */}
-          <div className="absolute top-0 left-0 right-0 h-6 border-b border-neutral-900 bg-neutral-950 cursor-pointer">
+          <div className="absolute top-0 left-0 right-0 h-6 border-b border-neutral-900 bg-[#090c12] cursor-pointer">
             {renderRuler()}
           </div>
 
-          {/* Red Playhead Line across entire timeline */}
+          {/* White Playhead Needle across entire timeline (Mockup Image 2) */}
           <div
-            className="absolute top-0 bottom-0 z-30 pointer-events-none transition-all duration-75 flex flex-col items-center"
+            className="absolute top-0 bottom-0 z-30 pointer-events-none transition-all duration-75 flex flex-col items-center -ml-[5px]"
             style={{ left: `${timeToPixels(playheadTime)}px` }}
           >
-            {/* Playhead Top Handle */}
-            <div className="w-3.5 h-3.5 bg-red-500 rounded-b-sm shadow-md shadow-red-500/50 -mt-0.5" />
-            <div className="w-[2px] h-full bg-red-500 shadow-sm shadow-red-500/50" />
+            {/* Playhead Inverted White Triangle Top Handle */}
+            <div className="w-0 h-0 border-x-[5px] border-x-transparent border-t-[8px] border-t-white drop-shadow-[0_0_6px_rgba(255,255,255,0.9)]" />
+            <div className="w-[1.5px] h-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
           </div>
 
-          {/* TRACK 1: Text & Captions */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "copy";
-              setDropTargetTrack("caption");
-            }}
-            onDragLeave={() => setDropTargetTrack(null)}
-            onDrop={(e) => handleTrackDrop(e, "caption")}
-            className={cn(
-              "mt-2 mb-2 relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
-              dropTargetTrack === "caption"
-                ? "border-yellow-400 bg-yellow-500/10 ring-1 ring-yellow-400/50"
-                : "border-neutral-900"
-            )}
-          >
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-yellow-400 font-semibold shadow">
-              <Type className="w-3 h-3" />
-              <span>Captions</span>
-            </div>
-
-            {project.tracks.textTrack.map((caption) => {
-              const { tempStart, tempEnd } = getRenderTimes(caption.id, caption.start, caption.end);
-              const isMoving = movingClip?.id === caption.id;
-              const deltaX = isMoving ? movingClip.currentX - movingClip.initialX : 0;
-              const left = timeToPixels(tempStart) + deltaX;
-              const width = Math.max(20, timeToPixels(tempEnd - tempStart));
-              const isSelected = selectedItem?.id === caption.id;
-
-              return (
-                <div
-                  key={caption.id}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    setSelectedItem({ type: "caption", id: caption.id });
-                    setMovingClip({
-                      id: caption.id,
-                      type: "caption",
-                      initialStart: caption.start,
-                      initialEnd: caption.end,
-                      initialX: e.clientX,
-                      currentX: e.clientX,
-                    });
-                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                  }}
-                  className={cn(
-                    "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
-                    isSelected
-                      ? "bg-yellow-500/30 border-yellow-400 text-yellow-200 ring-2 ring-yellow-400/40 z-10"
-                      : "bg-yellow-600/20 border-yellow-500/30 text-yellow-300 hover:bg-yellow-600/30",
-                    isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
-                  )}
-                  style={{ left: `${left}px`, width: `${width}px` }}
-                >
-                  {/* Left Trim Handle */}
-                  <div
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setTrimmingClip({
-                        clipId: caption.id,
-                        type: "caption",
-                        handle: "start",
-                        initialStart: caption.start,
-                        initialEnd: caption.end,
-                        initialX: e.clientX,
-                        currentX: e.clientX,
-                      });
-                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    }}
-                    className="clip-handle w-2.5 h-full hover:bg-yellow-400 bg-yellow-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute left-0 top-0 bottom-0"
-                    title="Drag to trim start"
-                  >
-                    <div className="w-[1px] h-3 bg-white/70 rounded-full pointer-events-none" />
-                  </div>
-
-                  <ClipKeyframes clip={caption} trackType="caption" playheadTime={playheadTime} zoomLevel={zoomLevel} />
-                  <span className="truncate flex-1 text-center px-3 pointer-events-none">{caption.text}</span>
-
-                  {/* Right Trim Handle */}
-                  <div
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setTrimmingClip({
-                        clipId: caption.id,
-                        type: "caption",
-                        handle: "end",
-                        initialStart: caption.start,
-                        initialEnd: caption.end,
-                        initialX: e.clientX,
-                        currentX: e.clientX,
-                      });
-                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    }}
-                    className="clip-handle w-2.5 h-full hover:bg-yellow-400 bg-yellow-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute right-0 top-0 bottom-0"
-                    title="Drag to trim end"
-                  >
-                    <div className="w-[1px] h-3 bg-white/70 rounded-full pointer-events-none" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* TRACK 1.5: Motion Graphics */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "copy";
-              setDropTargetTrack("graphic");
-            }}
-            onDragLeave={() => setDropTargetTrack(null)}
-            onDrop={(e) => handleTrackDrop(e, "graphic")}
-            className={cn(
-              "mb-2 relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
-              dropTargetTrack === "graphic"
-                ? "border-purple-400 bg-purple-500/10 ring-1 ring-purple-400/50"
-                : "border-neutral-900"
-            )}
-          >
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-purple-400 font-semibold shadow">
-              <Sparkles className="w-3 h-3" />
-              <span>Graphics & FX</span>
-            </div>
-
-            {(project.tracks.graphicsTrack || []).length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-[10px] text-neutral-600 pointer-events-none italic">
-                Drag motion cards & visual effects here
-              </div>
-            )}
-
-            {(project.tracks.graphicsTrack || []).map((graphic) => {
-                const { tempStart, tempEnd } = getRenderTimes(graphic.id, graphic.start, graphic.end);
-                const isMoving = movingClip?.id === graphic.id;
-                const deltaX = isMoving ? movingClip.currentX - movingClip.initialX : 0;
-                const left = timeToPixels(tempStart) + deltaX;
-                const width = Math.max(20, timeToPixels(tempEnd - tempStart));
-                const isSelected = selectedItem?.id === graphic.id;
-                const isEffect = isEffectGraphic(graphic);
-
-                return (
-                  <div
-                    key={graphic.id}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setSelectedItem({ type: "graphic", id: graphic.id });
-                      setMovingClip({
-                        id: graphic.id,
-                        type: "graphic",
-                        initialStart: graphic.start,
-                        initialEnd: graphic.end,
-                        initialX: e.clientX,
-                        currentX: e.clientX,
-                      });
-                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    }}
-                    className={cn(
-                      "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
-                      isSelected
-                        ? isEffect
-                          ? "bg-emerald-600/50 border-emerald-400 text-emerald-100 ring-2 ring-emerald-400/50 z-10 shadow-[0_0_12px_rgba(52,211,153,0.3)]"
-                          : "bg-purple-600/40 border-purple-400 text-purple-200 ring-2 ring-purple-400/40 z-10"
-                        : isEffect
-                          ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/50"
-                          : "bg-purple-900/30 border-purple-500/30 text-purple-300 hover:bg-purple-800/30",
-                      isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
-                    )}
-                    style={{ left: `${left}px`, width: `${width}px` }}
-                  >
-                    {isEffect && (
-                      <span className="px-1 py-0.2 mr-1 rounded bg-emerald-500/25 border border-emerald-400/40 text-[9px] font-mono text-emerald-300 font-bold shrink-0">
-                        FX
-                      </span>
-                    )}
-                    <span className="truncate flex-1 text-center px-1 pointer-events-none">
-                      {graphic.name || (isEffect ? `FX: ${graphic.props?.effectType || "Overlay"}` : graphic.compositionId)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-          {/* TRACK 2: B-Roll & Overlays */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "copy";
-              setDropTargetTrack("broll");
-            }}
-            onDragLeave={() => setDropTargetTrack(null)}
-            onDrop={(e) => handleTrackDrop(e, "broll")}
-            className={cn(
-              "mb-2 relative h-10 border-y bg-neutral-950/40 flex items-center transition-colors",
-              dropTargetTrack === "broll"
-                ? "border-purple-400 bg-purple-500/10 ring-1 ring-purple-400/50"
-                : "border-neutral-900"
-            )}
-          >
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
-              <Film className="w-3 h-3 text-neutral-400" />
-              <span>B-Roll</span>
-            </div>
-
-            {project.tracks.brollTrack.map((broll) => {
-              const { tempStart, tempEnd } = getRenderTimes(broll.id, broll.start, broll.end);
-              const isMoving = movingClip?.id === broll.id;
-              const deltaX = isMoving ? movingClip.currentX - movingClip.initialX : 0;
-              const left = timeToPixels(tempStart) + deltaX;
-              const width = Math.max(20, timeToPixels(tempEnd - tempStart));
-              const isSelected = selectedItem?.id === broll.id;
-
-              return (
-                <div
-                  key={broll.id}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    setSelectedItem({ type: "broll", id: broll.id });
-                    setMovingClip({
-                      id: broll.id,
-                      type: "broll",
-                      initialStart: broll.start,
-                      initialEnd: broll.end,
-                      initialX: e.clientX,
-                      currentX: e.clientX,
-                    });
-                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                  }}
-                  className={cn(
-                    "clip-item absolute h-8 rounded-md border flex items-center px-2 text-xs font-medium truncate cursor-pointer transition-all shadow-sm",
-                    isSelected
-                      ? "bg-purple-600/40 border-purple-400 text-white ring-2 ring-purple-400/40 z-10"
-                      : "bg-purple-900/30 border-purple-500/30 text-purple-200 hover:bg-purple-800/40",
-                    isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
-                  )}
-                  style={{ left: `${left}px`, width: `${width}px` }}
-                >
-                  {/* Left Trim Handle */}
-                  <div
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setTrimmingClip({
-                        clipId: broll.id,
-                        type: "broll",
-                        handle: "start",
-                        initialStart: broll.start,
-                        initialEnd: broll.end,
-                        initialX: e.clientX,
-                        currentX: e.clientX,
-                      });
-                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    }}
-                    className="clip-handle w-2.5 h-full hover:bg-purple-400 bg-purple-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute left-0 top-0 bottom-0"
-                    title="Drag to trim start"
-                  >
-                    <div className="w-[1px] h-4 bg-white/70 rounded-full pointer-events-none" />
-                  </div>
-
-                  <ClipKeyframes clip={broll} trackType="broll" playheadTime={playheadTime} zoomLevel={zoomLevel} />
-                  <span className="truncate font-semibold flex-1 text-center px-3 pointer-events-none">{broll.name || "B-Roll Clip"}</span>
-
-                  {/* Right Trim Handle */}
-                  <div
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      setTrimmingClip({
-                        clipId: broll.id,
-                        type: "broll",
-                        handle: "end",
-                        initialStart: broll.start,
-                        initialEnd: broll.end,
-                        initialX: e.clientX,
-                        currentX: e.clientX,
-                      });
-                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    }}
-                    className="clip-handle w-2.5 h-full hover:bg-purple-400 bg-purple-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute right-0 top-0 bottom-0"
-                    title="Drag to trim end"
-                  >
-                    <div className="w-[1px] h-4 bg-white/70 rounded-full pointer-events-none" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* TRACK 3: Main Video Track (Primary Footage) */}
+          {/* TRACK 1: Main Video Track (Primary Footage) */}
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -781,17 +558,12 @@ export function TimelineContainer() {
             onDragLeave={() => setDropTargetTrack(null)}
             onDrop={(e) => handleTrackDrop(e, "video")}
             className={cn(
-              "mb-2 relative h-14 border-y bg-neutral-950/80 flex items-center transition-colors",
+              "my-1.5 relative h-11 border-y bg-neutral-950/60 flex items-center transition-colors",
               dropTargetTrack === "video"
-                ? "border-amber-400 bg-amber-500/10 ring-1 ring-amber-400/50"
+                ? "border-violet-400 bg-violet-500/10 ring-1 ring-violet-400/50"
                 : "border-neutral-900"
             )}
           >
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-white font-semibold shadow">
-              <Video className="w-3 h-3 text-neutral-400" />
-              <span>Main Video</span>
-            </div>
-
             {project.tracks.videoTrack.map((clip, idx) => {
               const { tempStart, tempEnd } = getRenderTimes(clip.id, clip.start, clip.end);
               const left = timeToPixels(tempStart);
@@ -806,10 +578,10 @@ export function TimelineContainer() {
                     setSelectedItem({ type: "video", id: clip.id });
                   }}
                   className={cn(
-                    "clip-item absolute h-12 rounded-lg border flex items-center justify-between group cursor-pointer transition-all shadow-md overflow-hidden",
+                    "clip-item absolute h-9 rounded-md border flex items-center justify-between group cursor-pointer transition-all shadow-md overflow-hidden",
                     isSelected
-                      ? "bg-neutral-800/80 border-white ring-2 ring-white/20 z-10"
-                      : "bg-neutral-900/80 border-neutral-700 hover:bg-neutral-800/80"
+                      ? "bg-violet-600/90 border-violet-300 ring-2 ring-violet-400/40 z-10 shadow-[0_0_16px_rgba(124,58,237,0.4)]"
+                      : "bg-[#7c3aed]/80 border-violet-500/40 hover:bg-violet-600/80"
                   )}
                   style={{ left: `${left}px`, width: `${width}px` }}
                 >
@@ -836,21 +608,18 @@ export function TimelineContainer() {
                       });
                       (e.target as HTMLElement).setPointerCapture(e.pointerId);
                     }}
-                    className="clip-handle w-3 h-full hover:bg-neutral-500 bg-neutral-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
+                    className="clip-handle w-2.5 h-full hover:bg-violet-300 bg-violet-400/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
                     title="Drag to trim start"
                   >
-                    <div className="w-0.5 h-4 bg-white/70 rounded-full" />
+                    <div className="w-[1px] h-3 bg-white/80 rounded-full" />
                   </div>
 
                   <ClipKeyframes clip={clip} trackType="video" playheadTime={playheadTime} zoomLevel={zoomLevel} />
 
                   {/* Clip Label */}
                   <div className="flex-1 px-2 flex flex-col justify-center truncate pointer-events-none">
-                    <span className="text-xs font-bold text-white truncate drop-shadow-md">
-                      {clip.name || `Clip ${idx + 1}`}
-                    </span>
-                    <span className="text-[10px] text-neutral-300 font-mono drop-shadow-md">
-                      {(clip.end - clip.start).toFixed(1)}s • {clip.speed || 1}x
+                    <span className="text-[11px] font-semibold text-white truncate drop-shadow-md">
+                      {clip.name || `Video ${idx + 1}`}
                     </span>
                   </div>
 
@@ -869,10 +638,10 @@ export function TimelineContainer() {
                       });
                       (e.target as HTMLElement).setPointerCapture(e.pointerId);
                     }}
-                    className="clip-handle w-3 h-full hover:bg-neutral-500 bg-neutral-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
+                    className="clip-handle w-2.5 h-full hover:bg-violet-300 bg-violet-400/20 flex items-center justify-center cursor-ew-resize transition-colors z-20"
                     title="Drag to trim end"
                   >
-                    <div className="w-0.5 h-4 bg-white/70 rounded-full" />
+                    <div className="w-[1px] h-3 bg-white/80 rounded-full" />
                   </div>
                 </div>
               );
@@ -904,7 +673,7 @@ export function TimelineContainer() {
                     setSelectedItem({ type: "transition", id: trans.id });
                   }}
                   className={cn(
-                    "absolute top-1.5 bottom-1.5 z-30 rounded-md border flex items-center justify-center px-1.5 cursor-pointer transition-all shadow-md backdrop-blur-sm group select-none",
+                    "absolute top-1 bottom-1 z-30 rounded-md border flex items-center justify-center px-1.5 cursor-pointer transition-all shadow-md backdrop-blur-sm group select-none",
                     isSelected
                       ? "bg-amber-500/85 border-amber-300 text-black ring-2 ring-amber-400 font-bold"
                       : "bg-neutral-900/90 border-amber-500/60 text-amber-300 hover:bg-amber-950/90 hover:border-amber-400"
@@ -923,7 +692,7 @@ export function TimelineContainer() {
             })}
           </div>
 
-          {/* TRACK 4: Background Music & Audio */}
+          {/* TRACK 2: Background Music & Audio Track */}
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -933,17 +702,12 @@ export function TimelineContainer() {
             onDragLeave={() => setDropTargetTrack(null)}
             onDrop={(e) => handleTrackDrop(e, "audio")}
             className={cn(
-              "relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
+              "my-1.5 relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
               dropTargetTrack === "audio"
-                ? "border-emerald-400 bg-emerald-500/10 ring-1 ring-emerald-400/50"
+                ? "border-cyan-400 bg-cyan-500/10 ring-1 ring-cyan-400/50"
                 : "border-neutral-900"
             )}
           >
-            <div className="sticky left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900/90 border border-neutral-800 text-[10px] text-emerald-400 font-semibold shadow">
-              <Music className="w-3 h-3" />
-              <span>Audio</span>
-            </div>
-
             {(project.tracks.audioTrack || []).length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center text-[10px] text-neutral-600 pointer-events-none italic">
                 Drag audio tracks here
@@ -977,8 +741,8 @@ export function TimelineContainer() {
                   className={cn(
                     "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
                     isSelected
-                      ? "bg-emerald-600/40 border-emerald-400 text-white ring-2 ring-emerald-400/40 z-10"
-                      : "bg-emerald-900/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/30",
+                      ? "bg-cyan-500 border-cyan-200 text-black ring-2 ring-cyan-300 z-10 shadow-[0_0_12px_rgba(6,182,212,0.4)]"
+                      : "bg-[#06b6d4]/85 border-cyan-400/50 text-black hover:bg-cyan-400",
                     isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
                   )}
                   style={{ left: `${left}px`, width: `${width}px` }}
@@ -998,14 +762,14 @@ export function TimelineContainer() {
                       });
                       (e.target as HTMLElement).setPointerCapture(e.pointerId);
                     }}
-                    className="clip-handle w-2.5 h-full hover:bg-emerald-400 bg-emerald-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute left-0 top-0 bottom-0"
+                    className="clip-handle w-2.5 h-full hover:bg-cyan-300 bg-cyan-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute left-0 top-0 bottom-0"
                     title="Drag to trim start"
                   >
-                    <div className="w-[1px] h-3 bg-white/70 rounded-full pointer-events-none" />
+                    <div className="w-[1px] h-3 bg-black/60 rounded-full pointer-events-none" />
                   </div>
 
                   <ClipKeyframes clip={audio} trackType="audio" playheadTime={playheadTime} zoomLevel={zoomLevel} />
-                  <span className="truncate flex-1 text-center px-3 pointer-events-none">{audio.name || "Music Track"}</span>
+                  <span className="truncate flex-1 text-center px-3 pointer-events-none font-medium">{audio.name || "Audio"}</span>
 
                   {/* Right Trim Handle */}
                   <div
@@ -1022,10 +786,249 @@ export function TimelineContainer() {
                       });
                       (e.target as HTMLElement).setPointerCapture(e.pointerId);
                     }}
-                    className="clip-handle w-2.5 h-full hover:bg-emerald-400 bg-emerald-500/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute right-0 top-0 bottom-0"
+                    className="clip-handle w-2.5 h-full hover:bg-cyan-300 bg-cyan-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute right-0 top-0 bottom-0"
                     title="Drag to trim end"
                   >
-                    <div className="w-[1px] h-3 bg-white/70 rounded-full pointer-events-none" />
+                    <div className="w-[1px] h-3 bg-black/60 rounded-full pointer-events-none" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* TRACK 3: Overlay (B-Roll & Graphics Track) */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTargetTrack("broll");
+            }}
+            onDragLeave={() => setDropTargetTrack(null)}
+            onDrop={(e) => handleTrackDrop(e, "broll")}
+            className={cn(
+              "my-1.5 relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
+              dropTargetTrack === "broll"
+                ? "border-emerald-400 bg-emerald-500/10 ring-1 ring-emerald-400/50"
+                : "border-neutral-900"
+            )}
+          >
+            {/* Render B-Roll Clips */}
+            {project.tracks.brollTrack.map((broll) => {
+              const { tempStart, tempEnd } = getRenderTimes(broll.id, broll.start, broll.end);
+              const isMoving = movingClip?.id === broll.id;
+              const deltaX = isMoving ? movingClip.currentX - movingClip.initialX : 0;
+              const left = timeToPixels(tempStart) + deltaX;
+              const width = Math.max(20, timeToPixels(tempEnd - tempStart));
+              const isSelected = selectedItem?.id === broll.id;
+
+              return (
+                <div
+                  key={broll.id}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedItem({ type: "broll", id: broll.id });
+                    setMovingClip({
+                      id: broll.id,
+                      type: "broll",
+                      initialStart: broll.start,
+                      initialEnd: broll.end,
+                      initialX: e.clientX,
+                      currentX: e.clientX,
+                    });
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                  }}
+                  className={cn(
+                    "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
+                    isSelected
+                      ? "bg-emerald-500 border-emerald-200 text-black ring-2 ring-emerald-300 z-10 shadow-[0_0_12px_rgba(16,185,129,0.4)]"
+                      : "bg-[#10b981]/85 border-emerald-400/50 text-black hover:bg-emerald-400",
+                    isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
+                  )}
+                  style={{ left: `${left}px`, width: `${width}px` }}
+                >
+                  {/* Left Trim Handle */}
+                  <div
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setTrimmingClip({
+                        clipId: broll.id,
+                        type: "broll",
+                        handle: "start",
+                        initialStart: broll.start,
+                        initialEnd: broll.end,
+                        initialX: e.clientX,
+                        currentX: e.clientX,
+                      });
+                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    className="clip-handle w-2.5 h-full hover:bg-emerald-300 bg-emerald-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute left-0 top-0 bottom-0"
+                    title="Drag to trim start"
+                  >
+                    <div className="w-[1px] h-3 bg-black/60 rounded-full pointer-events-none" />
+                  </div>
+
+                  <ClipKeyframes clip={broll} trackType="broll" playheadTime={playheadTime} zoomLevel={zoomLevel} />
+                  <span className="truncate flex-1 text-center px-3 pointer-events-none font-medium">{broll.name || "Overlay"}</span>
+
+                  {/* Right Trim Handle */}
+                  <div
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setTrimmingClip({
+                        clipId: broll.id,
+                        type: "broll",
+                        handle: "end",
+                        initialStart: broll.start,
+                        initialEnd: broll.end,
+                        initialX: e.clientX,
+                        currentX: e.clientX,
+                      });
+                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    className="clip-handle w-2.5 h-full hover:bg-emerald-300 bg-emerald-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute right-0 top-0 bottom-0"
+                    title="Drag to trim end"
+                  >
+                    <div className="w-[1px] h-3 bg-black/60 rounded-full pointer-events-none" />
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Render Motion Graphics & Visual Effects */}
+            {(project.tracks.graphicsTrack || []).map((graphic) => {
+              const { tempStart, tempEnd } = getRenderTimes(graphic.id, graphic.start, graphic.end);
+              const isMoving = movingClip?.id === graphic.id;
+              const deltaX = isMoving ? movingClip.currentX - movingClip.initialX : 0;
+              const left = timeToPixels(tempStart) + deltaX;
+              const width = Math.max(20, timeToPixels(tempEnd - tempStart));
+              const isSelected = selectedItem?.id === graphic.id;
+              const isEffect = isEffectGraphic(graphic);
+
+              return (
+                <div
+                  key={graphic.id}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedItem({ type: "graphic", id: graphic.id });
+                    setMovingClip({
+                      id: graphic.id,
+                      type: "graphic",
+                      initialStart: graphic.start,
+                      initialEnd: graphic.end,
+                      initialX: e.clientX,
+                      currentX: e.clientX,
+                    });
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                  }}
+                  className={cn(
+                    "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
+                    isSelected
+                      ? "bg-emerald-400 border-white text-black ring-2 ring-emerald-300 z-10 shadow-[0_0_12px_rgba(16,185,129,0.4)]"
+                      : "bg-emerald-600/80 border-emerald-400/50 text-white hover:bg-emerald-500",
+                    isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
+                  )}
+                  style={{ left: `${left}px`, width: `${width}px` }}
+                >
+                  <span className="truncate flex-1 text-center px-1 pointer-events-none">
+                    {graphic.name || (isEffect ? `FX: ${graphic.props?.effectType || "Overlay"}` : graphic.compositionId)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* TRACK 4: Captions & Text Track */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTargetTrack("caption");
+            }}
+            onDragLeave={() => setDropTargetTrack(null)}
+            onDrop={(e) => handleTrackDrop(e, "caption")}
+            className={cn(
+              "my-1.5 relative h-9 border-y bg-neutral-950/40 flex items-center transition-colors",
+              dropTargetTrack === "caption"
+                ? "border-amber-400 bg-amber-500/10 ring-1 ring-amber-400/50"
+                : "border-neutral-900"
+            )}
+          >
+            {project.tracks.textTrack.map((caption) => {
+              const { tempStart, tempEnd } = getRenderTimes(caption.id, caption.start, caption.end);
+              const isMoving = movingClip?.id === caption.id;
+              const deltaX = isMoving ? movingClip.currentX - movingClip.initialX : 0;
+              const left = timeToPixels(tempStart) + deltaX;
+              const width = Math.max(20, timeToPixels(tempEnd - tempStart));
+              const isSelected = selectedItem?.id === caption.id;
+
+              return (
+                <div
+                  key={caption.id}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedItem({ type: "caption", id: caption.id });
+                    setMovingClip({
+                      id: caption.id,
+                      type: "caption",
+                      initialStart: caption.start,
+                      initialEnd: caption.end,
+                      initialX: e.clientX,
+                      currentX: e.clientX,
+                    });
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                  }}
+                  className={cn(
+                    "clip-item absolute h-7 rounded-md border flex items-center px-2 text-xs font-semibold truncate cursor-pointer transition-all shadow-sm",
+                    isSelected
+                      ? "bg-amber-500 border-amber-200 text-black ring-2 ring-amber-300 z-10 shadow-[0_0_12px_rgba(245,158,11,0.4)]"
+                      : "bg-[#f59e0b]/85 border-amber-400/50 text-black hover:bg-amber-400",
+                    isMoving && "opacity-75 z-50 cursor-grabbing scale-[1.02]"
+                  )}
+                  style={{ left: `${left}px`, width: `${width}px` }}
+                >
+                  {/* Left Trim Handle */}
+                  <div
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setTrimmingClip({
+                        clipId: caption.id,
+                        type: "caption",
+                        handle: "start",
+                        initialStart: caption.start,
+                        initialEnd: caption.end,
+                        initialX: e.clientX,
+                        currentX: e.clientX,
+                      });
+                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    className="clip-handle w-2.5 h-full hover:bg-amber-300 bg-amber-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute left-0 top-0 bottom-0"
+                    title="Drag to trim start"
+                  >
+                    <div className="w-[1px] h-3 bg-black/60 rounded-full pointer-events-none" />
+                  </div>
+
+                  <ClipKeyframes clip={caption} trackType="caption" playheadTime={playheadTime} zoomLevel={zoomLevel} />
+                  <span className="truncate flex-1 text-center px-3 pointer-events-none font-medium">{caption.text}</span>
+
+                  {/* Right Trim Handle */}
+                  <div
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setTrimmingClip({
+                        clipId: caption.id,
+                        type: "caption",
+                        handle: "end",
+                        initialStart: caption.start,
+                        initialEnd: caption.end,
+                        initialX: e.clientX,
+                        currentX: e.clientX,
+                      });
+                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    className="clip-handle w-2.5 h-full hover:bg-amber-300 bg-amber-600/20 flex items-center justify-center cursor-ew-resize transition-colors z-20 absolute right-0 top-0 bottom-0"
+                    title="Drag to trim end"
+                  >
+                    <div className="w-[1px] h-3 bg-black/60 rounded-full pointer-events-none" />
                   </div>
                 </div>
               );

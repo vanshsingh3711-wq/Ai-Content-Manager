@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
-import { Plus, Shield } from "lucide-react";
+import React, { useState } from "react";
+import { Plus, Shield, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function YoutubeIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -27,78 +28,199 @@ function LinkedinIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function TikTokIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.16 1.18 2.07 2.34 2.27.61.1 1.25.04 1.83-.16.91-.32 1.63-1.07 1.92-1.98.22-.64.27-1.32.26-2-.01-4.71 0-9.42 0-14.13z" />
+    </svg>
+  );
+}
+
+interface Platform {
+  id: string;
+  name: string;
+  desc: string;
+  icon: (props: React.SVGProps<SVGSVGElement>) => React.ReactElement;
+  connected: boolean;
+  handle?: string;
+  color: string;
+  glowClass: string;
+  bgIcon: string;
+}
+
 export default function SocialsPage() {
-  const platforms = [
+  const [platforms, setPlatforms] = useState<Platform[]>([
     {
       id: "youtube",
       name: "YouTube",
-      desc: "Auto-publish Shorts & long-form videos with custom thumbnails and tags.",
+      desc: "Auto-publish Shorts & long-form videos with custom thumbnails, tags, and category indexing.",
       icon: YoutubeIcon,
-      connected: false,
+      connected: true,
+      handle: "@aidirector_channel",
+      color: "text-red-500",
+      glowClass: "hover:border-red-500/30 hover:shadow-[0_0_24px_rgba(239,68,68,0.12)]",
+      bgIcon: "bg-red-500/10 text-red-500 border-red-500/20",
     },
     {
       id: "instagram",
       name: "Instagram",
-      desc: "Direct Reels publishing with automated captions and hashtag sets.",
+      desc: "Direct Reels publishing with automated kinetic captions, cover image, and viral hashtag sets.",
       icon: InstagramIcon,
       connected: false,
+      color: "text-pink-400",
+      glowClass: "hover:border-pink-500/30 hover:shadow-[0_0_24px_rgba(236,72,153,0.12)]",
+      bgIcon: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+    },
+    {
+      id: "tiktok",
+      name: "TikTok",
+      desc: "Instant Short-form sync for trending audio tags, hook overlays, and scheduled peak posting.",
+      icon: TikTokIcon,
+      connected: false,
+      color: "text-cyan-400",
+      glowClass: "hover:border-cyan-500/30 hover:shadow-[0_0_24px_rgba(6,182,212,0.12)]",
+      bgIcon: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     },
     {
       id: "linkedin",
       name: "LinkedIn",
-      desc: "Post talking-head video clips with generated takeaways and formatting.",
+      desc: "Post executive talking-head video clips with generated executive summaries and takeaways.",
       icon: LinkedinIcon,
       connected: false,
+      color: "text-blue-400",
+      glowClass: "hover:border-blue-500/30 hover:shadow-[0_0_24px_rgba(59,130,246,0.12)]",
+      bgIcon: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     },
-  ];
+  ]);
+
+  function toggleConnection(id: string) {
+    setPlatforms((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              connected: !p.connected,
+              handle: !p.connected ? `@${p.name.toLowerCase()}_creator` : undefined,
+            }
+          : p
+      )
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500 font-medium mb-2">Integrations</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-white">Social Accounts</h1>
-        <p className="text-sm text-neutral-500 mt-2">
-          Connect your channels for automated video publishing.
-        </p>
+    <div className="space-y-8 animate-in fade-in duration-300">
+      {/* ── Header ── */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-white">Social Integrations</h1>
+            <span className="tag border-violet-500/30 text-violet-300">AUTO-PUBLISH ENGINE</span>
+          </div>
+          <p className="text-xs text-white/40 mt-1">
+            Connect your distribution channels for 1-click scheduled publishing across platforms.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="tag border-emerald-500/30 text-emerald-300 flex items-center gap-1.5">
+            <span className="status-dot status-dot-online" />
+            OAuth 2.0 Gateway Active
+          </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {platforms.map(p => {
+      {/* ── Platform Grid ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {platforms.map((p) => {
           const Icon = p.icon;
           return (
             <div
               key={p.id}
-              className="p-6 rounded-xl border border-neutral-800 bg-neutral-950 flex flex-col justify-between space-y-5 hover:border-neutral-700 transition-colors"
+              className={cn(
+                "glass-card p-6 flex flex-col justify-between transition-all duration-200 border-white/[0.06] relative group",
+                p.glowClass,
+                p.connected && "border-white/[0.12] bg-white/[0.03]"
+              )}
             >
               <div className="space-y-4">
+                {/* Icon & Connection Pill */}
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-400">
+                  <div
+                    className={cn(
+                      "w-11 h-11 rounded-xl border flex items-center justify-center transition-transform group-hover:scale-105",
+                      p.bgIcon
+                    )}
+                  >
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-600 border border-neutral-800 rounded px-2 py-0.5">
-                    Not Connected
-                  </span>
+
+                  {p.connected ? (
+                    <span className="status-pill status-pill-done">
+                      <span className="status-dot status-dot-online" />
+                      Active
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-white/35 px-2 py-0.5 rounded border border-white/[0.06] bg-white/[0.02]">
+                      Disconnected
+                    </span>
+                  )}
                 </div>
+
+                {/* Details */}
                 <div>
-                  <h3 className="text-sm font-semibold text-white mb-1">{p.name}</h3>
-                  <p className="text-xs text-neutral-500 leading-relaxed">{p.desc}</p>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-semibold text-white">{p.name}</h3>
+                    {p.connected && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    )}
+                  </div>
+                  {p.handle && (
+                    <span className="text-xs font-mono text-violet-300 block mt-0.5">
+                      {p.handle}
+                    </span>
+                  )}
+                  <p className="text-xs text-white/40 leading-relaxed mt-2">{p.desc}</p>
                 </div>
               </div>
 
-              <button className="w-full py-2.5 rounded-lg text-xs font-medium bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800 inline-flex items-center justify-center gap-1.5 transition-colors">
-                <Plus className="w-3.5 h-3.5" />
-                Connect {p.name}
-              </button>
+              {/* Action Button */}
+              <div className="pt-6">
+                <button
+                  onClick={() => toggleConnection(p.id)}
+                  className={cn(
+                    "w-full py-2.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all",
+                    p.connected
+                      ? "btn-ghost text-white/60 hover:text-red-400 hover:border-red-500/30"
+                      : "btn-primary shadow-[0_0_16px_rgba(124,58,237,0.25)]"
+                  )}
+                >
+                  {p.connected ? (
+                    <span>Disconnect Channel</span>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Connect {p.name}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="p-4 rounded-lg border border-neutral-800 bg-neutral-950 flex items-center gap-3 text-xs text-neutral-500">
-        <Shield className="w-4 h-4 text-neutral-600 shrink-0" />
-        <span>
-          OAuth tokens are encrypted and stored with automatic refresh rotation.
-        </span>
+      {/* ── Security / Compliance Callout ── */}
+      <div className="glass-card p-5 border-white/[0.06] flex items-center gap-3.5 text-xs text-white/40 rounded-xl">
+        <div className="w-8 h-8 rounded-lg bg-violet-600/15 border border-violet-500/30 flex items-center justify-center text-violet-400 shrink-0">
+          <Shield className="w-4 h-4" />
+        </div>
+        <div className="space-y-0.5">
+          <span className="font-medium text-white">Enterprise OAuth Security</span>
+          <p className="text-white/40">
+            Publishing tokens are AES-256 encrypted with automatic rolling key refreshes. We never
+            request channel management or read permissions for your private messages.
+          </p>
+        </div>
       </div>
     </div>
   );

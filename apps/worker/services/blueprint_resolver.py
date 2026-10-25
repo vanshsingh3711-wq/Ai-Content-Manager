@@ -2,6 +2,7 @@ import re
 from typing import List, Dict, Any, Optional
 from services.ai_director import EditList, EditDecision
 from services.speech_pruner import merge_cuts
+from services.chunk_director import stitch_micro_scenes_to_blueprint, direct_all_chunks
 
 TEMPLATE_VARIETY_CYCLE = [
     "hero_reveal",
@@ -22,6 +23,17 @@ TEMPLATE_VARIETY_CYCLE = [
     "wealth_flywheel",
     "battle_chart",
     "step_sequence",
+    "todo_list",
+    "architecture_pipeline",
+    "causal_loop",
+    "exploded_layer_stack",
+    "bottleneck_constriction",
+    "trilemma_tradeoff",
+    "scale_zoom_ladder",
+    "decision_tree_fork",
+    "radar_spider_chart",
+    "pareto_power_law",
+    "chrono_dial_clock",
     "showdown_duel",
     "compound_formula",
     "wall_street_failure_hook",
@@ -59,6 +71,8 @@ def enforce_density_budgeting(
     if is_faceless:
         max_broll_ratio = 1.0
         min_broll_spacing = 3.0
+        min_mg_spacing = 3.5
+        min_mg_gap = 2.0
     clean_edits: List[EditDecision] = []
     for e in edits:
         if isinstance(e, dict):
@@ -528,15 +542,15 @@ def resolve_master_blueprint(
     if is_faceless:
         # Gapless snapping for faceless videos: eliminate unwanted flashing gaps between visual cuts
         broll_edits = [e for e in budgeted if e.action == "b_roll"]
-        broll_edits.sort(key=lambda x: (x.start if x.start is not None else 0.0))
-        for i in range(len(broll_edits) - 1):
-            curr_b = broll_edits[i]
-            next_b = broll_edits[i + 1]
-            if curr_b.end is not None and next_b.start is not None:
-                gap = next_b.start - curr_b.end
-                if 0.0 < gap <= 2.5:
-                    # Extend previous B-roll end to seamlessly meet the next B-roll start (0 gap)
+        if broll_edits:
+            broll_edits.sort(key=lambda x: (x.start if x.start is not None else 0.0))
+            broll_edits[0].start = 0.0
+            for i in range(len(broll_edits) - 1):
+                curr_b = broll_edits[i]
+                next_b = broll_edits[i + 1]
+                if curr_b.end is not None and next_b.start is not None:
                     curr_b.end = round(next_b.start, 2)
+            broll_edits[-1].end = round(max_duration, 2)
 
         # Remove accidental micro-clips (< 1.0s duration) that can cause annoying visual flashes
         budgeted = [

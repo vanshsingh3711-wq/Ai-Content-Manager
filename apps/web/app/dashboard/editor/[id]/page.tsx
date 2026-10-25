@@ -15,7 +15,7 @@ import { VersionHistoryDrawer } from "@/components/editor/VersionHistoryDrawer";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { TimelineProject } from "@/lib/timeline-types";
 import { convertVisualTimelineToSafeZones } from "@/lib/layout/subject-avoidance";
-import { CheckCircle2, X } from "lucide-react";
+import { isPresetOrLocalId, getPresetProject } from "@/lib/editor/editor-presets";
 
 export default function StudioEditorPage() {
   const params = useParams();
@@ -27,16 +27,17 @@ export default function StudioEditorPage() {
   const [isDesktopDrawerOpen, setIsDesktopDrawerOpen] = useState(true);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+  const isExporting = false;
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  const isRealProject = Boolean(projectId && projectId !== "new" && projectId !== "demo");
+  const isPresetOrLocal = isPresetOrLocalId(projectId);
+  const isRealProject = Boolean(projectId && !isPresetOrLocal);
   const [isLoading, setIsLoading] = useState(isRealProject);
   const [isLoadedFromServer, setIsLoadedFromServer] = useState(!isRealProject);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Global Cmd+K / Ctrl+K listener for AI Assistant
   useEffect(() => {
@@ -69,7 +70,12 @@ export default function StudioEditorPage() {
           ]);
 
           let activeProject: TimelineProject | null = null;
-          let videoJob: any = null;
+          let videoJob: {
+            title?: string;
+            rendered_url?: string;
+            source_url?: string;
+            settings?: { duration?: string; aspect_ratio?: "9:16" | "16:9" | "1:1" | "4:5" };
+          } | null = null;
           if (videoJobRes && videoJobRes.ok) {
             videoJob = await videoJobRes.json();
           }
@@ -88,7 +94,7 @@ export default function StudioEditorPage() {
 
           if (!activeProject) {
             // Fallback for real project whose timeline is not yet compiled
-            const dur = parseFloat(videoJob?.settings?.duration || 12.0);
+            const dur = parseFloat(videoJob?.settings?.duration || "12.0");
             activeProject = {
               id: projectId,
               videoId: projectId,
@@ -107,7 +113,6 @@ export default function StudioEditorPage() {
           }
 
           // Ensure base video clip exists if media was rendered or uploaded
-          const playableMedia = videoJob?.rendered_url || videoJob?.source_url;
           const localProxyUrl = `${apiBase}/api/v1/videos/${projectId}/rendered-file`;
           const vTrack = activeProject.tracks.videoTrack || [];
           if (vTrack.length === 0) {
@@ -161,61 +166,33 @@ export default function StudioEditorPage() {
       }
 
       // Default sample project for demo / new
-      const sampleProject: TimelineProject = {
-        id: projectId,
-        title: "Viral TikTok Reel",
-        aspectRatio: "9:16",
-        duration: 12.0,
-        fps: 30,
-        tracks: {
-          videoTrack: [
-            {
-              id: "clip-demo-1",
-              sourceUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-              name: "Main Talking Head",
-              start: 0,
-              end: 12.0,
-              sourceStart: 0,
-              sourceEnd: 12.0,
-              speed: 1,
-              volume: 100,
-              zoomFactor: 1.0,
-            },
-          ],
-          brollTrack: [
-            {
-              id: "broll-demo-1",
-              sourceUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-              name: "Tech Overlay",
-              start: 3.5,
-              end: 7.0,
-              opacity: 100,
-              fitMode: "cover",
-            },
-          ],
-          textTrack: [
-            {
-              id: "caption-demo-1",
-              text: "WELCOME TO THE FUTURE",
-              start: 0.5,
-              end: 3.5,
-              stylePreset: "tiktok_yellow",
-              positionY: 75,
-            },
-            {
-              id: "caption-demo-2",
-              text: "BUILD LIKE A PRO",
-              start: 4.0,
-              end: 8.0,
-              stylePreset: "hormozi_bold",
-              positionY: 75,
-            },
-          ],
-          audioTrack: [],
-        },
-      };
+      // For local uploads or presets, check if project is already initialized in memory with tracks
+      const currentStoreProject = useTimelineStore.getState().project;
+      if (
+        currentStoreProject &&
+        currentStoreProject.id === projectId &&
+        (currentStoreProject.tracks?.videoTrack?.length || 0) > 0
+      ) {
+        setIsLoadedFromServer(true);
+        setIsLoading(false);
+        return;
+      }
 
-      initProject(sampleProject);
+      // Load full preset configuration (viral, podcast, youtube, product, demo, etc.)
+      const presetProject = getPresetProject(projectId);
+      initProject(presetProject);
+
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tParam = urlParams.get("t");
+        if (tParam) {
+          const t = parseFloat(tParam);
+          if (!isNaN(t) && t >= 0) {
+            useTimelineStore.getState().setPlayheadTime(t);
+          }
+        }
+      }
+
       setIsLoadedFromServer(true);
       setIsLoading(false);
     };
@@ -223,9 +200,9 @@ export default function StudioEditorPage() {
     loadProject();
   }, [mounted, projectId, isRealProject, initProject]);
 
-  // Debounced Auto-Save to Backend: only when loaded from server
+  // Debounced Auto-Save to Backend: only when loaded from server for real database projects
   useEffect(() => {
-    if (!mounted || !isLoadedFromServer || !projectId || projectId === "new" || project.id === "default-project") return;
+    if (!mounted || !isLoadedFromServer || !isRealProject || !projectId || projectId === "new" || project.id === "default-project") return;
 
     const timer = setTimeout(async () => {
       try {
@@ -241,7 +218,7 @@ export default function StudioEditorPage() {
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [mounted, isLoadedFromServer, projectId, project]);
+  }, [mounted, isLoadedFromServer, isRealProject, projectId, project]);
 
   const handleExport = () => {
     setExportModalOpen(true);
@@ -295,7 +272,7 @@ export default function StudioEditorPage() {
           </div>
 
           {/* Bottom Half: Toolbar + Timeline */}
-          <div className="h-[270px] md:h-[300px] flex flex-col border-t border-neutral-900 bg-neutral-950">
+          <div className="h-[270px] md:h-[300px] flex flex-col border-t border-white/[0.06] bg-[#090b10]">
             <TimelineToolbar onOpenDrawer={handleOpenDrawer} />
             <TimelineContainer />
           </div>

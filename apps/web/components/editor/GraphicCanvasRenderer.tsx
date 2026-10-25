@@ -1369,17 +1369,53 @@ export function GraphicCanvasRenderer({ graphic, playheadTime }: GraphicCanvasRe
           </div>
         </div>
 
-        {/* Main Punchy Display Headline */}
-        <h3 className="text-2xl font-black tracking-tight text-white leading-tight drop-shadow-md">
-          {headline}
-        </h3>
+        {/* Main Punchy Display Headline with Typewriter */}
+        {(() => {
+          const hlStart = 0.25;
+          const hlDur = Math.min(1.0, Math.max(0.5, headline.length * 0.025));
+          const hlProg = Math.min(1, Math.max(0, (localTime - hlStart) / hlDur));
+          const visibleHlCount = Math.floor(hlProg * headline.length);
+          const typedHeadline = headline.slice(0, visibleHlCount);
+          const remainingHeadline = headline.slice(visibleHlCount);
+          const isTypingHl = localTime >= hlStart && visibleHlCount < headline.length;
 
-        {/* Optional Subtitle / Supporting text */}
-        {subtext && (
-          <p className="text-xs text-neutral-300 font-medium leading-relaxed mt-2 line-clamp-2">
-            {subtext}
-          </p>
-        )}
+          const subStart = hlStart + hlDur + 0.15;
+          const subDur = Math.min(1.2, Math.max(0.6, (subtext || "").length * 0.02));
+          const subProg = Math.min(1, Math.max(0, (localTime - subStart) / subDur));
+          const visibleSubCount = Math.floor(subProg * (subtext || "").length);
+          const typedSubtext = (subtext || "").slice(0, visibleSubCount);
+          const remainingSubtext = (subtext || "").slice(visibleSubCount);
+          const isTypingSub = localTime >= subStart && visibleSubCount < (subtext || "").length;
+
+          return (
+            <>
+              <h3 className="text-2xl font-black tracking-tight text-white leading-tight drop-shadow-md relative">
+                <span>{typedHeadline}</span>
+                {isTypingHl && (
+                  <span
+                    className="inline-block w-[3px] h-[0.85em] ml-1 rounded-sm align-middle animate-pulse"
+                    style={{ backgroundColor: accentColor, boxShadow: `0 0 10px ${accentColor}` }}
+                  />
+                )}
+                <span className="opacity-0 select-none">{remainingHeadline}</span>
+              </h3>
+
+              {/* Optional Subtitle / Supporting text with Typewriter */}
+              {subtext && (
+                <p className="text-xs text-neutral-300 font-medium leading-relaxed mt-2 line-clamp-2 relative">
+                  <span>{typedSubtext}</span>
+                  {isTypingSub && (
+                    <span
+                      className="inline-block w-[2px] h-[0.85em] ml-1 rounded-sm align-middle animate-pulse"
+                      style={{ backgroundColor: accentColor, boxShadow: `0 0 8px ${accentColor}` }}
+                    />
+                  )}
+                  <span className="opacity-0 select-none">{remainingSubtext}</span>
+                </p>
+              )}
+            </>
+          );
+        })()}
 
         {/* Bottom Accent Indicator Bar */}
         <div className="mt-4 flex items-center gap-2">
@@ -1563,6 +1599,1509 @@ export function GraphicCanvasRenderer({ graphic, playheadTime }: GraphicCanvasRe
             </div>
           );
         })}
+      </div>
+    );
+  }
+
+  // RENDERER: TODO LIST / SYSTEM CHECKLIST
+  if (
+    compKey === "todo-list" ||
+    compKey === "todo_list" ||
+    compKey === "todo" ||
+    compKey === "checklist"
+  ) {
+    const title = props.title || props.headline || "EXECUTION DIRECTIVES";
+    const badge = props.badge || "📋 CHECKLIST";
+    const accentColor = props.accentColor || "#38bdf8";
+    const format = props.format || "todo";
+    const rawPoints = Array.isArray(props.items) && props.items.length > 0
+      ? props.items
+      : [
+          props.point1 || props.step1 || "Automate Diagnostic Friction Audits",
+          props.point2 || props.step2 || "Deploy Scoped Autonomous Agents",
+          props.point3 || props.step3 || "Anchor to Verification Gates",
+          props.point4 || props.step4,
+        ].filter(Boolean);
+
+    const points = rawPoints.map((p: any) => String(p).replace(/^\d+[\.\)]\s*/, "").trim());
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-6 w-[280px] max-w-full sm:w-[320px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}44`,
+          boxShadow: `0 0 45px ${accentColor}25, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Badge & Count */}
+        <div className="flex items-center justify-between mb-2.5">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">
+            {points.length} ITEMS
+          </span>
+        </div>
+
+        {/* Bold Header */}
+        <h3 className="text-lg font-black tracking-tight text-white uppercase leading-tight drop-shadow-md mb-3">
+          {title}
+        </h3>
+
+        {/* Points with Typewriter */}
+        <div className="space-y-2">
+          {points.map((point: string, i: number) => {
+            const ptStart = 0.25 + i * 0.45;
+            const ptDur = 0.4;
+            const ptProg = Math.min(1, Math.max(0, (localTime - ptStart) / ptDur));
+            const hasStarted = localTime >= ptStart;
+            const visibleCount = Math.floor(ptProg * point.length);
+            const typedText = point.slice(0, visibleCount);
+            const remainingText = point.slice(visibleCount);
+            const isTyping = hasStarted && visibleCount < point.length;
+            const isDone = visibleCount >= point.length;
+
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-2.5 p-2 rounded-xl bg-neutral-900/60 border border-white/5 transition-all"
+                style={{ opacity: hasStarted ? 1 : 0.3 }}
+              >
+                {format === "sequence" ? (
+                  <span
+                    className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-mono font-bold shrink-0 mt-0.5"
+                    style={{
+                      backgroundColor: isDone ? `${accentColor}30` : "rgba(255,255,255,0.06)",
+                      color: isDone ? accentColor : "rgba(255,255,255,0.5)",
+                      border: `1px solid ${isDone ? accentColor + "60" : "rgba(255,255,255,0.1)"}`,
+                    }}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                ) : (
+                  <div
+                    className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5"
+                    style={{
+                      border: `1.5px solid ${isDone ? accentColor : "rgba(255,255,255,0.25)"}`,
+                      backgroundColor: isDone ? `${accentColor}25` : "transparent",
+                    }}
+                  >
+                    {isDone && <span className="text-[10px] font-bold" style={{ color: accentColor }}>✓</span>}
+                  </div>
+                )}
+                <div className="text-xs font-medium text-neutral-100 flex-1 leading-snug relative">
+                  <span>{typedText}</span>
+                  {isTyping && (
+                    <span
+                      className="inline-block w-[2px] h-[0.85em] ml-1 rounded-sm align-middle animate-pulse"
+                      style={{ backgroundColor: accentColor, boxShadow: `0 0 8px ${accentColor}` }}
+                    />
+                  )}
+                  <span className="opacity-0 select-none">{remainingText}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: ARCHITECTURE PIPELINE / SYSTEM FLOW
+  if (
+    compKey === "architecture-pipeline" ||
+    compKey === "architecture_pipeline" ||
+    compKey === "pipeline" ||
+    compKey === "system_architecture"
+  ) {
+    const title = props.title || props.headline || "AUTONOMOUS REASONING ARCHITECTURE";
+    const subtitle = props.subtitle || props.subtext || "END-TO-END DATA FLOW & VERIFICATION ENGINE";
+    const badge = props.badge || "⚡ SYSTEM ARCHITECTURE";
+    const accentColor = props.accentColor || "#00e5ff";
+
+    const stages = [
+      {
+        num: "01",
+        title: props.stage1Title || "Multimodal Telemetry",
+        desc: props.stage1Desc || "Streaming input ingestion",
+        badge: props.stage1Badge || "INGEST",
+        metric: props.stage1Metric || "100K EVT/S",
+        color: "#38bdf8",
+      },
+      {
+        num: "02",
+        title: props.stage2Title || "Vector Knowledge Core",
+        desc: props.stage2Desc || "Dense hybrid retrieval",
+        badge: props.stage2Badge || "EMBED",
+        metric: props.stage2Metric || "4.2ms LATENCY",
+        color: "#818cf8",
+      },
+      {
+        num: "03",
+        title: props.stage3Title || "Recursive Agent Loop",
+        desc: props.stage3Desc || "Autonomous multi-hop reasoning",
+        badge: props.stage3Badge || "REASON",
+        metric: props.stage3Metric || "99.4% PASS",
+        color: "#34d399",
+      },
+      {
+        num: "04",
+        title: props.stage4Title || "Deterministic Gate",
+        desc: props.stage4Desc || "Zero-regression assertion gate",
+        badge: props.stage4Badge || "VERIFY",
+        metric: props.stage4Metric || "100% PASS",
+        color: "#f59e0b",
+      },
+    ].filter((s) => Boolean(s.title));
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[320px] max-w-full sm:w-[380px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}44`,
+          boxShadow: `0 0 50px ${accentColor}25, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & Node Count */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest font-semibold">
+            ● {stages.length} ACTIVE NODES
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <h3 className="text-base font-black tracking-tight text-white uppercase leading-tight drop-shadow-md mb-0.5">
+          {title}
+        </h3>
+        <p className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mb-3">
+          {subtitle}
+        </p>
+
+        {/* Stages Pipeline */}
+        <div className="space-y-1.5">
+          {stages.map((st: any, i: number) => {
+            const stStart = 0.2 + i * 0.35;
+            const hasStarted = localTime >= stStart;
+            const cardColor = st.color || accentColor;
+
+            return (
+              <div
+                key={i}
+                className="p-2 rounded-xl bg-neutral-900/70 border transition-all"
+                style={{
+                  borderColor: hasStarted ? `${cardColor}40` : "rgba(255,255,255,0.06)",
+                  boxShadow: hasStarted ? `0 0 15px ${cardColor}15` : "none",
+                  opacity: hasStarted ? 1 : 0.35,
+                }}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black border"
+                      style={{
+                        color: cardColor,
+                        backgroundColor: `${cardColor}15`,
+                        borderColor: `${cardColor}40`,
+                      }}
+                    >
+                      {st.num}
+                    </span>
+                    <span className="text-xs font-black uppercase text-white tracking-tight">
+                      {st.title}
+                    </span>
+                  </div>
+                  <span
+                    className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5"
+                    style={{ color: cardColor }}
+                  >
+                    {st.metric}
+                  </span>
+                </div>
+                {st.desc && (
+                  <p className="text-[10px] text-neutral-400 font-sans leading-tight pl-6">
+                    {st.desc}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: CAUSAL DOMINO FEEDBACK LOOP
+  if (
+    compKey === "causal-loop" ||
+    compKey === "causal_loop" ||
+    compKey === "feedback_loop" ||
+    compKey === "vicious_cycle"
+  ) {
+    const title = props.title || props.headline || "THE SYSTEMIC FEEDBACK LOOP";
+    const subtitle = props.subtitle || props.subtext || "HOW TRIGGER ACTIONS AMPLIFY CASCADING CONSEQUENCES";
+    const loopType = props.loopType || (props.title?.toLowerCase().includes("trap") || props.title?.toLowerCase().includes("death") ? "vicious" : "reinforcing");
+    const accentColor = props.accentColor || (loopType === "vicious" ? "#f43f5e" : "#00e5ff");
+    const badge = props.badge || (loopType === "vicious" ? "⚠️ VICIOUS SPIRAL (-)" : "🔄 REINFORCING FLYWHEEL (+)");
+    const synthesis = props.synthesis || "Each phase intensifies the subsequent shock, locking the system in an accelerating loop.";
+
+    const nodes = [
+      {
+        num: "01",
+        title: props.node1Title || "Aggressive Capital Injection",
+        desc: props.node1Desc || "Stimulus liquidity floods market",
+        badge: props.node1Badge || "TRIGGER",
+        metric: props.node1Metric || "+$5.2T",
+        color: "#38bdf8",
+      },
+      {
+        num: "02",
+        title: props.node2Title || "Asset Price Inflation",
+        desc: props.node2Desc || "Valuations decouple from fundamentals",
+        badge: props.node2Badge || "AMPLIFY",
+        metric: props.node2Metric || "+48% RUN",
+        color: "#818cf8",
+      },
+      {
+        num: "03",
+        title: props.node3Title || "Aggressive Rate Hikes",
+        desc: props.node3Desc || "Tightening hits balance sheets",
+        badge: props.node3Badge || "SHOCK",
+        metric: props.node3Metric || "+525 BPS",
+        color: loopType === "vicious" ? "#f43f5e" : "#34d399",
+      },
+      {
+        num: "04",
+        title: props.node4Title || "Cascading Liquidity Crunch",
+        desc: props.node4Desc || "Forced deleveraging loops back",
+        badge: props.node4Badge || "FEEDBACK",
+        metric: props.node4Metric || "RE-IGNITED",
+        color: "#f59e0b",
+      },
+    ].filter((n) => Boolean(n.title));
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[320px] max-w-full sm:w-[380px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}44`,
+          boxShadow: `0 0 50px ${accentColor}25, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & Type */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest font-semibold">
+            CLOSED-LOOP CYCLE
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <h3 className="text-base font-black tracking-tight text-white uppercase leading-tight drop-shadow-md mb-0.5">
+          {title}
+        </h3>
+        <p className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mb-3">
+          {subtitle}
+        </p>
+
+        {/* 2x2 Causal Grid */}
+        <div className="grid grid-cols-2 gap-1.5 mb-2.5">
+          {nodes.map((node: any, i: number) => {
+            const ndStart = 0.2 + i * 0.3;
+            const hasStarted = localTime >= ndStart;
+            const cardColor = node.color || accentColor;
+
+            return (
+              <div
+                key={i}
+                className="p-2 rounded-xl bg-neutral-900/70 border transition-all"
+                style={{
+                  borderColor: hasStarted ? `${cardColor}40` : "rgba(255,255,255,0.06)",
+                  boxShadow: hasStarted ? `0 0 12px ${cardColor}15` : "none",
+                  opacity: hasStarted ? 1 : 0.35,
+                }}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span
+                    className="px-1.5 py-0.2 rounded text-[8px] font-mono font-black border"
+                    style={{
+                      color: cardColor,
+                      backgroundColor: `${cardColor}15`,
+                      borderColor: `${cardColor}40`,
+                    }}
+                  >
+                    {node.num}
+                  </span>
+                  <span
+                    className="text-[8px] font-mono font-bold uppercase tracking-wider px-1 rounded bg-white/5"
+                    style={{ color: cardColor }}
+                  >
+                    {node.metric}
+                  </span>
+                </div>
+                <h4 className="text-[11px] font-black uppercase text-white leading-tight mb-0.5">
+                  {node.title}
+                </h4>
+                {node.desc && (
+                  <p className="text-[9px] text-neutral-400 font-sans leading-tight line-clamp-1">
+                    {node.desc}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bottom Verdict */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider" style={{ color: accentColor, backgroundColor: `${accentColor}15` }}>
+            VERDICT
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: EXPLODED LAYER STACK (Phase 3 Explainer)
+  if (
+    compKey === "exploded-layer-stack" ||
+    compKey === "exploded_layer_stack" ||
+    compKey === "layer_stack" ||
+    compKey === "tech_stack"
+  ) {
+    const title = props.title || props.headline || "THE AUTONOMOUS AGENT STACK";
+    const subtitle = props.subtitle || props.subtext || "DECONSTRUCTED COMPUTE ANATOMY";
+    const accentColor = props.accentColor || "#00e5ff";
+    const badge = props.badge || "ISOMETRIC SYSTEM ARCHITECTURE";
+    const synthesis = props.synthesis || "Upper tiers inherit latency constraints and epistemic coherence directly from below.";
+
+    const layers = [
+      {
+        level: "04",
+        title: props.layer4Title || "Autonomous Tool Execution",
+        desc: props.layer4Desc || "Sandboxed agent synthesis & API invocation",
+        badge: props.layer4Badge || "COGNITIVE RUNTIME",
+        metric: props.layer4Metric || "< 150ms",
+        color: "#00e5ff",
+      },
+      {
+        level: "03",
+        title: props.layer3Title || "Long-Term Memory & Graph RAG",
+        desc: props.layer3Desc || "Hierarchical vector indexing & graph traversal",
+        badge: props.layer3Badge || "EPISTEMIC STATE",
+        metric: props.layer3Metric || "1.2M EMB",
+        color: "#818cf8",
+      },
+      {
+        level: "02",
+        title: props.layer2Title || "Context Window Orchestration",
+        desc: props.layer2Desc || "Attention routing & KV-cache compression",
+        badge: props.layer2Badge || "LATENT CORE",
+        metric: props.layer2Metric || "128K TOK/S",
+        color: "#10b981",
+      },
+      {
+        level: "01",
+        title: props.layer1Title || "Foundational Neural Weights",
+        desc: props.layer1Desc || "Quantized FP8 parameter clusters bound to HBM",
+        badge: props.layer1Badge || "HARDWARE SUBSTRATE",
+        metric: props.layer1Metric || "4.8 TB/S",
+        color: "#f59e0b",
+      },
+    ];
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[320px] max-w-full sm:w-[350px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}40`,
+          boxShadow: `0 0 50px ${accentColor}25, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & Reticle */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest font-semibold">
+            4-TIER STRATA
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-3">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Strata Stack List */}
+        <div className="space-y-1.5 mb-3">
+          {layers.map((layer, i) => {
+            const layerProg = Math.min(1, Math.max(0, (localTime - (3 - i) * 0.12) / 0.25));
+            return (
+              <div
+                key={layer.level}
+                className="relative rounded-lg p-2 transition-all flex flex-col justify-center"
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.03)",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderLeft: `3px solid ${layer.color}`,
+                  opacity: layerProg,
+                  transform: `translateX(${(1 - layerProg) * 12}px)`,
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="px-1 py-0.2 rounded text-[8px] font-mono font-black uppercase tracking-wider"
+                      style={{ color: layer.color, backgroundColor: `${layer.color}20` }}
+                    >
+                      L{layer.level}
+                    </span>
+                    <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-wider">
+                      {layer.badge}
+                    </span>
+                  </div>
+                  {layer.metric && (
+                    <span className="text-[8px] font-mono font-bold text-neutral-300 px-1.5 py-0.2 rounded bg-white/5 border border-white/10">
+                      {layer.metric}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] font-bold text-white truncate mt-0.5">
+                  {layer.title}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bottom Axiom Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: accentColor, backgroundColor: `${accentColor}15` }}
+          >
+            AXIOM
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: BOTTLENECK CONSTRICTION CHOKE (Phase 4 Explainer)
+  if (
+    compKey === "bottleneck-constriction" ||
+    compKey === "bottleneck_constriction" ||
+    compKey === "choke_point" ||
+    compKey === "memory_wall"
+  ) {
+    const title = props.title || props.headline || "THE COMPUTE MEMORY WALL";
+    const subtitle = props.subtitle || props.subtext || "CAPACITY CONSTRAINED BY INTERCONNECT";
+    const accentColor = props.accentColor || "#00e5ff";
+    const warningColor = props.warningColor || "#f43f5e";
+    const badge = props.badge || "THROUGHPUT CAPACITY FUNNEL";
+    const inputMetric = props.inputMetric || "1,000 TFLOPS";
+    const chokeMetric = props.chokeMetric || "CHOKE: 3.2 TB/S";
+    const outputMetric = props.outputMetric || "12 TFLOPS";
+    const efficiency = props.efficiency || "1.2% YIELD";
+    const restrictionPct = props.restrictionPct || "-98.8%";
+    const synthesis = props.synthesis || "Scaling processing power yields zero benefit when bus bandwidth cannot feed units.";
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[320px] max-w-full sm:w-[350px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${warningColor}40`,
+          boxShadow: `0 0 50px ${warningColor}20, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${warningColor}, transparent)`,
+            boxShadow: `0 0 12px ${warningColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & Efficiency */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${warningColor}18`,
+              borderColor: `${warningColor}50`,
+              color: warningColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: warningColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest font-semibold">
+            {efficiency}
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-3">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Funnel 3-Stage Metric Flow */}
+        <div className="grid grid-cols-3 gap-1.5 mb-3">
+          <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-cyan-400 font-bold uppercase tracking-wider">
+              INCOMING
+            </span>
+            <span className="text-[12px] font-mono font-black text-white mt-0.5 truncate">
+              {inputMetric}
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/40 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-rose-400 font-bold uppercase tracking-wider">
+              {restrictionPct}
+            </span>
+            <span className="text-[11px] font-mono font-black text-rose-400 mt-0.5 truncate">
+              {chokeMetric.replace('CHOKE POINT: ', '').replace('CHOKE: ', '')}
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
+              REALIZED
+            </span>
+            <span className="text-[12px] font-mono font-black text-emerald-300 mt-0.5 truncate">
+              {outputMetric}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom Axiom Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: warningColor, backgroundColor: `${warningColor}15` }}
+          >
+            AMDAHL
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: TRILEMMA TRADE-OFF THEOREM (Phase 5 Explainer)
+  if (
+    compKey === "trilemma-tradeoff" ||
+    compKey === "trilemma_tradeoff" ||
+    compKey === "trilemma" ||
+    compKey === "tradeoff_triangle"
+  ) {
+    const title = props.title || props.headline || "THE BLOCKCHAIN TRILEMMA";
+    const subtitle = props.subtitle || props.subtext || "OPTIMIZE TWO. THIRD IS SACRIFICED.";
+    const badge = props.badge || "TRADE-OFF THEOREM";
+    const axiom = props.axiom || props.synthesis || "Scaling throughput degrades either decentralized trust or consensus integrity.";
+    const v1Title = props.vertex1Title || "Decentralization";
+    const v1Metric = props.vertex1Metric || "100% PRESERVED";
+    const v2Title = props.vertex2Title || "Security";
+    const v2Metric = props.vertex2Metric || "100% PRESERVED";
+    const v3Title = props.vertex3Title || "Scalability";
+    const v3Metric = props.vertex3Metric || "15 TPS (SACRIFICED)";
+    const activeColor = props.activeColor || "#10b981";
+    const sacrificedColor = props.sacrificedColor || "#f43f5e";
+    const accentColor = props.accentColor || "#00e5ff";
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[320px] max-w-full sm:w-[350px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}40`,
+          boxShadow: `0 0 50px ${accentColor}18, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & Pick-Two Tag */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[9px] font-mono text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded uppercase tracking-widest font-black">
+            PICK 2 OF 3
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-3">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* 3 Vertices Grid */}
+        <div className="grid grid-cols-3 gap-1.5 mb-3">
+          <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-emerald-400 font-bold uppercase tracking-wider truncate">
+              {v1Title}
+            </span>
+            <span className="text-[10px] font-mono font-black text-emerald-300 mt-0.5 truncate">
+              ✓ PRESERVED
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-emerald-400 font-bold uppercase tracking-wider truncate">
+              {v2Title}
+            </span>
+            <span className="text-[10px] font-mono font-black text-emerald-300 mt-0.5 truncate">
+              ✓ PRESERVED
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/40 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-rose-400 font-bold uppercase tracking-wider line-through truncate opacity-80">
+              {v3Title}
+            </span>
+            <span className="text-[10px] font-mono font-black text-rose-400 mt-0.5 truncate">
+              ✕ SACRIFICED
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom Axiom Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: sacrificedColor, backgroundColor: `${sacrificedColor}15` }}
+          >
+            AXIOM
+          </span>
+          <span className="truncate">{axiom}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: SCALE & MAGNITUDE ZOOM LADDER (Phase 6 Explainer)
+  if (
+    compKey === "scale-zoom-ladder" ||
+    compKey === "scale_zoom_ladder" ||
+    compKey === "zoom_ladder" ||
+    compKey === "magnitude_ladder"
+  ) {
+    const title = props.title || props.headline || "THE ILLUSION OF SCALE";
+    const subtitle = props.subtitle || props.subtext || "ORDERS OF MAGNITUDE EXPANSION";
+    const badge = props.badge || "EXPONENTIAL SCALE LADDER";
+    const synthesis = props.synthesis || "The difference between a million and a billion is approximately one billion.";
+    const step1Value = props.step1Value || "$1 MILLION";
+    const step1Label = props.step1Label || "11.5 DAYS";
+    const step2Value = props.step2Value || "$1 BILLION";
+    const step2Label = props.step2Label || "31.7 YEARS";
+    const step3Value = props.step3Value || "$1 TRILLION";
+    const step3Label = props.step3Label || "31,700 YEARS";
+    const accentColor = props.accentColor || "#00e5ff";
+    const step1Color = props.step1Color || "#38bdf8";
+    const step2Color = props.step2Color || "#818cf8";
+    const step3Color = props.step3Color || "#f43f5e";
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[320px] max-w-full sm:w-[360px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}40`,
+          boxShadow: `0 0 50px ${accentColor}18, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & Ratio Indicator */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[9px] font-mono font-black text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded uppercase tracking-wider">
+            1:1,000:1,000,000
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-3">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* 3-Tier Grid */}
+        <div className="grid grid-cols-3 gap-1.5 mb-3">
+          {/* Tier 1 */}
+          <div className="p-2 rounded-lg bg-white/5 border border-sky-400/30 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-sky-400 font-bold uppercase tracking-wider">
+              1x BASE
+            </span>
+            <span className="text-[12px] font-mono font-black text-white mt-0.5 truncate">
+              {step1Value}
+            </span>
+            <span className="text-[9px] font-mono text-sky-300/80 truncate">
+              {step1Label}
+            </span>
+          </div>
+          {/* Tier 2 */}
+          <div className="p-2 rounded-lg bg-indigo-950/40 border border-indigo-400/40 flex flex-col justify-center">
+            <span className="text-[8px] font-mono text-indigo-400 font-bold uppercase tracking-wider">
+              1,000x
+            </span>
+            <span className="text-[12px] font-mono font-black text-white mt-0.5 truncate">
+              {step2Value}
+            </span>
+            <span className="text-[9px] font-mono text-indigo-300/80 truncate">
+              {step2Label}
+            </span>
+          </div>
+          {/* Tier 3 */}
+          <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/50 flex flex-col justify-center shadow-[0_0_15px_rgba(244,63,94,0.15)]">
+            <span className="text-[8px] font-mono text-rose-400 font-bold uppercase tracking-wider">
+              1,000,000x
+            </span>
+            <span className="text-[12px] font-mono font-black text-rose-400 mt-0.5 truncate">
+              {step3Value}
+            </span>
+            <span className="text-[9px] font-mono text-rose-300/80 truncate">
+              {step3Label}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom Scale Law Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: step3Color, backgroundColor: `${step3Color}15` }}
+          >
+            SCALE LAW
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: DECISION TREE FORK (Phase 7 Explainer)
+  if (
+    compKey === "decision-tree-fork" ||
+    compKey === "decision_tree_fork" ||
+    compKey === "decision_tree" ||
+    compKey === "strategic_fork"
+  ) {
+    const title = props.title || props.headline || "THE ARCHITECTURAL BIFURCATION";
+    const subtitle = props.subtitle || props.subtext || "IRREVERSIBLE SYSTEMIC TRAJECTORIES";
+    const badge = props.badge || "DECISION FORK";
+    const synthesis = props.synthesis || "Path dependency is the silent killer in architecture: root choices dictate limits at leaves.";
+    const rootTitle = props.rootTitle || "FOUNDATION MODEL FORK";
+    const branch1Title = props.branch1Title || "Path A: Closed API";
+    const branch1Badge = props.branch1Badge || "WALLED GARDEN";
+    const branch2Title = props.branch2Title || "Path B: Open Swarm";
+    const branch2Badge = props.branch2Badge || "AUTONOMOUS SWARM";
+    const accentColor = props.accentColor || "#00e5ff";
+    const branch1Color = props.branch1Color || "#f43f5e";
+    const branch2Color = props.branch2Color || "#10b981";
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[320px] max-w-full sm:w-[360px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}40`,
+          boxShadow: `0 0 50px ${accentColor}18, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & Bifurcation Tag */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[9px] font-mono font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded uppercase tracking-wider">
+            FORK T=0
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-3">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Root Node Callout */}
+        <div className="p-2 rounded-lg bg-white/5 border border-white/10 mb-2 flex items-center justify-between">
+          <span className="text-[9px] font-mono text-neutral-400 font-bold uppercase tracking-wider">
+            ROOT DECISION
+          </span>
+          <span className="text-[11px] font-mono font-black text-white truncate">
+            {rootTitle}
+          </span>
+        </div>
+
+        {/* 2 Diverging Branches Grid */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {/* Branch A (Closed / High Lock-in) */}
+          <div className="p-2 rounded-lg bg-rose-950/30 border border-rose-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-rose-400 font-bold uppercase tracking-wider">
+              {branch1Badge}
+            </span>
+            <span className="text-[11px] font-mono font-black text-rose-300 mt-1 line-clamp-2">
+              {branch1Title}
+            </span>
+          </div>
+
+          {/* Branch B (Open / Compounding) */}
+          <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
+              {branch2Badge}
+            </span>
+            <span className="text-[11px] font-mono font-black text-emerald-300 mt-1 line-clamp-2">
+              {branch2Title}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom System Law Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: accentColor, backgroundColor: `${accentColor}15` }}
+          >
+            SYSTEM LAW
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: RADAR SPIDER CHART (Phase 8 Explainer)
+  if (
+    compKey === "radar-spider-chart" ||
+    compKey === "radar_spider_chart" ||
+    compKey === "radar_chart" ||
+    compKey === "spider_chart"
+  ) {
+    const title = props.title || props.headline || "FRONTIER MODEL BENCHMARK";
+    const subtitle = props.subtitle || props.subtext || "MULTI-DIMENSIONAL PERFORMANCE MATRIX";
+    const badge = props.badge || "POLYGONAL RADAR BENCHMARK";
+    const synthesis = props.synthesis || "Radar evaluations reveal asymmetric trade-offs: cognitive swarms sacrifice raw speed for reasoning accuracy.";
+    const accentColor = props.accentColor || "#00e5ff";
+    const entity1Name = props.entity1Name || "Autonomous Agent";
+    const entity1Badge = props.entity1Badge || "STATEFUL SWARM";
+    const entity1Color = props.entity1Color || "#00E5FF";
+    const entity2Name = props.entity2Name || "Monolithic Base LLM";
+    const entity2Badge = props.entity2Badge || "ZERO-SHOT";
+    const entity2Color = props.entity2Color || "#F59E0B";
+
+    const e1Scores = [
+      Number(props.entity1Score1 ?? 96),
+      Number(props.entity1Score2 ?? 72),
+      Number(props.entity1Score3 ?? 98),
+      Number(props.entity1Score4 ?? 86),
+      Number(props.entity1Score5 ?? 94),
+    ];
+    const e2Scores = [
+      Number(props.entity2Score1 ?? 68),
+      Number(props.entity2Score2 ?? 94),
+      Number(props.entity2Score3 ?? 70),
+      Number(props.entity2Score4 ?? 64),
+      Number(props.entity2Score5 ?? 52),
+    ];
+
+    const cx = 155;
+    const cy = 60;
+    const r = 46;
+    const angles = [0, 1, 2, 3, 4].map((i) => -Math.PI / 2 + (i * 2 * Math.PI) / 5);
+
+    const getPolygonPoints = (scores: number[]) =>
+      angles
+        .map((ang, i) => {
+          const ratio = Math.max(0.1, Math.min(1.0, (scores[i] || 50) / 100));
+          const px = cx + Math.cos(ang) * (r * ratio);
+          const py = cy + Math.sin(ang) * (r * ratio);
+          return `${px.toFixed(1)},${py.toFixed(1)}`;
+        })
+        .join(" ");
+
+    const getRingPoints = (ratio: number) =>
+      angles
+        .map((ang) => {
+          const px = cx + Math.cos(ang) * (r * ratio);
+          const py = cy + Math.sin(ang) * (r * ratio);
+          return `${px.toFixed(1)},${py.toFixed(1)}`;
+        })
+        .join(" ");
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[330px] max-w-full sm:w-[360px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}40`,
+          boxShadow: `0 0 50px ${accentColor}18, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & 5-Axis Tag */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[9px] font-mono font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded uppercase tracking-wider">
+            5-AXIS RADAR
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-2.5">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Mini Pentagonal Radar Preview SVG */}
+        <div className="relative w-full h-[125px] flex items-center justify-center bg-black/40 rounded-xl border border-white/5 mb-3 overflow-hidden">
+          <svg className="w-full h-full" viewBox="0 0 310 120">
+            {/* Grid concentric rings */}
+            <polygon points={getRingPoints(1.0)} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3 3" />
+            <polygon points={getRingPoints(0.66)} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="1" strokeDasharray="2 2" />
+            <polygon points={getRingPoints(0.33)} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="2 2" />
+
+            {/* Radial Spokes */}
+            {angles.map((ang, idx) => (
+              <line
+                key={idx}
+                x1={cx}
+                y1={cy}
+                x2={cx + Math.cos(ang) * r}
+                y2={cy + Math.sin(ang) * r}
+                stroke="rgba(255,255,255,0.12)"
+                strokeWidth="1"
+              />
+            ))}
+
+            {/* Entity 2 Polygon (Amber) */}
+            <polygon
+              points={getPolygonPoints(e2Scores)}
+              fill={`${entity2Color}25`}
+              stroke={entity2Color}
+              strokeWidth="1.8"
+            />
+
+            {/* Entity 1 Polygon (Cyan) */}
+            <polygon
+              points={getPolygonPoints(e1Scores)}
+              fill={`${entity1Color}35`}
+              stroke={entity1Color}
+              strokeWidth="2.2"
+            />
+          </svg>
+        </div>
+
+        {/* 2 Comparative Entity Cards */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-cyan-400 font-bold uppercase tracking-wider">
+              {entity1Badge}
+            </span>
+            <span className="text-[11px] font-mono font-black text-cyan-300 mt-1 line-clamp-1">
+              {entity1Name}
+            </span>
+          </div>
+
+          <div className="p-2 rounded-lg bg-amber-950/30 border border-amber-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-amber-400 font-bold uppercase tracking-wider">
+              {entity2Badge}
+            </span>
+            <span className="text-[11px] font-mono font-black text-amber-300 mt-1 line-clamp-1">
+              {entity2Name}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom System Law Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: accentColor, backgroundColor: `${accentColor}15` }}
+          >
+            SYSTEM LAW
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: PARETO POWER LAW (Phase 9 Explainer)
+  if (
+    compKey === "pareto-power-law" ||
+    compKey === "pareto_power_law" ||
+    compKey === "pareto" ||
+    compKey === "power_law"
+  ) {
+    const title = props.title || props.headline || "THE PARETO PRINCIPLE";
+    const subtitle = props.subtitle || props.subtext || "80/20 POWER LAW DISTRIBUTION";
+    const badge = props.badge || "POWER LAW DYNAMICS";
+    const synthesis = props.synthesis || "In nonlinear complex systems, 80% of systemic yield is driven by 20% of critical inputs.";
+    const accentColor = props.accentColor || "#00e5ff";
+    const vitalPct = props.vitalPct || "20%";
+    const vitalLabel = props.vitalLabel || "THE VITAL FEW";
+    const vitalReturn = props.vitalReturn || "80% SYSTEM IMPACT";
+    const vitalColor = props.vitalColor || "#00E5FF";
+    const trivialPct = props.trivialPct || "80%";
+    const trivialLabel = props.trivialLabel || "THE TRIVIAL MANY";
+    const trivialReturn = props.trivialReturn || "20% RESIDUAL VALUE";
+    const trivialColor = props.trivialColor || "#F59E0B";
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[330px] max-w-full sm:w-[360px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}40`,
+          boxShadow: `0 0 50px ${accentColor}18, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & 80/20 Tag */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[9px] font-mono font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded uppercase tracking-wider">
+            80 / 20 RULE
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-2.5">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Mini Asymptotic Power Law Curve SVG */}
+        <div className="relative w-full h-[110px] flex items-center justify-center bg-black/40 rounded-xl border border-white/5 mb-3 overflow-hidden p-2">
+          <svg className="w-full h-full" viewBox="0 0 300 95">
+            <defs>
+              <linearGradient id="canvasVitalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={vitalColor} stopOpacity={0.45} />
+                <stop offset="100%" stopColor={vitalColor} stopOpacity={0.08} />
+              </linearGradient>
+              <linearGradient id="canvasTailGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={trivialColor} stopOpacity={0.2} />
+                <stop offset="100%" stopColor={trivialColor} stopOpacity={0.04} />
+              </linearGradient>
+            </defs>
+
+            {/* Grid line */}
+            <line x1="20" y1="80" x2="290" y2="80" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+            <line x1="20" y1="10" x2="20" y2="80" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+
+            {/* Shaded Area: Vital 20% (x: 20 to 74) */}
+            <path
+              d="M 20 18 Q 40 38 74 65 L 74 80 L 20 80 Z"
+              fill="url(#canvasVitalGrad)"
+            />
+
+            {/* Shaded Area: Long Tail (x: 74 to 290) */}
+            <path
+              d="M 74 65 Q 150 74 290 77 L 290 80 L 74 80 Z"
+              fill="url(#canvasTailGrad)"
+            />
+
+            {/* Asymptotic Curve Stroke */}
+            <path
+              d="M 20 18 Q 40 38 74 65 Q 150 74 290 77"
+              fill="none"
+              stroke={vitalColor}
+              strokeWidth="2.5"
+            />
+
+            {/* 20% Divider Line */}
+            <line x1="74" y1="12" x2="74" y2="80" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2" strokeDasharray="2 2" />
+            <circle cx="74" cy="12" r="2.5" fill="#FFFFFF" />
+
+            {/* Text Tags in Plot */}
+            <text x="35" y="52" fill={vitalColor} fontSize="8" fontFamily="monospace" fontWeight="bold">
+              80% VALUE
+            </text>
+            <text x="140" y="72" fill={trivialColor} fontSize="7" fontFamily="monospace">
+              LONG TAIL 20%
+            </text>
+            <text x="74" y="90" fill="rgba(255,255,255,0.5)" fontSize="7" fontFamily="monospace" textAnchor="middle">
+              20%
+            </text>
+          </svg>
+        </div>
+
+        {/* 2 Comparative Entity Cards */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-cyan-400 font-bold uppercase tracking-wider">
+              {vitalLabel} // {vitalPct}
+            </span>
+            <span className="text-[11px] font-mono font-black text-cyan-300 mt-1 line-clamp-1">
+              {vitalReturn}
+            </span>
+            <div className="w-full bg-white/10 h-1 rounded-full mt-1.5 overflow-hidden">
+              <div className="bg-cyan-400 h-full w-[80%]" />
+            </div>
+          </div>
+
+          <div className="p-2 rounded-lg bg-amber-950/30 border border-amber-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-amber-400 font-bold uppercase tracking-wider">
+              {trivialLabel} // {trivialPct}
+            </span>
+            <span className="text-[11px] font-mono font-black text-amber-300 mt-1 line-clamp-1">
+              {trivialReturn}
+            </span>
+            <div className="w-full bg-white/10 h-1 rounded-full mt-1.5 overflow-hidden">
+              <div className="bg-amber-400 h-full w-[20%]" />
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom System Law Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: accentColor, backgroundColor: `${accentColor}15` }}
+          >
+            SYSTEM LAW
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDERER: CHRONO DIAL CLOCK (Phase 10 Explainer)
+  if (
+    compKey === "chrono-dial-clock" ||
+    compKey === "chrono_dial_clock" ||
+    compKey === "chrono_dial" ||
+    compKey === "chrono_clock"
+  ) {
+    const title = props.title || props.headline || "AI HISTORY IN 24 HOURS";
+    const subtitle = props.subtitle || props.subtext || "1950 TO 2026 IN 1 DAY";
+    const badge = props.badge || "24-HOUR CHRONOMETER";
+    const synthesis = props.synthesis || "If modern AI were 24 hours, foundation models only emerged in the final 4 seconds.";
+    const accentColor = props.accentColor || "#00e5ff";
+    const activeColor = props.activeColor || "#10b981";
+    const currentTime = props.currentTime || "23:59:56";
+    const epoch1Title = props.epoch1Title || "Turing Test";
+    const epoch4Title = props.epoch4Title || "Autonomous Swarms";
+
+    return (
+      <div
+        className="relative select-none pointer-events-none rounded-2xl bg-neutral-950/95 backdrop-blur-2xl border p-4 sm:p-5 w-[330px] max-w-full sm:w-[360px] text-white font-sans transition-all overflow-hidden"
+        style={{
+          opacity,
+          transform: `scale(${scaleEntrance})`,
+          borderColor: `${accentColor}40`,
+          boxShadow: `0 0 50px ${accentColor}18, inset 0 1px 1px rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Top Glow line */}
+        <div
+          className="absolute -top-px left-8 right-8 h-[2px]"
+          style={{
+            background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+            boxShadow: `0 0 12px ${accentColor}`,
+          }}
+        />
+
+        {/* Top Row: Badge & 24h Tag */}
+        <div className="flex items-center justify-between mb-2">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider border"
+            style={{
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}50`,
+              color: accentColor,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            <span>{badge}</span>
+          </div>
+          <span className="text-[9px] font-mono font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded uppercase tracking-wider">
+            {currentTime}
+          </span>
+        </div>
+
+        {/* Bold Title & Subtitle */}
+        <div className="mb-2.5">
+          <h3 className="text-[15px] sm:text-[16px] font-black uppercase tracking-tight leading-tight text-white drop-shadow">
+            {title}
+          </h3>
+          <p className="text-[10px] font-mono text-neutral-400 tracking-wider truncate mt-0.5">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Mini Circular Chronometer SVG */}
+        <div className="relative w-full h-[120px] flex items-center justify-center bg-black/40 rounded-xl border border-white/5 mb-3 overflow-hidden p-2">
+          <svg className="w-full h-full" viewBox="0 0 200 110">
+            <defs>
+              <radialGradient id="chronoCanvasGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor={accentColor} stopOpacity={0.3} />
+                <stop offset="100%" stopColor="transparent" stopOpacity={0} />
+              </radialGradient>
+            </defs>
+
+            {/* Dial Housing */}
+            <circle cx="100" cy="55" r="48" fill="url(#chronoCanvasGlow)" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+            <circle cx="100" cy="55" r="38" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="2 2" />
+
+            {/* Sweeping Hand (nearly completing full circle at 23:59) */}
+            <line x1="100" y1="55" x2="98" y2="12" stroke={activeColor} strokeWidth="2" strokeLinecap="round" />
+            <circle cx="98" cy="12" r="3" fill="#FFFFFF" />
+
+            {/* Milestone node points */}
+            <circle cx="100" cy="17" r="2.5" fill="#00E5FF" />
+            <circle cx="62" cy="55" r="2.5" fill="#38BDF8" />
+            <circle cx="80" cy="85" r="2.5" fill="#F59E0B" />
+            <circle cx="95" cy="18" r="3.5" fill={activeColor} />
+
+            {/* Center Bearing Hub */}
+            <circle cx="100" cy="55" r="5" fill="#050505" stroke={accentColor} strokeWidth="1.5" />
+
+            {/* Center Readout */}
+            <text x="100" y="68" fill="rgba(255,255,255,0.85)" fontSize="8" fontFamily="monospace" fontWeight="bold" textAnchor="middle">
+              T - 4 SEC
+            </text>
+          </svg>
+        </div>
+
+        {/* 2 Comparative Milestone Cards */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-cyan-400 font-bold uppercase tracking-wider">
+              00:00 // 1950
+            </span>
+            <span className="text-[11px] font-mono font-black text-cyan-300 mt-1 line-clamp-1">
+              {epoch1Title}
+            </span>
+          </div>
+
+          <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/40 flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
+              23:59:56 // 2026
+            </span>
+            <span className="text-[11px] font-mono font-black text-emerald-300 mt-1 line-clamp-1">
+              {epoch4Title}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom System Law Banner */}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-mono text-neutral-300 flex items-center gap-1.5">
+          <span
+            className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+            style={{ color: accentColor, backgroundColor: `${accentColor}15` }}
+          >
+            TEMPORAL LAW
+          </span>
+          <span className="truncate">{synthesis}</span>
+        </div>
       </div>
     );
   }

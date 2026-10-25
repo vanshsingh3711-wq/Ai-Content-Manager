@@ -522,21 +522,12 @@ def enforce_beat_sheet_constraints(result_edits: list, beat_sheet_dict: dict, pl
                 "delta":  "",
             }
         else:
-            # Dynamic fallback rotation instead of pure hero_reveal
-            mg_type = "stat_card_highlight" if (chosen["id"] % 2 == 0) else "hero_reveal"
-            if mg_type == "stat_card_highlight":
-                mg_targets = {
-                    "label": role.upper() if role else "KEY INSIGHT",
-                    "stat": focus[:25],
-                    "delta": "Proven Strategy",
-                }
-            else:
-                mg_type = "hero_reveal"
-                mg_targets = {
-                    "label":      role.upper() if role else "INSIGHT",
-                    "headline":   focus[:55],
-                    "supporting": chosen["text"][:90],
-                }
+            mg_type = "hero_reveal"
+            mg_targets = {
+                "label":      role.upper() if role else "INSIGHT",
+                "headline":   focus[:55],
+                "supporting": chosen["text"][:90],
+            }
 
         print(f"[{planner_name}] GAP PROMOTION: beat {chosen['id']} ({gap_start:.1f}–{gap_end:.1f}) → {mg_type!r}")
         is_mg = (planner_name == "MOTION GRAPHICS PLANNER")

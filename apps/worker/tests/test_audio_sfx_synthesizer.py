@@ -81,3 +81,19 @@ def test_fetch_sfx_procedural_fallback():
         assert res is True
         assert os.path.exists(out_file)
         assert os.path.getsize(out_file) > 1000
+
+
+def test_generate_cinematic_sfx_track():
+    from services.sfx_manager import generate_cinematic_sfx_track
+    with tempfile.TemporaryDirectory() as temp_dir:
+        out_file = os.path.join(temp_dir, "master_sfx.wav")
+        sample_edits = [
+            {"action": "motion_graphics", "start": 1.0, "end": 4.0, "motion_graphics_type": "metric_reveal"},
+            {"action": "motion_graphics", "start": 5.0, "end": 8.0, "motion_graphics_type": "cooked_terminal"},
+            {"action": "transition", "start": 8.5, "end": 9.0},
+        ]
+        res = generate_cinematic_sfx_track(sample_edits, total_duration=10.0, output_wav=out_file)
+        assert res == out_file
+        assert os.path.exists(out_file)
+        assert os.path.getsize(out_file) > 10000
+

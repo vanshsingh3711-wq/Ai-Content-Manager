@@ -40,6 +40,8 @@ from services.character_planner import generate_character_plan
 from services.beat_analyzer import analyze_script
 from services.treatment_assigner import assign_visual_treatments
 from services.blueprint_resolver import resolve_master_blueprint
+from services.script_chunker import chunk_transcript
+from services.chunk_director import stitch_micro_scenes_to_blueprint
 from services.sfx_planner import generate_sfx_plan
 from services.blueprint_validator import validate_blueprint, format_validation_report
 from services.asset_manager import fetch_broll_assets
@@ -323,19 +325,75 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
             set_job_status_ai_directing(job_uuid)
             style_pref = job_settings.get("video_style", "viral")
             is_faceless_job = (job_video_type == VideoType.FACELESS_SHORT or "faceless" in str(job_video_type).lower())
-            log_info(f"AI Directing Models -> Story & Motion Graphics: {mg_model} | B-Roll & Visuals: {broll_model} | Faceless: {is_faceless_job}")
+            directing_mode = job_settings.get("directing_mode", "auto")
+            use_chunked_directing = (
+                directing_mode == "chunked" or
+                (directing_mode == "auto" and (total_duration > 45.0 or is_faceless_job))
+            )
+            log_info(f"AI Directing Models -> Story & Motion Graphics: {mg_model} | B-Roll & Visuals: {broll_model} | Faceless: {is_faceless_job} | Mode: {'chunked' if use_chunked_directing else 'legacy'}")
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                future_broll = executor.submit(generate_broll_plan, unified_json_str, broll_model, style_pref)
-                future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, mg_model, style_pref)
-                future_char = None
-                if not is_faceless_job:
-                    future_char = executor.submit(generate_character_plan, unified_json_str, char_model, style_pref)
+            if use_chunked_directing:
+                log_info(f"⚡ Activating Chunked Micro-Scene Directing Architecture (duration: {total_duration:.1f}s)...")
+                script_chunks = chunk_transcript(timestamp_map, total_duration)
 
-                broll_plan = future_broll.result()
-                mg_plan = future_mg.result()
-                char_plan = future_char.result() if future_char else EditList(edits=[])
-                
+                # Register all chunk triggers into timestamp_map so validator accepts them
+                for sc in script_chunks:
+                    timestamp_map[sc.chunk_id] = {
+                        "start": sc.start,
+                        "end": sc.end,
+                        "text": sc.text,
+                        "words": sc.words
+                    }
+                    timestamp_map[f"{sc.chunk_id}_cut1"] = {
+                        "start": sc.start,
+                        "end": round(sc.start + (sc.duration / 2.0), 2),
+                        "text": sc.text,
+                        "words": sc.words
+                    }
+                    timestamp_map[f"{sc.chunk_id}_cut2"] = {
+                        "start": round(sc.start + (sc.duration / 2.0), 2),
+                        "end": sc.end,
+                        "text": sc.text,
+                        "words": sc.words
+                    }
+
+                detected_topic = job_settings.get("topic") or "technology"
+                stitched_plan = stitch_micro_scenes_to_blueprint(
+                    chunks=script_chunks,
+                    total_duration=total_duration,
+                    topic=detected_topic,
+                    style=style_pref,
+                    is_faceless=is_faceless_job,
+                    min_mg_spacing=3.5
+                )
+
+                # Register any supplemental SFX/transition triggers into timestamp_map
+                for ed in stitched_plan.edits:
+                    if ed.trigger_id and ed.trigger_id not in timestamp_map:
+                        timestamp_map[ed.trigger_id] = {
+                            "start": ed.start,
+                            "end": ed.end or (ed.start + 3.0),
+                            "text": getattr(ed, "reason", "") or ""
+                        }
+
+                broll_edits = [e for e in stitched_plan.edits if e.action == "b_roll"]
+                mg_edits = [e for e in stitched_plan.edits if e.action == "motion_graphics"]
+                broll_plan = EditList(edits=broll_edits)
+                mg_plan = EditList(edits=mg_edits)
+                char_plan = EditList(edits=[])
+                log_info(f"Chunked Director: Generated {len(broll_edits)} precision B-roll cuts and {len(mg_edits)} contextual motion graphics.")
+            else:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                    future_broll = executor.submit(generate_broll_plan, unified_json_str, broll_model, style_pref)
+                    future_mg = executor.submit(generate_motion_graphics_plan, unified_json_str, mg_model, style_pref)
+                    future_char = None
+                    if not is_faceless_job:
+                        future_char = executor.submit(generate_character_plan, unified_json_str, char_model, style_pref)
+
+                    broll_plan = future_broll.result()
+                    mg_plan = future_mg.result()
+                    char_plan = future_char.result() if future_char else EditList(edits=[])
+
             # Save the plans for debugging/comparison
             with open(os.path.join(assets_dir, "broll_plan.json"), "w") as f:
                 f.write(broll_plan.model_dump_json(indent=2))
@@ -344,21 +402,25 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
 
         # --- STEP 5: MASTER BLUEPRINT RESOLVER & SFX PLANNER ---
         with PipelineStep(5, 8, "MASTER BLUEPRINT RESOLVER & SFX PLANNER", "Merging plans, resolving conflicts, adding sound"):
-            resolved_visual_blueprint = resolve_master_blueprint(
-                unified_analysis_json=unified_json_str,
-                broll_plan=broll_plan,
-                mg_plan=mg_plan,
-                char_plan=char_plan,
-                ai_model_pref=ai_model_pref,
-                deterministic_cuts=deterministic_cuts,
-                is_faceless=is_faceless_job,
-            )
-            edit_decision_list = generate_sfx_plan(
-                unified_analysis_json=unified_json_str,
-                resolved_visual_blueprint=resolved_visual_blueprint,
-                ai_model_pref=ai_model_pref,
-                style_pref=style_pref
-            )
+            if use_chunked_directing:
+                resolved_visual_blueprint = EditList(edits=[e for e in stitched_plan.edits if e.action != "sfx"])
+                edit_decision_list = stitched_plan
+            else:
+                resolved_visual_blueprint = resolve_master_blueprint(
+                    unified_analysis_json=unified_json_str,
+                    broll_plan=broll_plan,
+                    mg_plan=mg_plan,
+                    char_plan=char_plan,
+                    ai_model_pref=ai_model_pref,
+                    deterministic_cuts=deterministic_cuts,
+                    is_faceless=is_faceless_job,
+                )
+                edit_decision_list = generate_sfx_plan(
+                    unified_analysis_json=unified_json_str,
+                    resolved_visual_blueprint=resolved_visual_blueprint,
+                    ai_model_pref=ai_model_pref,
+                    style_pref=style_pref
+                )
 
         # --- STEP 6: BLUEPRINT VALIDATION ---
         with PipelineStep(6, 8, "BLUEPRINT VALIDATION", "Enforcing B-roll budgets, timestamp validity, and safety guardrails"):
@@ -408,7 +470,8 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                         if tid and tid not in seen_triggers and b_dict.get("action") == "b_roll":
                             edits_for_broll.append(b_dict)
                             seen_triggers.add(tid)
-                if len(seen_triggers) < 10 and beat_sheet_dict and "beats" in beat_sheet_dict:
+                target_broll_count = max(14, int(total_duration / 2.5))
+                if len(seen_triggers) < target_broll_count and beat_sheet_dict and "beats" in beat_sheet_dict:
                     for b in beat_sheet_dict["beats"]:
                         b_id = f"beat_{b['id']}"
                         if b_id not in seen_triggers:
@@ -422,7 +485,7 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
                                 "reason": f"Background footage diversity for beat {b['id']}",
                             })
                             seen_triggers.add(b_id)
-                            if len(seen_triggers) >= 12:
+                            if len(seen_triggers) >= target_broll_count:
                                 break
 
             broll_map = fetch_broll_assets(
