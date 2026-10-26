@@ -201,3 +201,119 @@ def publish_to_instagram_reels(
         }
 
     raise RuntimeError(f"Instagram publish failed: {res2.text}")
+
+
+@_wait_for_internet_retry
+def publish_to_tiktok(
+    video_path: str,
+    title: str,
+    access_token: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Publishes video to TikTok via TikTok Content Posting API v2.
+    """
+    print(f"[*] Publishing to TikTok: '{title}'...")
+    if not access_token:
+        print("[*] No TikTok OAuth token provided. Simulated TikTok publish.")
+        return {
+            "platform": "tiktok",
+            "status": "simulated",
+            "publish_id": f"tt_sim_{os.urandom(4).hex()}",
+            "title": title,
+        }
+
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+
+    file_size = os.path.getsize(video_path)
+
+    # Step 1: Initialize post
+    init_url = "https://open.tiktokapis.com/v2/post/publish/video/init/"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; charset=UTF-8",
+    }
+    payload = {
+        "post_info": {
+            "title": title[:150],
+            "privacy_level": "PUBLIC_TO_EVERYONE",
+            "disable_duet": False,
+            "disable_stitch": False,
+            "disable_comment": False,
+            "video_cover_timestamp_ms": 1000,
+        },
+        "source_info": {
+            "source": "FILE_UPLOAD",
+            "video_size": file_size,
+            "chunk_size": file_size,
+            "total_chunk_count": 1,
+        },
+    }
+
+    res_init = requests.post(init_url, json=payload, headers=headers, timeout=20)
+    res_init.raise_for_status()
+    init_data = res_init.json()
+
+    publish_id = init_data.get("data", {}).get("publish_id")
+    upload_url = init_data.get("data", {}).get("upload_url")
+
+    if not upload_url:
+        raise RuntimeError(f"TikTok upload initialization failed: {res_init.text}")
+
+    # Step 2: Upload video payload
+    with open(video_path, "rb") as f:
+        upload_headers = {
+            "Content-Range": f"bytes 0-{file_size - 1}/{file_size}",
+            "Content-Type": "video/mp4",
+        }
+        res_upload = requests.put(upload_url, data=f, headers=upload_headers, timeout=120)
+        res_upload.raise_for_status()
+
+    return {
+        "platform": "tiktok",
+        "status": "published",
+        "publish_id": publish_id,
+        "title": title,
+    }
+
+
+def publish_from_social_account(
+    local_mp4_path: str,
+    account: Any,
+    title: str,
+    description: str = "",
+    is_shorts: bool = True,
+    public_video_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Unified dispatcher that decrypts credentials from a SocialAccount model
+    and routes the publishing payload to YouTube, TikTok, or Instagram.
+    """
+    platform_name = str(account.platform.value if hasattr(account.platform, "value") else account.platform).lower()
+    access_token = account.get_decrypted_access_token() if hasattr(account, "get_decrypted_access_token") else getattr(account, "access_token", None)
+
+    if platform_name == "youtube":
+        return publish_to_youtube(
+            video_path=local_mp4_path,
+            title=title,
+            description=description,
+            is_shorts=is_shorts,
+            access_token=access_token,
+        )
+    elif platform_name == "tiktok":
+        return publish_to_tiktok(
+            video_path=local_mp4_path,
+            title=title,
+            access_token=access_token,
+        )
+    elif platform_name == "instagram":
+        target_url = public_video_url or upload_rendered_video_to_storage(local_mp4_path, job_id=str(os.urandom(4).hex()))
+        return publish_to_instagram_reels(
+            video_url=target_url,
+            caption=f"{title}\n\n{description}",
+            access_token=access_token,
+            instagram_account_id=getattr(account, "platform_account_id", None) or "me",
+        )
+    else:
+        raise ValueError(f"Unsupported social publishing platform: {platform_name}")
+

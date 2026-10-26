@@ -164,8 +164,11 @@ class SocialAccount(SQLModel, table=True):
         if not self.token_expires_at:
             return False
         now = get_utc_now()
+        exp = self.token_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
         # Treat as expired 60 seconds early to avoid race conditions
-        return self.token_expires_at <= now
+        return exp <= now
 
 
 class VideoJob(SQLModel, table=True):
