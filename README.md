@@ -121,10 +121,10 @@ Input (Audio / Script / Video)
 | Browser-based NLE (4-track timeline) | ✅ Implemented | React 19, Zustand, ⌘K AI Copilot |
 | NLE export (Premiere XML / FCPXML / EDL) | ✅ Implemented | |
 | Resilient bounded network retries | ✅ Implemented | Exponential backoff, jitter, deadline control |
-| Headless web evidence capture | 🔬 Experimental | Chromium / Playwright screenshots as B-roll |
-| Depth matting (foreground isolation) | 🔬 Experimental | Requires local model weights |
-| MediaPipe face safe-zone centering | 🔬 Experimental | 2D bounding box tracking |
-| Direct social OAuth publishing | 🗓 Planned | YouTube, TikTok, Instagram |
+| Headless web evidence capture | ✅ Implemented | Chromium / Playwright screenshot-to-9:16 kinetic animated scroll clip |
+| Depth matting (foreground isolation) | ✅ Implemented | Robust RVM MobileNetV3 / TorchScript matting with 3-layer depth sandwich |
+| MediaPipe face safe-zone centering | ✅ Implemented | Smart 9:16 pan-and-scan camera engine with EMA smoothing & caption safe-zones |
+| Direct social OAuth publishing | ✅ Implemented | YouTube Shorts, TikTok Content Posting API v2 & Instagram Reels with AES-256 Fernet tokens |
 
 ---
 

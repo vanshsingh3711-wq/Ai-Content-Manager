@@ -13,7 +13,11 @@ from sqlmodel import Session, select, desc, func
 from config import get_settings
 from database import get_session
 from models import User, VideoJob, VideoJobStatus, VideoType, ProjectSnapshot
-from routers.jobs import dispatch_job_to_celery, dispatch_timeline_render_to_celery
+from routers.jobs import (
+    dispatch_job_to_celery,
+    dispatch_timeline_render_to_celery,
+    dispatch_publish_socials_to_celery,
+)
 from storage import get_presigned_url_from_full_url
 
 settings = get_settings()
@@ -1697,5 +1701,46 @@ def delete_project_snapshot(
     session.delete(snapshot)
     session.commit()
     return {"status": "deleted", "snapshot_id": str(snapshot_id)}
+
+
+class PublishSocialsRequest(BaseModel):
+    social_account_ids: List[str] = Field(..., min_length=1, description="List of connected SocialAccount UUIDs")
+    title: Optional[str] = Field(None, description="Custom post title or short caption")
+    description: Optional[str] = Field(None, description="Custom post description and hashtags")
+    is_shorts: bool = Field(True, description="Whether to format publication for YouTube Shorts / vertical reels")
+
+
+@router.post("/{video_id}/publish-socials")
+def publish_video_to_socials(
+    video_id: uuid.UUID,
+    payload: PublishSocialsRequest,
+    session: Session = Depends(get_session),
+):
+    """
+    Dispatches rendered video publication to all designated connected social accounts
+    (YouTube Shorts, TikTok, Instagram Reels) asynchronously via Celery.
+    """
+    job = session.get(VideoJob, video_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Video job with ID {video_id} not found",
+        )
+
+    task_id = dispatch_publish_socials_to_celery(
+        job_id=job.id,
+        social_account_ids=payload.social_account_ids,
+        title=payload.title or job.title,
+        description=payload.description or "",
+        is_shorts=payload.is_shorts,
+    )
+
+    return {
+        "status": "enqueued",
+        "task_id": task_id,
+        "video_id": str(job.id),
+        "social_account_ids": payload.social_account_ids,
+        "message": f"Social publishing dispatched to {len(payload.social_account_ids)} accounts",
+    }
 
 

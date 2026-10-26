@@ -123,6 +123,57 @@ def dispatch_timeline_render_to_celery(job_id: uuid.UUID, project_data: Optional
         return sim_id
 
 
+def dispatch_publish_socials_to_celery(
+    job_id: uuid.UUID,
+    social_account_ids: List[str],
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    is_shorts: bool = True,
+) -> str:
+    """Dispatches a social media publishing task to Celery or runs in a background thread fallback."""
+    print(f"[API: CELERY] 📤 Sending task 'tasks.publish_rendered_video_to_socials' for Job {job_id}...")
+    try:
+        client = get_celery_client()
+        task = client.send_task(
+            "tasks.publish_rendered_video_to_socials",
+            args=[str(job_id), social_account_ids],
+            kwargs={
+                "title": title,
+                "description": description,
+                "is_shorts": is_shorts,
+            },
+            queue=settings.CELERY_TASK_DEFAULT_QUEUE,
+        )
+        print(f"[API: CELERY] ✅ Social publishing task enqueued! Celery Task ID: {task.id}")
+        return task.id
+    except Exception as e:
+        sim_id = f"pub_worker_fallback_{uuid.uuid4().hex[:8]}"
+        print(f"[API: CELERY] ⚠️ Celery dispatch failed ({e}). Starting direct background worker execution...")
+        import threading
+        import traceback
+        def _bg_publisher():
+            try:
+                worker_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "worker"))
+                if worker_path not in sys.path:
+                    sys.path.insert(0, worker_path)
+                from tasks.publisher_tasks import publish_rendered_video_to_socials
+                publish_rendered_video_to_socials(
+                    None,
+                    str(job_id),
+                    social_account_ids,
+                    title=title,
+                    description=description,
+                    is_shorts=is_shorts,
+                )
+            except Exception as bg_err:
+                print(f"[API: BG_PUBLISHER_ERR] Social publishing error: {bg_err}")
+                traceback.print_exc()
+
+        th = threading.Thread(target=_bg_publisher, daemon=True)
+        th.start()
+        return sim_id
+
+
 @router.post("/{job_id}/dispatch", response_model=DispatchJobResponse)
 def dispatch_job(
     job_id: uuid.UUID,

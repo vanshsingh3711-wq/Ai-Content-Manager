@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { Plus, Shield, CheckCircle2 } from "lucide-react";
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { Plus, Shield, CheckCircle2, Loader2, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function YoutubeIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -42,73 +43,175 @@ interface Platform {
   desc: string;
   icon: (props: React.SVGProps<SVGSVGElement>) => React.ReactElement;
   connected: boolean;
+  accountId?: string;
   handle?: string;
   color: string;
   glowClass: string;
   bgIcon: string;
 }
 
-export default function SocialsPage() {
-  const [platforms, setPlatforms] = useState<Platform[]>([
-    {
-      id: "youtube",
-      name: "YouTube",
-      desc: "Auto-publish Shorts & long-form videos with custom thumbnails, tags, and category indexing.",
-      icon: YoutubeIcon,
-      connected: true,
-      handle: "@aidirector_channel",
-      color: "text-red-500",
-      glowClass: "hover:border-red-500/30 hover:shadow-[0_0_24px_rgba(239,68,68,0.12)]",
-      bgIcon: "bg-red-500/10 text-red-500 border-red-500/20",
-    },
-    {
-      id: "instagram",
-      name: "Instagram",
-      desc: "Direct Reels publishing with automated kinetic captions, cover image, and viral hashtag sets.",
-      icon: InstagramIcon,
-      connected: false,
-      color: "text-pink-400",
-      glowClass: "hover:border-pink-500/30 hover:shadow-[0_0_24px_rgba(236,72,153,0.12)]",
-      bgIcon: "bg-pink-500/10 text-pink-400 border-pink-500/20",
-    },
-    {
-      id: "tiktok",
-      name: "TikTok",
-      desc: "Instant Short-form sync for trending audio tags, hook overlays, and scheduled peak posting.",
-      icon: TikTokIcon,
-      connected: false,
-      color: "text-cyan-400",
-      glowClass: "hover:border-cyan-500/30 hover:shadow-[0_0_24px_rgba(6,182,212,0.12)]",
-      bgIcon: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-    },
-    {
-      id: "linkedin",
-      name: "LinkedIn",
-      desc: "Post executive talking-head video clips with generated executive summaries and takeaways.",
-      icon: LinkedinIcon,
-      connected: false,
-      color: "text-blue-400",
-      glowClass: "hover:border-blue-500/30 hover:shadow-[0_0_24px_rgba(59,130,246,0.12)]",
-      bgIcon: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    },
-  ]);
+const INITIAL_PLATFORMS: Platform[] = [
+  {
+    id: "youtube",
+    name: "YouTube Shorts",
+    desc: "Auto-publish Shorts & long-form videos with custom tags, title indexing, and category optimization.",
+    icon: YoutubeIcon,
+    connected: false,
+    color: "text-red-500",
+    glowClass: "hover:border-red-500/30 hover:shadow-[0_0_24px_rgba(239,68,68,0.12)]",
+    bgIcon: "bg-red-500/10 text-red-500 border-red-500/20",
+  },
+  {
+    id: "tiktok",
+    name: "TikTok",
+    desc: "Direct video sync via TikTok Content Posting API v2 with sound tags, hook overlays, and instant upload.",
+    icon: TikTokIcon,
+    connected: false,
+    color: "text-cyan-400",
+    glowClass: "hover:border-cyan-500/30 hover:shadow-[0_0_24px_rgba(6,182,212,0.12)]",
+    bgIcon: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  },
+  {
+    id: "instagram",
+    name: "Instagram Reels",
+    desc: "Direct Reels publishing with automatic kinetic captions, cover image, and viral hashtag sets.",
+    icon: InstagramIcon,
+    connected: false,
+    color: "text-pink-400",
+    glowClass: "hover:border-pink-500/30 hover:shadow-[0_0_24px_rgba(236,72,153,0.12)]",
+    bgIcon: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn Video",
+    desc: "Post executive talking-head video clips with generated executive summaries and takeaways.",
+    icon: LinkedinIcon,
+    connected: false,
+    color: "text-blue-400",
+    glowClass: "hover:border-blue-500/30 hover:shadow-[0_0_24px_rgba(59,130,246,0.12)]",
+    bgIcon: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  },
+];
 
-  function toggleConnection(id: string) {
-    setPlatforms((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              connected: !p.connected,
-              handle: !p.connected ? `@${p.name.toLowerCase()}_creator` : undefined,
+function SocialsContent() {
+  const searchParams = useSearchParams();
+  const connectedParam = searchParams.get("connected");
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const [platforms, setPlatforms] = useState<Platform[]>(INITIAL_PLATFORMS);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [successBanner, setSuccessBanner] = useState<string | null>(
+    connectedParam ? `Successfully authenticated and linked ${connectedParam.toUpperCase()} channel!` : null
+  );
+
+  const fetchConnectedAccounts = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${apiUrl}/api/v1/oauth/accounts`);
+      if (res.ok) {
+        const accounts: Array<{
+          id: string;
+          platform: string;
+          account_name?: string;
+          is_active?: boolean;
+        }> = await res.json();
+
+        setPlatforms((prev) =>
+          prev.map((p) => {
+            const acc = accounts.find(
+              (a) => a.platform.toLowerCase() === p.id.toLowerCase() && a.is_active !== false
+            );
+            if (acc) {
+              return {
+                ...p,
+                connected: true,
+                accountId: acc.id,
+                handle: acc.account_name || `@${p.id}_creator`,
+              };
             }
-          : p
-      )
-    );
-  }
+            return {
+              ...p,
+              connected: false,
+              accountId: undefined,
+              handle: undefined,
+            };
+          })
+        );
+      }
+    } catch {
+      // Fallback: keep initial display without crashing
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConnectedAccounts();
+  }, []);
+
+  const handleConnect = async (platformId: string) => {
+    try {
+      setConnectingId(platformId);
+      const res = await fetch(`${apiUrl}/api/v1/oauth/authorize/${platformId}`);
+      if (!res.ok) throw new Error("Failed to generate authorization URL");
+      const data = await res.json();
+      if (data.auth_url) {
+        window.location.href = data.auth_url;
+      }
+    } catch (err) {
+      console.error(err);
+      setConnectingId(null);
+    }
+  };
+
+  const handleDisconnect = async (platform: Platform) => {
+    if (!platform.accountId) {
+      setPlatforms((prev) =>
+        prev.map((p) => (p.id === platform.id ? { ...p, connected: false, handle: undefined } : p))
+      );
+      return;
+    }
+
+    try {
+      setConnectingId(platform.id);
+      const res = await fetch(`${apiUrl}/api/v1/oauth/accounts/${platform.accountId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setPlatforms((prev) =>
+          prev.map((p) =>
+            p.id === platform.id
+              ? { ...p, connected: false, accountId: undefined, handle: undefined }
+              : p
+          )
+        );
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setConnectingId(null);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
+      {/* ── Success Query Feedback Banner ── */}
+      {successBanner && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300 animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{successBanner}</span>
+          </div>
+          <button
+            onClick={() => setSuccessBanner(null)}
+            className="text-emerald-400/60 hover:text-emerald-200 text-[11px] font-mono cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -117,14 +220,23 @@ export default function SocialsPage() {
             <span className="tag border-violet-500/30 text-violet-300">AUTO-PUBLISH ENGINE</span>
           </div>
           <p className="text-xs text-white/40 mt-1">
-            Connect your distribution channels for 1-click scheduled publishing across platforms.
+            Connect your distribution channels for 1-click scheduled publishing across TikTok, YouTube Shorts, and Reels.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={fetchConnectedAccounts}
+            disabled={loading}
+            className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white text-xs inline-flex items-center gap-1.5 transition-colors"
+            title="Refresh Account Connections"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin text-violet-400")} />
+            <span>Sync</span>
+          </button>
           <span className="tag border-emerald-500/30 text-emerald-300 flex items-center gap-1.5">
             <span className="status-dot status-dot-online" />
-            OAuth 2.0 Gateway Active
+            OAuth 2.0 PKCE Active
           </span>
         </div>
       </div>
@@ -133,6 +245,7 @@ export default function SocialsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {platforms.map((p) => {
           const Icon = p.icon;
+          const isBusy = connectingId === p.id;
           return (
             <div
               key={p.id}
@@ -186,15 +299,22 @@ export default function SocialsPage() {
               {/* Action Button */}
               <div className="pt-6">
                 <button
-                  onClick={() => toggleConnection(p.id)}
+                  onClick={() => (p.connected ? handleDisconnect(p) : handleConnect(p.id))}
+                  disabled={isBusy}
                   className={cn(
-                    "w-full py-2.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all",
+                    "w-full py-2.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer",
                     p.connected
                       ? "btn-ghost text-white/60 hover:text-red-400 hover:border-red-500/30"
-                      : "btn-primary shadow-[0_0_16px_rgba(124,58,237,0.25)]"
+                      : "btn-primary shadow-[0_0_16px_rgba(124,58,237,0.25)]",
+                    isBusy && "opacity-60 cursor-not-allowed"
                   )}
                 >
-                  {p.connected ? (
+                  {isBusy ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : p.connected ? (
                     <span>Disconnect Channel</span>
                   ) : (
                     <>
@@ -215,13 +335,21 @@ export default function SocialsPage() {
           <Shield className="w-4 h-4" />
         </div>
         <div className="space-y-0.5">
-          <span className="font-medium text-white">Enterprise OAuth Security</span>
+          <span className="font-medium text-white">Enterprise OAuth PKCE Security</span>
           <p className="text-white/40">
-            Publishing tokens are AES-256 encrypted with automatic rolling key refreshes. We never
-            request channel management or read permissions for your private messages.
+            Social publishing credentials are AES-256 encrypted with Fernet authenticated key derivation. Tokens automatically refresh prior to expiration and are never returned in client listings.
           </p>
         </div>
       </div>
     </div>
   );
 }
+
+export default function SocialsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-neutral-400 text-sm">Loading Social Integrations...</div>}>
+      <SocialsContent />
+    </Suspense>
+  );
+}
+
