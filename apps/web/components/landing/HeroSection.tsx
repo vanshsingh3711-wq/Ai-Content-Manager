@@ -54,26 +54,58 @@ export function HeroSection() {
       {/* ── 2-Column Grid (Left: Copy & CTA | Right: Live 3D Video Showcase) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center min-h-[640px]">
         {/* ══════════════════════════════════════════════════════
-            LEFT COLUMN: Copy, CTA, and Press Logos
+            LEFT COLUMN: Copy, CTA, Modality Pills, and Press Logos
         ══════════════════════════════════════════════════════ */}
         <div className="lg:col-span-6 xl:col-span-6 flex flex-col items-start text-left z-10">
-          <h1 className="text-5xl sm:text-6xl lg:text-[72px] font-extrabold tracking-tight text-white mb-6 leading-[1.05]">
-            Turn 1 Long Video<br />
-            Into 10 Viral<br />
-            Shorts in 60s
+          {/* Universal Modality Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-[11px] font-mono uppercase tracking-wider text-cyan-300 mb-5 font-semibold">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            Autonomous Creator Engine • Audio, Script & Raw Video
+          </div>
+
+          <h1 className="text-4xl sm:text-5xl lg:text-[66px] font-extrabold tracking-tight text-white mb-6 leading-[1.06]">
+            Auto-Edit Videos From{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-purple-400">
+              Audio, Script, or Raw Video
+            </span>
           </h1>
 
-          <p className="text-base sm:text-lg text-neutral-300 max-w-md mb-8 leading-relaxed font-normal">
-            AI Director automatically creates engaging, captioned, and highly edited shorts from your long-form content instantly.
+          <p className="text-base sm:text-lg text-neutral-300 max-w-xl mb-6 leading-relaxed font-normal">
+            Whether you have a 30-minute podcast episode, a written script idea, or raw camera footage — AI Director automatically cuts silences, sources 4K B-roll, inserts motion graphics, and renders kinetic karaoke captions in 60s.
           </p>
 
-          <div className="mb-14">
+          {/* 3 Universal Modality Badges */}
+          <div className="w-full max-w-lg grid grid-cols-3 gap-2 mb-8">
+            <div className="p-2.5 rounded-xl bg-white/[0.03] border border-cyan-500/30 hover:border-cyan-400/60 transition-all flex flex-col gap-1">
+              <span className="text-sm">🎙️</span>
+              <span className="text-[11px] font-bold text-white tracking-tight">Audio Ingest</span>
+              <span className="text-[10px] text-neutral-400 font-mono leading-tight">Podcasts, Voice Notes</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/[0.03] border border-purple-500/30 hover:border-purple-400/60 transition-all flex flex-col gap-1">
+              <span className="text-sm">📝</span>
+              <span className="text-[11px] font-bold text-white tracking-tight">Script Ingest</span>
+              <span className="text-[10px] text-neutral-400 font-mono leading-tight">Ideas, Prompts, Blogs</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/[0.03] border border-emerald-500/30 hover:border-emerald-400/60 transition-all flex flex-col gap-1">
+              <span className="text-sm">📹</span>
+              <span className="text-[11px] font-bold text-white tracking-tight">Raw Video</span>
+              <span className="text-[10px] text-neutral-400 font-mono leading-tight">Footage, Talking Head</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 mb-12">
             <Link
               href="/dashboard"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-white text-black font-extrabold text-sm hover:bg-neutral-100 transition-all shadow-[0_0_35px_rgba(6,182,212,0.55)] hover:shadow-[0_0_50px_rgba(6,182,212,0.85)] active:scale-95"
             >
-              <span>Get Started Free</span>
+              <span>Start Auto-Editing Free</span>
               <span className="text-base">→</span>
+            </Link>
+            <Link
+              href="/dashboard/editor"
+              className="inline-flex items-center gap-2 px-6 py-4 rounded-full bg-white/[0.05] border border-white/[0.12] text-white hover:bg-white/[0.1] font-semibold text-sm transition-all"
+            >
+              <span>Explore Studio Editor</span>
             </Link>
           </div>
 

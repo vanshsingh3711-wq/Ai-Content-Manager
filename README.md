@@ -7,6 +7,7 @@
 
 # AI DIRECTOR™
 ### Autonomous AI Video Director & Non-Linear Editing Platform
+### Auto-Edit Videos for Creators from Audio, Script, or Raw Video
 
 [![Next.js 16](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
@@ -18,11 +19,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <b>Turn raw footage or raw ideas into viral, production-grade video masterpieces in 60 seconds.</b><br />
+  <b>Auto-edit complete video masterpieces from voice notes, written scripts, or raw camera footage in 60s.</b><br />
   A distributed, multi-agent AI video editing ecosystem engineered for high-retention TikTok, YouTube Shorts, Reels, and widescreen explainers.
 </p>
 
 [✨ Experience the Platform](#-product-tour) •
+[🎛️ 3 Creation Modalities](#️-three-universal-creation-modalities) •
 [⚡ Key Capabilities](#-core-capabilities) •
 [🏛 System Architecture](#-system-architecture--diagrams) •
 [🎬 Studio Timeline Editor](#-interactive-timeline-editor) •
@@ -40,7 +42,7 @@
 
 **AI Director** is an autonomous video directing and automated non-linear editing (NLE) platform. Built from the ground up to eliminate the manual bottleneck in digital video production, AI Director orchestrates a cognitive swarm of specialized LLM director agents, speech-to-text acoustic processors, computer vision models, procedural sound effect synthesizers, and hardware-accelerated video compositing engines.
 
-Whether given a **1-hour raw talking-head recording** or a **single sentence script idea**, AI Director automatically extracts narrative hooks, crops to vertical/horizontal framing with facial-tracking safe zones, inserts contextually matched 4K B-roll and motion graphic visual aids, layers kinetic karaoke typography, engineers cinematic audio dynamics, and renders pristine 4K video exports formatted for global social distribution.
+Whether starting from **audio voiceovers**, **written scripts**, or **raw multi-gigabyte camera footage**, AI Director automatically cuts silences, tracks faces, sources contextually matched 4K B-roll, renders Remotion motion graphics, layers kinetic karaoke subtitles, and exports production-ready 4K video formatted for global distribution.
 
 ---
 
@@ -49,7 +51,15 @@ Whether given a **1-hour raw talking-head recording** or a **single sentence scr
 <div align="center">
   <h3>Hero Showcase & Real-Time Conversion Engine</h3>
   <img src="./docs/assets/landing_hero.png" alt="AI Director Landing Hero" width="95%" style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
-  <p><i>The landing experience featuring dynamic 3D mobile simulation, real-time hook analytics (+84% watch time, 99.4 hook score), and intelligent B-roll previewing.</i></p>
+  <p><i>The landing experience featuring the 3 universal creation pathways (Audio, Script, Raw Video), dynamic 3D mobile simulation, and real-time hook analytics (+84% watch time, 99.4 hook score).</i></p>
+</div>
+
+<br />
+
+<div align="center">
+  <h3>The 3 Universal Creator Modalities in Action</h3>
+  <img src="./docs/assets/landing_modalities.png" alt="3 Universal Creation Modalities" width="95%" style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
+  <p><i>Direct ingestion matrix supporting Audio Ingest (Podcasts & Voice Notes), Script Ingest (Ideas, Prompts, Blogs), and Raw Video Ingest (Footage & Talking Heads).</i></p>
 </div>
 
 <br />
@@ -96,6 +106,46 @@ Whether given a **1-hour raw talking-head recording** or a **single sentence scr
     </td>
   </tr>
 </table>
+
+---
+
+## 🎛️ Three Universal Creation Modalities
+
+AI Director is built around three distinct creative starting points, allowing creators to produce videos regardless of how their content begins:
+
+### 1. 🎙️ Audio-First Ingestion (`Audio → Complete Video`)
+*Turn podcasts, voice memos, and spoken recordings into viral video shorts.*
+- **Ideal For**: Podcasters, voiceover artists, musicians, speech authors, audiobook creators.
+- **Accepted Inputs**: `MP3`, `WAV`, `M4A`, `AAC`, voice memos, raw mic stems.
+- **Under The Hood**:
+  - `transcriber.py`: Runs `faster-whisper` (int8 quantized) to extract word-level timestamps down to the millisecond.
+  - `silence_detector.py` & `speech_pruner.py`: Analyzes dB thresholds (`-30dB`) and breath envelopes using voice activity detection (VAD), excising dead air without clipping speech transients.
+  - `beat_analyzer.py`: Detects acoustic transients, tempo, and vocal cadence peaks to place visual cuts on musical downbeats.
+  - `broll_planner.py`: Slices narration into semantic chunks and queries Pexels for 4K contextual B-roll.
+  - `subtitle_generator.py`: Generates kinetic ASS karaoke subtitles styled to pop on every spoken syllable.
+  - `audio_sfx_synthesizer.py`: Procedurally synthesizes whooshes, risers, and bass drops aligned with acoustic inflection points.
+
+### 2. 📝 Script-First Ingestion (`Script → Faceless Masterpiece`)
+*Turn written ideas, outlines, and prompts into high-production faceless videos.*
+- **Ideal For**: Faceless YouTube creators, newsletter publishers, tech educators, financial influencers.
+- **Accepted Inputs**: Raw text, Markdown, bullet-point outlines, prompts, article URLs.
+- **Under The Hood**:
+  - `script_chunker.py`: Deconstructs written text into hook, body arguments, contrast moments, and call-to-action blocks.
+  - `director_taxonomy.py` & Multi-Agent Swarm: Assigns thematic visual treatments based on topic (Tech, Finance, Psychology, Education).
+  - `motion_graphic_planner.py`: Instantiates animated Remotion React components (financial candlestick charts, isometric server architectures, Pareto curves, decision trees).
+  - `web_evidence_capture.py`: Headless Chromium bot visits real-time web sources (GitHub trending, live financial graphs, Wikipedia, news) and records smooth screen-capture B-roll.
+  - `compositor.py`: Merges AI voiceover or background Lo-Fi music, transitions, and kinetic typography into a widescreen (16:9) or vertical (9:16) export.
+
+### 3. 📹 Raw Video Footage Ingestion (`Raw Footage → 10 Viral Shorts`)
+*Turn long recordings and webcam footage into high-hook social clips.*
+- **Ideal For**: Vloggers, YouTubers, course instructors, interviewers, remote podcast hosts.
+- **Accepted Inputs**: `MP4`, `MOV`, `WebM`, ProRes, 4K 60fps smartphone/camera files.
+- **Under The Hood**:
+  - `visual_analysis/service.py`: Computes OpenCV color histogram deltas to find camera scene cuts.
+  - MediaPipe Pose & Face Tracking: Calculates real-time 2D bounding boxes for speaker faces and locks them inside platform safe zones (avoiding TikTok/Instagram action buttons).
+  - `depth_matting.py`: Estimates neural depth maps to isolate foreground speakers, allowing titles, charts, and graphics to float behind the presenter without green screens.
+  - Non-Destructive Silence Cut: Automatically eliminates pauses and re-times footage for high-tempo retention.
+  - `nle_exporter.py`: Allows one-click export to Adobe Premiere Pro (XML), Final Cut Pro (FCPXML), or DaVinci Resolve (EDL).
 
 ---
 
