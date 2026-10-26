@@ -459,6 +459,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     suppress_motion_graphics = kwargs.get("suppress_motion_graphics", False)
 
+    gatekeeper = None
+    if kwargs.get("composition_segments") or kwargs.get("subjects") or kwargs.get("enable_safe_zone_gatekeeper"):
+        try:
+            from services.safe_zone_gatekeeper import SafeZoneGatekeeper
+            gatekeeper = SafeZoneGatekeeper(
+                canvas_width=play_res_x,
+                canvas_height=play_res_y,
+                margin_bottom_px=margin_v,
+                mg_card_bottom_px=mg_bottom_y,
+            )
+        except Exception:
+            gatekeeper = None
+
     for chunk_id, chunk_data in candidate_items:
         chunk_start = chunk_data.get("start", 0.0)
         chunk_end = chunk_data.get("end", 0.0)
@@ -478,7 +491,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 is_inside_mg = _is_inside_motion_graphic(m_start, m_end)
                 if is_inside_mg and suppress_motion_graphics:
                     continue
-                pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
+                if gatekeeper:
+                    placement = gatekeeper.resolve_caption_placement(
+                        start_time=m_start,
+                        end_time=m_end,
+                        active_mg_ranges=mg_intervals,
+                        composition_segments=kwargs.get("composition_segments"),
+                        subjects=kwargs.get("subjects"),
+                    )
+                    pos_prefix = placement.ass_prefix
+                else:
+                    pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
                 start_str = format_ass_time(m_start)
                 end_str = format_ass_time(m_end)
                 dialogue_lines.append(
@@ -511,7 +534,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if is_inside_mg and suppress_motion_graphics:
                 continue
 
-            pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
+            if gatekeeper:
+                placement = gatekeeper.resolve_caption_placement(
+                    start_time=mapped_start,
+                    end_time=mapped_end,
+                    active_mg_ranges=mg_intervals,
+                    composition_segments=kwargs.get("composition_segments"),
+                    subjects=kwargs.get("subjects"),
+                )
+                pos_prefix = placement.ass_prefix
+            else:
+                pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
 
             start_str = format_ass_time(mapped_start)
             end_str = format_ass_time(mapped_end)

@@ -223,13 +223,21 @@ def _probe_streams(ffmpeg_bin: str, filepath: str) -> Dict[str, Any]:
     """
     ffprobe_bin = _get_ffprobe_bin(ffmpeg_bin)
 
-    info = {"has_video": False, "has_audio": False, "video_duration": 0.0, "audio_duration": 0.0, "fps": 30.0}
+    info = {
+        "has_video": False,
+        "has_audio": False,
+        "video_duration": 0.0,
+        "audio_duration": 0.0,
+        "fps": 30.0,
+        "width": 0,
+        "height": 0,
+    }
 
     probe_success = False
     try:
         result = subprocess.run(
             [ffprobe_bin, "-v", "error",
-             "-show_entries", "stream=codec_type,duration,r_frame_rate",
+             "-show_entries", "stream=codec_type,width,height,duration,r_frame_rate",
              "-of", "json", filepath],
             capture_output=True, text=True, timeout=10,
         )
@@ -243,6 +251,8 @@ def _probe_streams(ffmpeg_bin: str, filepath: str) -> Dict[str, Any]:
                 if codec_type == "video":
                     info["has_video"] = True
                     info["video_duration"] = max(info["video_duration"], dur)
+                    info["width"] = int(stream.get("width", 0) or 0)
+                    info["height"] = int(stream.get("height", 0) or 0)
                     fps_str = stream.get("r_frame_rate", "30/1")
                     try:
                         num, den = fps_str.split("/")
@@ -773,6 +783,25 @@ def render_video_pipeline(
     input_streams = _probe_streams(ffmpeg_bin, raw_video_path)
     source_has_audio = input_streams["has_audio"]
     source_fps = input_streams.get("fps", 30.0)
+    source_w = input_streams.get("width", 0)
+    source_h = input_streams.get("height", 0)
+
+    smart_framing_trajectory = None
+    if source_w > 0 and source_h > 0 and target_w == 1080 and target_h == 1920:
+        subjects_list = settings.get("subjects") or settings.get("visual_timeline", {}).get("subjects", [])
+        try:
+            from services.smart_framing import SmartFramingEngine
+            engine = SmartFramingEngine(source_w, source_h, target_w, target_h)
+            if engine.is_reframing_needed():
+                scenes_list = settings.get("scenes") or settings.get("visual_timeline", {}).get("scenes", [])
+                smart_framing_trajectory = engine.compute_smoothed_trajectory(
+                    subjects=subjects_list,
+                    video_duration=total_duration,
+                    scenes=scenes_list,
+                )
+                _log("SMART_FRAME", f"Computed {len(smart_framing_trajectory)} auto-reframing points for {source_w}x{source_h} -> 9:16")
+        except Exception as e:
+            _log("SMART_FRAME_WARN", f"Smart framing trajectory initialization skipped: {e}")
 
     timeline = _build_segment_timeline(edits, timestamp_map, total_duration, settings)
     kept_segments = [s for s in timeline if not s["is_cut"]]
@@ -971,12 +1000,26 @@ def render_video_pipeline(
             filter_str.append(f"anullsrc=d={duration:.3f}:r=44100:cl=stereo[base_a];")
             current_a = "[base_a]"
 
-        base_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+        crop_box = None
+        if smart_framing_trajectory:
+            matched_pt = smart_framing_trajectory[0]
+            for pt in smart_framing_trajectory:
+                if pt["timestamp"] <= start_t:
+                    matched_pt = pt
+                else:
+                    break
+            crop_box = matched_pt
+
+        if crop_box:
+            base_scale = f"crop={crop_box['w']}:{crop_box['h']}:{crop_box['x']}:{crop_box['y']},scale={target_w}:{target_h}:flags=lanczos"
+        else:
+            base_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+
         if "zoom_in" in action_types:
             zoom_frames = max(1, int(duration * source_fps))
             fps_val = int(round(source_fps)) if source_fps else 30
             base_scale = (
-                f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},"
+                f"{base_scale},"
                 f"zoompan=z='min(1.0+0.15*(in/{zoom_frames}),1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={target_w}x{target_h}:fps={fps_val}"
             )
 
