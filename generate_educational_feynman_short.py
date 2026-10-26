@@ -478,7 +478,8 @@ def main():
         font_size=60,
         primary_color="&H00FFFFFF",
         highlight_color="&H0000FFFF",
-        is_faceless=True
+        is_faceless=True,
+        consistent_dock=True
     )
 
     # Step 6: B-roll downloads via Pexels API

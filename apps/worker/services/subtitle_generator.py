@@ -273,6 +273,31 @@ PRESET_CONFIGS = {
         "border_style": 1,
     },
 }
+def partition_into_balanced_windows(n: int, target: int = 3, min_size: int = 2) -> List[int]:
+    """
+    Partitions n items into window sizes of min_size..target so that NO window
+    ever has length 1 (unless n == 1).
+    Avoids orphaned solitary words at the end of sentences (e.g. 4 -> [2, 2], 7 -> [3, 2, 2]).
+    """
+    if n <= target:
+        return [n]
+    sizes = []
+    rem = n
+    while rem > 0:
+        if rem == 4:
+            sizes.extend([2, 2])
+            break
+        elif rem == 5:
+            sizes.extend([3, 2])
+            break
+        elif rem - target == 1:
+            sizes.append(2)
+            rem -= 2
+        else:
+            take = min(target, rem)
+            sizes.append(take)
+            rem -= take
+    return sizes
 
 
 def generate_ass_subtitles(
@@ -423,6 +448,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
     dialogue_lines: List[str] = []
+    raw_events: List[Dict[str, Any]] = []
 
     # 6. Filter canonical transcript chunks
     has_transcript_chunks = any(not str(k).startswith("beat_") for k in timestamp_map.keys())
@@ -456,6 +482,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         else:
             mg_bottom_y = int(play_res_y * 0.78)
     mg_pos_prefix = rf"{{\an5\pos({center_x},{mg_bottom_y})}}"
+
+    # If consistent_dock is enabled, keep all captions anchored at mg_bottom_y (e.g. 1440)
+    # rather than jumping to center_y (960) during b-roll.
+    consistent_dock = kwargs.get("consistent_dock", False)
+    if consistent_dock and eff_alignment == 5:
+        default_pos_prefix = mg_pos_prefix
 
     suppress_motion_graphics = kwargs.get("suppress_motion_graphics", False)
 
@@ -502,12 +534,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     pos_prefix = placement.ass_prefix
                 else:
                     pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
-                start_str = format_ass_time(m_start)
-                end_str = format_ass_time(m_end)
-                dialogue_lines.append(
-                    f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{pos_prefix}{text.upper()}"
-                )
+                raw_events.append({
+                    "start": m_start,
+                    "end": m_end,
+                    "rendered_text": f"{pos_prefix}{text.upper()}"
+                })
             continue
+
+        # Precompute balanced windows so NO window has an orphaned solitary word
+        window_sizes = partition_into_balanced_windows(len(words), target=words_per_window, min_size=2)
+        word_to_window: Dict[int, Tuple[int, int]] = {}
+        cur_w_start = 0
+        for sz in window_sizes:
+            cur_w_end = cur_w_start + sz
+            for idx in range(cur_w_start, cur_w_end):
+                word_to_window[idx] = (cur_w_start, cur_w_end)
+            cur_w_start = cur_w_end
 
         # Create subtitle event with active-word kinetic spring bounce animation
         for active_idx, active_word_info in enumerate(words):
@@ -516,7 +558,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if active_idx < len(words) - 1:
                 word_end = words[active_idx + 1]["start"]
             else:
-                word_end = chunk_data.get("end", active_word_info["end"])
+                raw_end = chunk_data.get("end", active_word_info["end"])
+                # Clamp end of last word so it doesn't linger awkwardly during pauses
+                word_end = min(raw_end, active_word_info["end"] + 0.35)
                 if word_end - word_start < 0.2:
                     word_end = word_start + 0.2
 
@@ -529,15 +573,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if mapped_end <= mapped_start:
                 mapped_end = mapped_start + 0.15
 
-            # If an active motion graphic overlay is present, place caption at bottom of motion graphics
-            is_inside_mg = _is_inside_motion_graphic(mapped_start, mapped_end)
+            # Get the precomputed balanced window for this word
+            window_start, window_end = word_to_window.get(active_idx, (0, len(words)))
+            window_words = words[window_start:window_end]
+
+            # Consistent window position: evaluate motion graphics overlay for the entire window
+            win_raw_start = window_words[0]["start"]
+            win_raw_end = window_words[-1].get("end", window_words[-1]["start"] + 0.3)
+            win_mapped_start = _map_time(win_raw_start)
+            win_mapped_end = _map_time(win_raw_end)
+
+            is_inside_mg = _is_inside_motion_graphic(win_mapped_start, win_mapped_end)
             if is_inside_mg and suppress_motion_graphics:
                 continue
 
             if gatekeeper:
                 placement = gatekeeper.resolve_caption_placement(
-                    start_time=mapped_start,
-                    end_time=mapped_end,
+                    start_time=win_mapped_start,
+                    end_time=win_mapped_end,
                     active_mg_ranges=mg_intervals,
                     composition_segments=kwargs.get("composition_segments"),
                     subjects=kwargs.get("subjects"),
@@ -546,17 +599,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             else:
                 pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
 
-            start_str = format_ass_time(mapped_start)
-            end_str = format_ass_time(mapped_end)
-
             dur_ms = max(120, int((mapped_end - mapped_start) * 1000))
             pop_in = min(45, max(25, int(dur_ms * 0.25)))
             pop_settle = min(95, pop_in + 35)
-
-            # Rolling window keeps subtitles clean and centered
-            window_start = (active_idx // words_per_window) * words_per_window
-            window_end = min(len(words), window_start + words_per_window)
-            window_words = words[window_start:window_end]
 
             formatted_words = []
             for w_i, w in enumerate(window_words):
@@ -582,9 +627,45 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     )
 
             rendered_text = f"{pos_prefix}{' '.join(formatted_words)}"
-            dialogue_lines.append(
-                f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{rendered_text}"
-            )
+            raw_events.append({
+                "start": mapped_start,
+                "end": mapped_end,
+                "rendered_text": rendered_text
+            })
+
+    # Sort raw events chronologically
+    raw_events.sort(key=lambda ev: ev["start"])
+
+    # Strict overlap elimination pass:
+    # Ensure event i finishes before event i+1 starts, leaving a crisp 20ms clearing buffer
+    # so the previous words disappear completely before the next caption begins.
+    for i in range(len(raw_events)):
+        ev = raw_events[i]
+        ev_start = ev["start"]
+        ev_end = ev["end"]
+
+        if ev_end < ev_start + 0.05:
+            ev_end = ev_start + 0.05
+
+        if i < len(raw_events) - 1:
+            next_start = raw_events[i + 1]["start"]
+            if ev_end > next_start - 0.02:
+                if next_start - 0.02 >= ev_start + 0.05:
+                    ev_end = next_start - 0.02
+                else:
+                    ev_end = ev_start + 0.05
+                    raw_events[i + 1]["start"] = ev_end + 0.02
+                    if raw_events[i + 1]["end"] <= raw_events[i + 1]["start"]:
+                        raw_events[i + 1]["end"] = raw_events[i + 1]["start"] + 0.08
+
+        ev["start"] = ev_start
+        ev["end"] = ev_end
+
+        start_str = format_ass_time(ev_start)
+        end_str = format_ass_time(ev_end)
+        dialogue_lines.append(
+            f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{ev['rendered_text']}"
+        )
 
     full_ass_content = header + "\n".join(dialogue_lines) + "\n"
 
