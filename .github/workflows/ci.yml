@@ -42,6 +42,7 @@ jobs:
       - name: Run Worker Test Suite & Regression Checks
         env:
           PYTHONPATH: "apps/worker:apps/api:."
+          DATABASE_URL: "sqlite:///apps/api/dev.db"
           DEEPSEEK_API_KEY: "test_mock_key"
           CELERY_BROKER_URL: "memory://"
           CELERY_RESULT_BACKEND: "cache+memory://"

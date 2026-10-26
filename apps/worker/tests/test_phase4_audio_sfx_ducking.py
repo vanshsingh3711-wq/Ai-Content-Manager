@@ -161,8 +161,19 @@ class TestPhase4AudioSFXAndDucking:
         subprocess.run(cmd_base, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         assert os.path.exists(base_video)
 
-        # 2. Use chill-bgm.mp3
+        # 2. Use chill-bgm.mp3 (fallback to tracked web asset or synthetic test audio if missing)
         bgm_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sfx", "clips", "chill-bgm.mp3"))
+        if not os.path.exists(bgm_path):
+            bgm_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "web", "public", "assets", "audio", "chill-bgm.mp3"))
+        if not os.path.exists(bgm_path):
+            bgm_path = str(tmp_path / "test_bgm.mp3")
+            cmd_bgm = [
+                ffmpeg_bin, "-y",
+                "-f", "lavfi", "-i", "sine=f=220:d=3.0,volume=0.5",
+                "-c:a", "aac",
+                bgm_path,
+            ]
+            subprocess.run(cmd_bgm, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         assert os.path.exists(bgm_path)
 
         # 3. Apply BGM + ducking

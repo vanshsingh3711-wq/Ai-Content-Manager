@@ -21,6 +21,11 @@ engine = create_engine(
 
 def init_db() -> None:
     """Initialize database tables according to SQLModel metadata."""
+    import os
+    if settings.DATABASE_URL.startswith("sqlite:///"):
+        db_file = settings.DATABASE_URL.replace("sqlite:///", "")
+        if db_file and not db_file.startswith(":memory:"):
+            os.makedirs(os.path.dirname(os.path.abspath(db_file)), exist_ok=True)
     SQLModel.metadata.create_all(engine)
 
 

@@ -27,7 +27,6 @@ def test_mg_pre_path_propagates_to_segment_actions():
          patch("services.compositor._probe_streams", return_value={"has_video": True, "has_audio": True, "fps": 30.0, "video_duration": 10.0, "audio_duration": 10.0}), \
          patch("services.compositor._render_canvas_composition", return_value="/fake/mg_path.mov"), \
          patch("services.compositor.subprocess.run") as mock_run, \
-         patch("services.compositor.os.makedirs"), \
          patch("services.compositor._validate_rendered_output"):
         
         settings = {"USE_GRANULAR_OVERLAYS": True, "ENABLE_SEGMENT_CACHE": False}

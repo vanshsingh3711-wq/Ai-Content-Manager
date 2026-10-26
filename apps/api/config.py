@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # Database
-    DATABASE_URL: str = "sqlite:///./dev.db"
+    DATABASE_URL: str = f"sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), 'dev.db'))}"
     
     # CORS
     CORS_ORIGINS: Union[List[str], str] = [

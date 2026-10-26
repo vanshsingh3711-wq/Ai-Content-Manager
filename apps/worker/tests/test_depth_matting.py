@@ -175,6 +175,8 @@ def test_fill_background():
 
 def test_is_depth_matting_available():
     """Verifies that the RVM model is recognized and available."""
+    from services.depth_matting import ensure_model_downloaded
+    ensure_model_downloaded()
     assert is_depth_matting_available() is True
     assert get_model_path().exists()
     assert get_model_path().stat().st_size > 10 * 1024 * 1024
@@ -183,6 +185,8 @@ def test_is_depth_matting_available():
 def test_rvm_onnx_inference():
     """Verifies live ONNX inference with recurrent states on RVM MobileNetV3."""
     import onnxruntime as ort
+    from services.depth_matting import ensure_model_downloaded
+    ensure_model_downloaded()
     model_path = str(get_model_path())
     sess = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
 

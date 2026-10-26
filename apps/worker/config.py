@@ -22,7 +22,7 @@ class WorkerSettings(BaseSettings):
     CELERY_TASK_DEFAULT_QUEUE: str = "video_processing_queue"
     
     # Database
-    DATABASE_URL: str = "sqlite:///../api/dev.db"
+    DATABASE_URL: str = f"sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'api', 'dev.db'))}"
     
     # Storage / Cloudflare R2 / S3
     R2_ACCOUNT_ID: str = ""
