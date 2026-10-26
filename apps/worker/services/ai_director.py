@@ -38,17 +38,19 @@ class EditList(BaseModel):
     edits: List[EditDecision] = Field(..., description="List of sequential editing decisions.")
 
 
+from services.network_retry import bounded_network_retry, NetworkRetryExhaustedError
+
+
 def _wait_for_internet_retry(func):
-    def wrapper(*args, **kwargs):
-        attempt = 1
-        while True:
-            try:
-                return func(*args, **kwargs)
-            except (APIConnectionError, socket.error) as e:
-                print(f"[!] Network connection lost. Waiting 10s for internet to return (Attempt {attempt})...")
-                time.sleep(10)
-                attempt += 1
-    return wrapper
+    """Bounded retry decorator for LLM/network calls (up to 5 attempts with backoff and jitter)."""
+    return bounded_network_retry(
+        max_retries=5,
+        base_delay=1.0,
+        max_delay=30.0,
+        backoff_factor=2.0,
+        jitter=True,
+        retryable_exceptions=(APIConnectionError, socket.error, ConnectionError, TimeoutError),
+    )(func)
 
 def _load_style_profile(style_pref: str) -> str:
     # ai_director.py is at apps/worker/services/ → go 3 levels up to reach project root
@@ -205,10 +207,10 @@ def generate_edit_decisions(unified_analysis_json: str) -> EditList:
 
     print("[*] Generating B-Roll Plan...")
     broll_plan = generate_broll_plan(unified_analysis_json)
-    
+
     print("[*] Generating Motion Graphics Plan...")
     mg_plan = generate_motion_graphics_plan(unified_analysis_json)
-    
+
     # Check if the user requested a faceless documentary style
     is_faceless = False
     try:
@@ -218,7 +220,7 @@ def generate_edit_decisions(unified_analysis_json: str) -> EditList:
             is_faceless = True
     except Exception:
         pass
-        
+
     if is_faceless:
         print("[*] 'Faceless' mode detected. Skipping Character Plan...")
         from services.ai_director import EditList
@@ -226,7 +228,7 @@ def generate_edit_decisions(unified_analysis_json: str) -> EditList:
     else:
         print("[*] Generating Character Plan...")
         char_plan = generate_character_plan(unified_analysis_json)
-    
+
     print("[*] Resolving Master Blueprint...")
     final_plan = resolve_master_blueprint(
         unified_analysis_json=unified_analysis_json,
@@ -234,6 +236,6 @@ def generate_edit_decisions(unified_analysis_json: str) -> EditList:
         mg_plan=mg_plan,
         char_plan=char_plan
     )
-    
+
     return final_plan
 

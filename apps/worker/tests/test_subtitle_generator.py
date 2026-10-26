@@ -32,10 +32,10 @@ def test_subtitle_generation_basic(tmp_path):
     }
     generate_ass_subtitles(tmap, output_ass)
     assert os.path.exists(output_ass)
-    
+
     with open(output_ass, "r", encoding="utf-8") as f:
         content = f.read()
-        
+
     assert "PlayResX: 1080" in content
     assert "PlayResY: 1920" in content
     assert "HELLO" in content and "WORLD" in content
@@ -59,10 +59,10 @@ def test_subtitle_generation_with_cuts(tmp_path):
     # Cut 0.0 to 1.5s (1.5s removed before ID_01)
     edits = [{"action": "cut", "start": 0.0, "end": 1.5}]
     generate_ass_subtitles(tmap, output_ass, edits=edits)
-    
+
     with open(output_ass, "r", encoding="utf-8") as f:
         content = f.read()
-        
+
     # Word at 2.0s should shift to 2.0 - 1.5 = 0.5s -> 0:00:00.50
     assert "0:00:00.50" in content
 
@@ -91,10 +91,10 @@ def test_subtitle_inside_cut_removed(tmp_path):
     # Cut 0.0 to 2.0s
     edits = [{"action": "cut", "start": 0.0, "end": 2.0}]
     generate_ass_subtitles(tmap, output_ass, edits=edits)
-    
+
     with open(output_ass, "r", encoding="utf-8") as f:
         content = f.read()
-        
+
     # "CUT THIS" must NOT appear in dialogue events
     dialogue_lines = [l for l in content.splitlines() if l.startswith("Dialogue:")]
     assert len(dialogue_lines) == 2
@@ -135,20 +135,38 @@ def test_motion_graphic_suppresses_overlapping_captions(tmp_path):
     }
     # Motion graphic runs from 2.5 to 5.0s (over chunk ID_02)
     edits = [{"action": "motion_graphics", "start": 2.5, "end": 5.0, "motion_graphics_type": "metric_reveal"}]
+    # By default, captions are repositioned to the bottom of the motion graphics card
     generate_ass_subtitles(tmap, output_ass, edits=edits, is_faceless=True)
 
     with open(output_ass, "r", encoding="utf-8") as f:
         content = f.read()
 
     dialogue_lines = [l for l in content.splitlines() if l.startswith("Dialogue:")]
-    # ID_01 (2 words) and ID_03 (2 words) should be generated; ID_02 words must be suppressed!
-    assert len(dialogue_lines) == 4
-    for line in dialogue_lines:
+    assert len(dialogue_lines) == 7
+
+    # Non-motion graphics lines (ID_01 and ID_03) are centered (\pos(540,960))
+    assert r"\pos(540,960)" in dialogue_lines[0]
+    assert r"\pos(540,960)" in dialogue_lines[1]
+    assert r"\pos(540,960)" in dialogue_lines[5]
+    assert r"\pos(540,960)" in dialogue_lines[6]
+
+    # Motion graphics lines (ID_02) are at the bottom of the motion graphics card (\pos(540,1440))
+    for line in dialogue_lines[2:5]:
+        assert r"\pos(540,1440)" in line
+        assert r"\pos(540,1760)" not in line  # NOT at bottom of video
+        assert r"\pos(540,960)" not in line   # NOT in center overlapping card
+
+    # If suppress_motion_graphics=True is explicitly passed, overlapping captions are suppressed
+    suppress_ass = str(tmp_path / "subs_suppress.ass")
+    generate_ass_subtitles(tmap, suppress_ass, edits=edits, is_faceless=True, suppress_motion_graphics=True)
+    with open(suppress_ass, "r", encoding="utf-8") as f:
+        suppress_content = f.read()
+    suppress_lines = [l for l in suppress_content.splitlines() if l.startswith("Dialogue:")]
+    assert len(suppress_lines) == 4
+    for line in suppress_lines:
         assert "METRIC" not in line
         assert "CARD" not in line
         assert "EXPLANATION" not in line
-    assert "INTRO" in dialogue_lines[0]
-    assert "OUTRO" in dialogue_lines[2]
 
 
 def test_reconcile_transcript_words_hyphens_and_numbers():

@@ -7,6 +7,8 @@ import json
 import sys
 import math
 import hashlib
+import uuid
+import time
 from typing import Any, Dict, List, Optional, Tuple
 from services.media_extractor import get_ffmpeg_binary_path
 from services.editing_config import EDITING_CONFIG
@@ -23,15 +25,36 @@ def _log(tag: str, msg: str):
     print(f"  [COMPOSITOR:{tag}] {msg}", flush=True)
 
 
+def prepare_ffmpeg_command(cmd: List[str], threads: int = 2) -> List[str]:
+    """
+    Normalizes and positions FFmpeg options correctly:
+    1. Global options (e.g. -hide_banner) are placed immediately after the ffmpeg binary.
+    2. Encoder options (e.g. -threads <N>) are placed in the output options section
+       preceding the destination output file, ensuring the encoder AVCodecContext
+       actually constrains worker CPU threads rather than misapplying to input decoders.
+    """
+    final_cmd = list(cmd)
+    if not final_cmd:
+        return final_cmd
+
+    # Insert global options after binary
+    if "-hide_banner" not in final_cmd:
+        final_cmd.insert(1, "-hide_banner")
+
+    # If threads is already explicitly specified anywhere, do not duplicate
+    has_threads = any(arg == "-threads" or arg.startswith("-threads:") for arg in final_cmd)
+    if not has_threads and len(final_cmd) >= 2:
+        # Place -threads right before the output target file
+        final_cmd.insert(-1, "-threads")
+        final_cmd.insert(-1, str(threads))
+
+    return final_cmd
+
+
 def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     """Run an FFmpeg command, log it, and raise on failure."""
-    final_cmd = list(cmd)
-    if "-threads" not in final_cmd:
-        # Cap to 2 CPU threads to leave headroom for OS window manager and UI apps
-        final_cmd[1:1] = ["-threads", "2"]
-    if "-hide_banner" not in final_cmd:
-        final_cmd[1:1] = ["-hide_banner"]
-        
+    final_cmd = prepare_ffmpeg_command(cmd, threads=2)
+
     _log("CMD", f"({label}) {' '.join(final_cmd[:8])}... ({len(final_cmd)} args)")
     result = subprocess.run(final_cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -107,7 +130,7 @@ def _get_video_codec(ffmpeg_bin: str) -> str:
     global _HW_CODEC
     if _HW_CODEC is not None:
         return _HW_CODEC
-    
+
     _HW_CODEC = "libx264"
     try:
         res = subprocess.run([ffmpeg_bin, "-encoders"], capture_output=True, text=True)
@@ -128,7 +151,7 @@ def _get_video_codec(ffmpeg_bin: str) -> str:
                 _HW_CODEC = "h264_videotoolbox"
     except Exception:
         pass
-        
+
     _log("HW_ACCEL", f"Selected video codec: {_HW_CODEC}")
     return _HW_CODEC
 
@@ -240,7 +263,7 @@ def _probe_streams(ffmpeg_bin: str, filepath: str) -> Dict[str, Any]:
                 [ffmpeg_bin, "-i", filepath],
                 capture_output=True, text=True, timeout=10
             )
-            # ffmpeg -i returns exit code 1 when no output file is specified, 
+            # ffmpeg -i returns exit code 1 when no output file is specified,
             # but outputs stream info to stderr.
             for line in result.stderr.split("\n"):
                 if "Stream #" in line and ": Video:" in line:
@@ -254,7 +277,7 @@ def _probe_streams(ffmpeg_bin: str, filepath: str) -> Dict[str, Any]:
                             pass
                 if "Stream #" in line and ": Audio:" in line:
                     info["has_audio"] = True
-            
+
             if not info["has_video"] and not info["has_audio"]:
                 raise RuntimeError(f"No streams detected in fallback ffmpeg probe for {filepath}")
         except Exception as e:
@@ -300,7 +323,7 @@ def _build_segment_timeline(
     # 1. Collect cut intervals and group actions by trigger_id
     cut_intervals = []
     actions_by_chunk: Dict[str, List[Dict[str, Any]]] = {}
-    
+
     for edit in edits:
         if edit.get("action") == "cut":
             start = edit.get("start")
@@ -374,7 +397,7 @@ def _build_segment_timeline(
         current_end = c_end
 
     base_timeline = []
-    
+
     if not chunks:
         _log("WARN", "No transcript chunks found. Using full video as single segment.")
         base_timeline = [{
@@ -416,14 +439,14 @@ def _build_segment_timeline(
 
     # 3. Intersect base timeline with kept intervals
     timeline = []
-    
+
     # We will generate "kept" segments (is_cut=False) and "cut" segments (is_cut=True)
     # to maintain compatibility with downstream logging and test expectations.
-    
+
     for seg in base_timeline:
         seg_start = seg["start"]
         seg_end = seg["end"]
-        
+
         # Find which kept_intervals overlap with this segment
         overlaps = []
         for k_start, k_end in kept_intervals:
@@ -431,7 +454,7 @@ def _build_segment_timeline(
             overlap_end = min(seg_end, k_end)
             if overlap_start < overlap_end:
                 overlaps.append((overlap_start, overlap_end))
-        
+
         if not overlaps:
             # Fully cut
             timeline.append({
@@ -460,7 +483,7 @@ def _build_segment_timeline(
                     "is_cut": False
                 })
                 current_seg_time = overlap_end
-            
+
             # If there's remaining cut portion at the end
             if current_seg_time < seg_end:
                 timeline.append({
@@ -476,12 +499,12 @@ def _build_segment_timeline(
         # Clear legacy actions
         for seg in timeline:
             seg["actions"] = []
-            
+
         non_cut_edits = [e for e in edits if e.get("action") != "cut"]
         for edit in non_cut_edits:
             e_start = edit.get("start")
             e_end = edit.get("end")
-            
+
             if e_start is None or e_end is None:
                 tid = edit.get("trigger_id")
                 if tid and tid in timestamp_map:
@@ -489,26 +512,26 @@ def _build_segment_timeline(
                     e_end = timestamp_map[tid].get("end", total_duration)
                 else:
                     e_start, e_end = 0.0, total_duration
-                    
+
             dur = e_end - e_start
-            
+
             for seg in timeline:
                 if seg.get("is_cut"):
                     continue
-                
+
                 seg_start = seg["start"]
                 seg_end = seg["end"]
-                
+
                 # An overlap occurs if the edit starts before the segment ends AND ends after the segment starts.
                 if e_start < seg_end and e_end > seg_start:
                     overlap_start = max(seg_start, e_start)
                     overlap_end = min(seg_end, e_end)
                     frag_dur = overlap_end - overlap_start
-                    
+
                     min_frag_dur = settings.get("MIN_FRAGMENT_DURATION", 0.1) if settings else 0.1
                     if frag_dur < min_frag_dur and dur >= min_frag_dur:
                         continue
-                        
+
                     cloned = dict(edit)
                     cloned["original_start"] = e_start
                     cloned["original_end"] = e_end
@@ -578,7 +601,7 @@ def compute_segment_cache_key(
 
     # 4. Extra input assets (B-roll, overlays, sound effects, cutouts)
     if extra_inputs:
-        for extra in extra_inputs:
+        for extra in sorted(extra_inputs):
             if extra and os.path.exists(extra):
                 try:
                     est = os.stat(extra)
@@ -589,6 +612,113 @@ def compute_segment_cache_key(
                 hasher.update(f":extra:{extra}".encode("utf-8"))
 
     return hasher.hexdigest()[:24]
+
+
+def is_valid_cached_segment(
+    file_path: str,
+    min_size: int = 1024,
+    ffprobe_bin: Optional[str] = None,
+) -> bool:
+    """
+    Validates whether a cached video segment file is intact, readable, and non-corrupt.
+    Performs size check, ISO BMFF container header check, and ffprobe stream verification.
+    """
+    if not file_path or not os.path.exists(file_path):
+        return False
+
+    try:
+        size = os.path.getsize(file_path)
+        if size < min_size:
+            return False
+
+        # Check MP4 ISO base media file format header atom
+        with open(file_path, "rb") as f:
+            header = f.read(32)
+        if len(header) < 16:
+            return False
+
+        # In standard MP4/MOV files, bytes 4..8 usually represent 'ftyp', 'moov', or 'wide'
+        atom_type = header[4:8]
+        if atom_type not in (b"ftyp", b"moov", b"wide", b"mdat", b"free"):
+            return False
+
+        # If ffprobe binary is provided or discoverable, run a quick syntax probe
+        if ffprobe_bin and os.path.exists(ffprobe_bin):
+            probe_cmd = [
+                ffprobe_bin, "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=codec_name",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                file_path
+            ]
+            res = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=10)
+            if res.returncode != 0 or not res.stdout.strip():
+                return False
+
+        return True
+    except Exception:
+        return False
+
+
+def clean_segment_cache(cache_dir: str, max_age_days: int = 7, max_size_bytes: Optional[int] = None) -> int:
+    """
+    Cleans up expired, corrupted, or over-quota files in segment_cache_dir.
+    Returns the number of removed files.
+    """
+    if not os.path.exists(cache_dir):
+        return 0
+
+    now = time.time()
+    max_age_sec = max_age_days * 86400
+    removed_count = 0
+    files_with_mtime = []
+
+    try:
+        for entry in os.scandir(cache_dir):
+            if not entry.is_file() or not entry.name.endswith(".mp4"):
+                continue
+
+            # Remove any orphan tmp files older than 1 hour
+            if entry.name.startswith("tmp_"):
+                if now - entry.stat().st_mtime > 3600:
+                    try:
+                        os.remove(entry.path)
+                        removed_count += 1
+                    except OSError:
+                        pass
+                continue
+
+            stat = entry.stat()
+            # Remove expired segments
+            if now - stat.st_mtime > max_age_sec:
+                try:
+                    os.remove(entry.path)
+                    removed_count += 1
+                except OSError:
+                    pass
+                continue
+
+            files_with_mtime.append((entry.path, stat.st_size, stat.st_mtime))
+
+        # Check total size quota if configured
+        if max_size_bytes is not None and files_with_mtime:
+            total_size = sum(sz for _, sz, _ in files_with_mtime)
+            if total_size > max_size_bytes:
+                # Sort oldest first (LRU)
+                files_with_mtime.sort(key=lambda x: x[2])
+                for path, sz, _ in files_with_mtime:
+                    try:
+                        os.remove(path)
+                        removed_count += 1
+                        total_size -= sz
+                        if total_size <= max_size_bytes:
+                            break
+                    except OSError:
+                        pass
+    except Exception as e:
+        _log("CACHE_WARN", f"Cache cleanup encountered error: {e}")
+
+    return removed_count
 
 
 # ---------------------------------------------------------------------------
@@ -709,18 +839,17 @@ def render_video_pipeline(
                         e_start, e_end = 0.0, total_duration
                 dur = e_end - e_start
                 if dur <= 0.05: continue
-                
+
                 if edit.get("motion_graphics_type"):
                     mg_template = edit.get("motion_graphics_type")
                     mg_props = edit.get("motion_graphics_targets", {})
                 else:
                     mg_template = edit.get("template", "MotionGraphicsPreview")
                     mg_props = {"text": edit.get("motion_graphics_text")}
-                
+
                 if edit.get("visual_beats"): mg_props["visual_beats"] = edit.get("visual_beats")
                 if edit.get("transition"): mg_props["transition"] = edit.get("transition")
-                
-                import uuid
+
                 mg_id = str(uuid.uuid4())[:8]
                 mg_path = _render_canvas_composition(
                     mg_template, mg_props,
@@ -824,17 +953,17 @@ def render_video_pipeline(
         duration = end_t - start_t
         if duration <= 0.05:
             continue
-            
+
         segment_mp4 = os.path.join(temp_dir, f"segment_{seg_idx:03d}.mp4")
-        
+
         cmd = [ffmpeg_bin, "-y", "-i", raw_video_path]
         input_idx = 1
-        
+
         filter_str = []
         action_types = {a["action"] for a in seg["actions"]}
 
         filter_str.append(f"[0:v]trim=start={start_t:.3f}:end={end_t:.3f},setpts=PTS-STARTPTS[base_v];")
-        
+
         if source_has_audio:
             filter_str.append(f"[0:a]atrim=start={start_t:.3f}:end={end_t:.3f},asetpts=PTS-STARTPTS[base_a];")
             current_a = "[base_a]"
@@ -850,7 +979,7 @@ def render_video_pipeline(
                 f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},"
                 f"zoompan=z='min(1.0+0.15*(in/{zoom_frames}),1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={target_w}x{target_h}:fps={fps_val}"
             )
-            
+
         filter_str.append(f"[base_v]{base_scale}[norm_v];")
         current_v = "[norm_v]"
 
@@ -885,18 +1014,18 @@ def render_video_pipeline(
                     x.get("seg_overlap_start", seg["start"])
                 )
             )
-            
+
             for a in actions_sorted:
                 action_type = a.get("action")
                 rel_start = a.get("seg_overlap_start", seg["start"]) - seg["start"]
                 rel_end = a.get("seg_overlap_end", seg["end"]) - seg["start"]
-                
+
                 if action_type == "motion_graphics" or a.get("motion_graphics_text"):
                     mg_path = a.get("_pre_mg_path")
                     if mg_path and os.path.exists(mg_path):
                         offset = a.get("seg_overlap_start", seg["start"]) - a.get("original_start", seg["start"])
                         cmd.extend(["-ss", str(max(0, offset)), "-t", str(rel_end - rel_start), "-i", mg_path])
-                        
+
                         mg_v = f"[mg_{mg_count}_v]"
                         frag_dur = max(0.1, rel_end - rel_start)
                         mg_fade_in = min(0.35, frag_dur / 4.0)
@@ -923,9 +1052,9 @@ def render_video_pipeline(
                             filter_str.append(f"{current_v}{cutout_v}overlay=x=0:y=0:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_cutout_mg_{mg_count}];")
                             current_v = f"[with_cutout_mg_{mg_count}]"
                             input_idx += 1
-                        
+
                         mg_count += 1
-                        
+
                 elif action_type == "b_roll":
                     tid = a.get("trigger_id") or a.get("id")
                     broll_path_a = broll_map.get(tid) if (tid and tid in broll_map) else None
@@ -942,16 +1071,16 @@ def render_video_pipeline(
                         fade_in_d = min(0.35, frag_dur / 3.0)
                         fade_out_d = min(0.35, frag_dur / 3.0)
                         fade_out_st = max(0.0, frag_dur - fade_out_d)
-                        
+
                         broll_filter = f"[{input_idx}:v]fps={source_fps},scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
                         broll_filter += f",fade=t=in:st=0:d={fade_in_d:.3f},fade=t=out:st={fade_out_st:.3f}:d={fade_out_d:.3f}"
                         broll_filter += f",setpts=PTS-STARTPTS+{rel_start}/TB{bv};"
                         filter_str.append(broll_filter)
-                        
+
                         overlay_x, overlay_y = "0", "0"
                         if broll_transition == "slide" or broll_transition == "push":
                             overlay_x = f"'if(lte(t,{rel_start}+0.5), -w+(w/0.5)*(t-{rel_start}), 0)'"
-                            
+
                         filter_str.append(f"{current_v}{bv}overlay=x={overlay_x}:y={overlay_y}:enable='between(t,{rel_start},{rel_end})':eof_action=pass[with_broll_{broll_count}];")
                         current_v = f"[with_broll_{broll_count}]"
                         input_idx += 1
@@ -969,7 +1098,7 @@ def render_video_pipeline(
                             input_idx += 1
 
                         broll_count += 1
-                            
+
             # To ensure the legacy block doesn't trigger when using granular overlays:
             broll_path = None
             mg_path = None
@@ -994,7 +1123,7 @@ def render_video_pipeline(
                 if a.get("action") == "motion_graphics" or a.get("motion_graphics_text") or a.get("motion_graphics_type"):
                     mg_action = a
                     break
-            
+
             if mg_action:
                 if mg_action.get("motion_graphics_type"):
                     mg_template = mg_action.get("motion_graphics_type")
@@ -1002,10 +1131,10 @@ def render_video_pipeline(
                 else:
                     mg_template = mg_action.get("template", "MotionGraphicsPreview")
                     mg_props = {"text": mg_action.get("motion_graphics_text")}
-                
+
                 if mg_action.get("visual_beats"): mg_props["visual_beats"] = mg_action.get("visual_beats")
                 if mg_action.get("transition"): mg_props["transition"] = mg_action.get("transition")
-                
+
                 mg_path = _render_canvas_composition(
                     mg_template, mg_props,
                     duration, source_fps, target_w, target_h, temp_dir, f"mg_{seg['chunk_id']}"
@@ -1024,7 +1153,7 @@ def render_video_pipeline(
                 char_props_overrides = {}
                 if a.get("visual_beats"): char_props_overrides["visual_beats"] = a.get("visual_beats")
                 if a.get("transition"): char_props_overrides["transition"] = a.get("transition")
-            
+
             if a.get("action") == "sfx" or a.get("sound_effect"):
                 has_sfx = True
                 sfx_keyword = a.get("sound_effect", "pop")
@@ -1062,12 +1191,12 @@ def render_video_pipeline(
                 broll_filter += ",fade=t=in:st=0:d=0.5"
             broll_filter += f"[broll_v];"
             filter_str.append(broll_filter)
-            
+
             overlay_x = "0"
             overlay_y = "0"
             if broll_transition == "slide" or broll_transition == "push":
                 overlay_x = "'if(lte(t,0.5), -w+(w/0.5)*t, 0)'"
-                
+
             filter_str.append(f"{current_v}[broll_v]overlay=x={overlay_x}:y={overlay_y}:eof_action=pass[with_broll];")
             current_v = "[with_broll]"
             input_idx += 1
@@ -1079,7 +1208,7 @@ def render_video_pipeline(
                 filter_str.append(f"{current_v}[cutout_br_v]overlay=x=0:y=0:eof_action=pass[with_cutout_br];")
                 current_v = "[with_cutout_br]"
                 input_idx += 1
-            
+
         if mg_path:
             cmd.extend(["-i", mg_path])
             filter_str.append(f"[{input_idx}:v]setpts=PTS-STARTPTS[mg_v];")
@@ -1094,13 +1223,13 @@ def render_video_pipeline(
                 filter_str.append(f"{current_v}[cutout_v]overlay=x=0:y=0:eof_action=pass[with_cutout];")
                 current_v = "[with_cutout]"
                 input_idx += 1
-            
+
         if character_video_path and os.path.exists(character_video_path):
             cmd.extend(["-i", character_video_path])
             char_idx = input_idx
             # Trim the 3D character WebM exactly like the raw video so lip sync matches the cut segments
             filter_str.append(f"[{char_idx}:v]trim=start={start_t:.3f}:end={end_t:.3f},setpts=PTS-STARTPTS[char_v_trim];")
-            
+
             char_scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
             if "zoom_in" in action_types:
                 zoom_frames = max(1, int(duration * source_fps))
@@ -1109,12 +1238,12 @@ def render_video_pipeline(
                     f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},"
                     f"zoompan=z='min(1.0+0.15*(in/{zoom_frames}),1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={target_w}x{target_h}:fps={fps_val}"
                 )
-                
+
             filter_str.append(f"[char_v_trim]{char_scale}[char_v_scaled];")
             filter_str.append(f"{current_v}[char_v_scaled]overlay=x=0:y=0:eof_action=pass[with_char];")
             current_v = "[with_char]"
             input_idx += 1
-            
+
         if has_sfx:
             sfx_path = None
             if sfx_source_url:
@@ -1147,7 +1276,7 @@ def render_video_pipeline(
                 filter_str.append(f"{current_a}[sfx_a]amix=inputs=2:duration=first:dropout_transition=2[a_out_sfx];")
                 current_a = "[a_out_sfx]"
                 input_idx += 1
-                
+
         # Boundary transition smoothing across cut boundaries
         if seg.get("transition_out"):
             t_out = seg["transition_out"]
@@ -1169,12 +1298,12 @@ def render_video_pipeline(
                 current_a = "[a_in_fade]"
 
         filter_str.append(f"{current_v}format=yuv420p[vout]")
-        
+
         filter_complex = "".join(filter_str)
         filter_script_path = os.path.join(temp_dir, f"filter_{seg_idx}.txt")
         with open(filter_script_path, "w", encoding="utf-8") as f:
             f.write(filter_complex)
-        
+
         cmd.extend([
             "-filter_complex_script", filter_script_path,
             "-map", "[vout]",
@@ -1215,26 +1344,43 @@ def render_video_pipeline(
             target_h=target_h,
         )
         cached_segment_path = os.path.join(segment_cache_dir, f"seg_{seg_hash}.mp4")
+        ffprobe_bin = _get_ffprobe_bin(ffmpeg_bin)
 
-        if enable_cache and os.path.exists(cached_segment_path) and os.path.getsize(cached_segment_path) > 1024:
-            _log("CACHE_HIT", f"Reusing cached segment {seg_idx+1}/{len(kept_segments)} (hash: {seg_hash})")
-            shutil.copy2(cached_segment_path, segment_mp4)
-            segment_files.append(segment_mp4)
-            continue
+        if enable_cache and os.path.exists(cached_segment_path):
+            if is_valid_cached_segment(cached_segment_path, ffprobe_bin=ffprobe_bin):
+                _log("CACHE_HIT", f"Reusing valid cached segment {seg_idx+1}/{len(kept_segments)} (hash: {seg_hash})")
+                shutil.copy2(cached_segment_path, segment_mp4)
+                segment_files.append(segment_mp4)
+                continue
+            else:
+                _log("CACHE_DISCARD", f"Discarding invalid/corrupt cached segment: {cached_segment_path}")
+                try:
+                    os.remove(cached_segment_path)
+                except Exception:
+                    pass
 
         _log("FFMPEG", f"Rendering segment {seg_idx+1}/{len(kept_segments)} (hash: {seg_hash})")
         try:
             _run_ffmpeg(cmd, f"render_segment_{seg_idx}")
             segment_files.append(segment_mp4)
-            if enable_cache and os.path.exists(segment_mp4) and os.path.getsize(segment_mp4) > 1024:
+            if enable_cache and os.path.exists(segment_mp4) and is_valid_cached_segment(segment_mp4, ffprobe_bin=ffprobe_bin):
+                tmp_cache = os.path.join(segment_cache_dir, f"tmp_{seg_hash}_{os.getpid()}_{uuid.uuid4().hex[:8]}.mp4")
                 try:
                     os.makedirs(segment_cache_dir, exist_ok=True)
-                    tmp_cache = os.path.join(segment_cache_dir, f"tmp_{seg_hash}.mp4")
                     shutil.copy2(segment_mp4, tmp_cache)
-                    os.replace(tmp_cache, cached_segment_path)
-                    _log("CACHE_SAVE", f"Cached segment {seg_idx+1} -> {cached_segment_path}")
+                    if is_valid_cached_segment(tmp_cache, ffprobe_bin=ffprobe_bin):
+                        os.replace(tmp_cache, cached_segment_path)
+                        _log("CACHE_SAVE", f"Cached segment {seg_idx+1} -> {cached_segment_path}")
+                    else:
+                        _log("CACHE_WARN", f"Temporary segment copy corrupt: {tmp_cache}")
                 except Exception as cache_err:
                     _log("CACHE_WARN", f"Segment caching warning: {cache_err}")
+                finally:
+                    if os.path.exists(tmp_cache):
+                        try:
+                            os.remove(tmp_cache)
+                        except Exception:
+                            pass
         except RuntimeError as e:
             _log("ERROR", f"Rendering segment {seg_idx} failed: {e}")
             raise

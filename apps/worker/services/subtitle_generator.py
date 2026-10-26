@@ -3,14 +3,37 @@ from typing import Any, Dict, List, Set, Optional, Tuple
 
 
 def format_ass_time(seconds: float) -> str:
-    """Converts seconds to ASS timestamp format: H:MM:SS.cc"""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    centis = int(round((seconds - int(seconds)) * 100))
-    if centis >= 100:
-        secs += 1
-        centis = 0
+    """
+    Converts seconds to normalized ASS timestamp format: H:MM:SS.cc
+
+    Uses integer centisecond arithmetic to guarantee exact carry propagation
+    across second, minute, and hour boundaries (e.g. 59.999s -> 0:01:00.00,
+    3599.999s -> 1:00:00.00), preventing malformed outputs like '0:00:60.00'.
+    Clamps negative or invalid values to '0:00:00.00'.
+    """
+    if seconds is None:
+        return "0:00:00.00"
+
+    try:
+        sec_val = float(seconds)
+    except (ValueError, TypeError):
+        return "0:00:00.00"
+
+    if sec_val <= 0.0 or sec_val != sec_val:  # Also handles NaN
+        return "0:00:00.00"
+
+    # Convert to integer centiseconds (1/100 sec) with half-up rounding (adding 1e-9 epsilon for float precision)
+    total_centis = int(sec_val * 100.0 + 0.5 + 1e-9)
+    if total_centis < 0:
+        total_centis = 0
+
+    centis = total_centis % 100
+    total_seconds = total_centis // 100
+    secs = total_seconds % 60
+    total_minutes = total_seconds // 60
+    minutes = total_minutes % 60
+    hours = total_minutes // 60
+
     return f"{hours}:{minutes:02d}:{secs:02d}.{centis:02d}"
 
 
@@ -413,14 +436,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     # For centered faceless captions, 3 words per window gives maximum punch and zero clutter
     words_per_window = 3 if eff_alignment == 5 else 4
 
-    # Calculate exact coordinate positions
+    # Calculate coordinate positions
     center_x = play_res_x // 2
     if eff_alignment == 5:
         center_y = play_res_y // 2
-        pos_prefix = rf"{{\an5\pos({center_x},{center_y})}}"
+        default_pos_prefix = rf"{{\an5\pos({center_x},{center_y})}}"
     else:
         bottom_y = play_res_y - margin_v
-        pos_prefix = rf"{{\an2\pos({center_x},{bottom_y})}}"
+        default_pos_prefix = rf"{{\an2\pos({center_x},{bottom_y})}}"
+
+    # When motion graphics overlay is present, position caption at the bottom of the motion graphics card
+    # (NOT at the bottom of the video, and NOT covering the card center)
+    mg_bottom_y = kwargs.get("motion_graphics_bottom_y")
+    if mg_bottom_y is None:
+        if play_res_y >= 1900:
+            mg_bottom_y = 1440  # Directly beneath 9:16 motion graphic card (typically ending ~1340px)
+        elif play_res_y <= 1100:
+            mg_bottom_y = int(play_res_y * 0.82)
+        else:
+            mg_bottom_y = int(play_res_y * 0.78)
+    mg_pos_prefix = rf"{{\an5\pos({center_x},{mg_bottom_y})}}"
+
+    suppress_motion_graphics = kwargs.get("suppress_motion_graphics", False)
 
     for chunk_id, chunk_data in candidate_items:
         chunk_start = chunk_data.get("start", 0.0)
@@ -438,8 +475,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if text:
                 m_start = _map_time(chunk_start)
                 m_end = _map_time(chunk_end)
-                if _is_inside_motion_graphic(m_start, m_end):
+                is_inside_mg = _is_inside_motion_graphic(m_start, m_end)
+                if is_inside_mg and suppress_motion_graphics:
                     continue
+                pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
                 start_str = format_ass_time(m_start)
                 end_str = format_ass_time(m_end)
                 dialogue_lines.append(
@@ -450,14 +489,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         # Create subtitle event with active-word kinetic spring bounce animation
         for active_idx, active_word_info in enumerate(words):
             word_start = active_word_info["start"]
-            
+
             if active_idx < len(words) - 1:
                 word_end = words[active_idx + 1]["start"]
             else:
                 word_end = chunk_data.get("end", active_word_info["end"])
                 if word_end - word_start < 0.2:
                     word_end = word_start + 0.2
-            
+
             if word_end <= word_start:
                 word_end = word_start + 0.15
 
@@ -467,9 +506,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if mapped_end <= mapped_start:
                 mapped_end = mapped_start + 0.15
 
-            # Suppress subtitle if this spoken word collides with an active motion graphic!
-            if _is_inside_motion_graphic(mapped_start, mapped_end):
+            # If an active motion graphic overlay is present, place caption at bottom of motion graphics
+            is_inside_mg = _is_inside_motion_graphic(mapped_start, mapped_end)
+            if is_inside_mg and suppress_motion_graphics:
                 continue
+
+            pos_prefix = mg_pos_prefix if is_inside_mg else default_pos_prefix
 
             start_str = format_ass_time(mapped_start)
             end_str = format_ass_time(mapped_end)

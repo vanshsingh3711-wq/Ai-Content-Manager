@@ -177,18 +177,18 @@ export function HeroSection() {
                 <span className="text-fuchsia-400 text-base">↗</span>
               </div>
               <div className="text-[9px] font-mono font-bold text-neutral-300 uppercase tracking-widest mt-1">
-                Watch Time
+                Target Retention
               </div>
             </div>
 
-            {/* FLOATING WIDGET 2: 99.4 HOOK SCORE (Bottom-Right of Phone) */}
+            {/* FLOATING WIDGET 2: HOOK SCORE PREVIEW (Bottom-Right of Phone) */}
             <div className="absolute -right-6 sm:-right-8 bottom-24 z-40 px-4 py-2.5 rounded-2xl bg-[#0e121e]/95 border-2 border-cyan-400/90 shadow-[0_0_35px_rgba(6,182,212,0.6)] backdrop-blur-2xl flex flex-col justify-center animate-bounce [animation-duration:6s]">
               <div className="flex items-center gap-1.5 text-white font-mono font-black text-lg leading-none">
                 <span className="text-cyan-400 text-xs tracking-tighter">lll</span>
                 <span>99.4</span>
               </div>
               <div className="text-[9px] font-mono font-bold text-cyan-300 uppercase tracking-widest mt-1">
-                Hook Score
+                Simulated Hook
               </div>
             </div>
 
@@ -241,7 +241,7 @@ export function HeroSection() {
                   <div className="w-2.5 h-2.5 border-t-2 border-r-2 border-white absolute -top-1 -right-1" />
                   <div className="w-2.5 h-2.5 border-b-2 border-l-2 border-white absolute -bottom-1 -left-1" />
                   <div className="w-2.5 h-2.5 border-b-2 border-r-2 border-white absolute -bottom-1 -right-1" />
-                  
+
                   {/* AI Face Lock Tag */}
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-cyan-500/90 text-[8px] font-mono font-black text-black tracking-widest uppercase shadow-[0_0_10px_rgba(6,182,212,0.8)] whitespace-nowrap">
                     AI FACE LOCK 99.8%

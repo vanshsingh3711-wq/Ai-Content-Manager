@@ -73,7 +73,7 @@ export function ComparisonSlider() {
               </span>
             </div>
             <span className="text-[10px] font-mono text-cyan-300 mt-1 font-bold">
-              ⚡ 99.4% WHISPER SYNC
+              ⚡ WORD-LEVEL WHISPER SYNC
             </span>
           </div>
 

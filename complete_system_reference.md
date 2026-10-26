@@ -49,7 +49,7 @@ graph TB
 
     subgraph "Worker (Celery)"
         WORKER["apps/worker/tasks/video_pipeline.py<br/>Celery Task"]
-        
+
         subgraph "Services Layer"
             INGEST["ingest_manager.py"]
             TRANS["transcriber.py<br/>faster-whisper"]
@@ -179,7 +179,7 @@ Uses FFmpeg to extract a 16kHz mono WAV file. This format is required by faster-
 
 #### 3b. Transcription — faster-whisper
 
-**Model**: `small` (int8 quantized, CPU)  
+**Model**: `small` (int8 quantized, CPU)
 **NOT using any TTS (text-to-speech)**. This is **STT (speech-to-text)** — it listens to the video audio and converts speech to text.
 
 ```python
@@ -241,7 +241,7 @@ Parses stderr for `silence_start` / `silence_end` events.
 #### 4b. Audio Region Classification
 `classify_audio_regions()` takes the entire timeline and labels every moment as one of:
 - **`SPEECH`** — Whisper detected words here
-- **`SILENCE`** — FFmpeg detected low volume here  
+- **`SILENCE`** — FFmpeg detected low volume here
 - **`NON_SPEECH_AUDIO`** — Neither speech nor silence (music, ambient noise)
 
 These regions are sent to the AI Director as context so it knows where to place B-roll (ideally during `NON_SPEECH_AUDIO` or `SILENCE` gaps).
@@ -535,7 +535,7 @@ After rendering, the compositor validates:
    ```
    s3://ai-video-manager-uploads/rendered-exports/{user_id}/{job_id}_final.mp4
    ```
-   
+
 2. **Local dev fallback**: Copies to `media_temp/rendered-exports/...` and returns `http://localhost:8000/api/v1/storage/download?key=...`
 
 3. **YouTube Shorts publish** (if OAuth token provided):
@@ -555,7 +555,7 @@ After rendering, the compositor validates:
 
 **Location**: [`packages/motion-components/`](file:///media/vansh/167267A5726787F7/Coding/Main%20Projects/Ai%20Content%20Manager/packages/motion-components/)
 
-This is a **future** React/Remotion-based rendering engine (not yet integrated into the pipeline). Currently, the pipeline uses FFmpeg directly. This package will eventually replace the FFmpeg compositor for more advanced animations.
+This package powers the **React/Remotion motion graphic overlay engine**. It is integrated into the worker pipeline via [`services/remotion_renderer.py`](file:///media/vansh/167267A5726787F7/Coding/Main%20Projects/Ai%20Content%20Manager/apps/worker/services/remotion_renderer.py), which invokes the Remotion CLI to render transparent Apple ProRes 4444 `.mov` video layers (preserving alpha transparency). The master [`compositor.py`](file:///media/vansh/167267A5726787F7/Coding/Main%20Projects/Ai%20Content%20Manager/apps/worker/services/compositor.py) then overlays these animations onto the video stream via FFmpeg filtergraphs. Full end-to-end timeline composition is orchestrated by FFmpeg.
 
 **Module structure** (23 modules):
 

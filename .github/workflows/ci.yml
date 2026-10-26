@@ -1,0 +1,86 @@
+name: CI Pipeline — Automated Verification & Engineering Quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker-and-backend-tests:
+    name: Python Worker & Service Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install System FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r apps/worker/requirements.txt
+          pip install pytest pytest-mock
+
+      - name: Run Worker Test Suite & Regression Checks
+        env:
+          DEEPSEEK_API_KEY: "test_mock_key"
+          CELERY_BROKER_URL: "memory://"
+          CELERY_RESULT_BACKEND: "cache+memory://"
+        run: |
+          python -m pytest apps/worker/tests/ -v --durations=10
+
+  frontend-and-motion-tests:
+    name: Frontend & Motion Graphic Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Run Web Workspace Tests
+        run: npm run test --workspace=@ai-content-manager/web
+
+      - name: Run Motion Components Tests
+        run: npm run test --workspace=@ai-content-manager/motion-components
+
+      - name: Production Web Build Verification
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k"
+          CLERK_SECRET_KEY: "sk_test_mock_secret_key"
+        run: npm run build --workspace=@ai-content-manager/web
+
+  docker-build-verification:
+    name: Docker Worker Build Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Worker Dockerfile Build
+        run: |
+          docker build -t ai-director-worker:ci -f apps/worker/Dockerfile .

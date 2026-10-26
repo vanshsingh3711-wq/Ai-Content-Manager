@@ -33,14 +33,23 @@ def _log(tag: str, msg: str):
     print(f"  [COMPOSITOR:{tag}] {msg}", flush=True)
 
 
+def prepare_ffmpeg_command(cmd: List[str], threads: int = 2) -> List[str]:
+    """Position global and output encoder options correctly."""
+    final_cmd = list(cmd)
+    if not final_cmd:
+        return final_cmd
+    if "-hide_banner" not in final_cmd:
+        final_cmd.insert(1, "-hide_banner")
+    has_threads = any(arg == "-threads" or arg.startswith("-threads:") for arg in final_cmd)
+    if not has_threads and len(final_cmd) >= 2:
+        final_cmd.insert(-1, "-threads")
+        final_cmd.insert(-1, str(threads))
+    return final_cmd
+
+
 def _run_ffmpeg(cmd: List[str], label: str) -> subprocess.CompletedProcess:
     """Run an FFmpeg command, log it, and raise on failure."""
-    final_cmd = list(cmd)
-    if "-threads" not in final_cmd:
-        # Cap to 2 CPU threads to leave headroom for OS window manager and UI apps
-        final_cmd[1:1] = ["-threads", "2"]
-    if "-hide_banner" not in final_cmd:
-        final_cmd[1:1] = ["-hide_banner"]
+    final_cmd = prepare_ffmpeg_command(cmd, threads=2)
         
     _log("CMD", f"({label}) {' '.join(final_cmd[:8])}... ({len(final_cmd)} args)")
     result = subprocess.run(final_cmd, capture_output=True, text=True)

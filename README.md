@@ -51,7 +51,7 @@ Whether starting from **audio voiceovers**, **written scripts**, or **raw multi-
 <div align="center">
   <h3>Hero Showcase & Real-Time Conversion Engine</h3>
   <img src="./docs/assets/landing_hero.png" alt="AI Director Landing Hero" width="95%" style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
-  <p><i>The landing experience featuring the 3 universal creation pathways (Audio, Script, Raw Video), dynamic 3D mobile simulation, and real-time hook analytics (+84% watch time, 99.4 hook score).</i></p>
+  <p><i>The landing experience featuring the 3 universal creation pathways (Audio, Script, Raw Video), dynamic 3D mobile simulation, and illustrative hook analytics UI preview (demonstrating simulated metrics).</i></p>
 </div>
 
 <br />
@@ -169,6 +169,25 @@ AI Director is built around three distinct creative starting points, allowing cr
 └──────────────────────────┴──────────────────────────┴──────────────────────────────────┘
 ```
 
+### 📋 Feature Implementation & Architecture Maturity Matrix
+
+| Capability / Module | Maturity Status | Technical Scope & Implementation Ground Truth |
+| :--- | :--- | :--- |
+| **Acoustic Transcription** | `Implemented` | `faster-whisper` (int8 quantized) with millisecond word timestamps and token stitching. |
+| **Silence Deletion & Speech Pruning** | `Implemented` | FFmpeg `silencedetect` with configurable dB thresholds (`-30dB`) avoiding transient clicks. |
+| **Multi-Agent AI Planning** | `Implemented` | DeepSeek R1/V3 cognitive agents (`broll_planner.py`, `motion_graphic_planner.py`, `chunk_director.py`). |
+| **Resilient Network Retry Layer** | `Implemented` | Bounded exponential backoff with full jitter, deadline control, and terminal exception raising (`network_retry.py`). |
+| **Pexels 4K B-Roll Asset Sourcing** | `Implemented` | Aspect-ratio filtered video search and local download caching with bounded retry protection (`asset_manager.py`). |
+| **Remotion Motion Graphics** | `Implemented` | Transparent ProRes 4444 MOV overlay rendering for animated charts, cards, and diagrams (`remotion_renderer.py`). |
+| **Kinetic ASS Subtitles** | `Implemented` | Syllable-level karaoke highlighting with carry-normalized centisecond timestamps and overlay collision avoidance (`subtitle_generator.py`). |
+| **FFmpeg Multi-Track Compositor** | `Implemented` | Chunked filtergraph assembly with explicit output encoder thread constrainment (`-threads 2`) and SHA-256 segment caching (`compositor.py`). |
+| **Non-Linear Studio Web NLE** | `Implemented` | React 19 / Next.js canvas timeline with 4-track scrubbing, playhead controls, and media management (`apps/web`). |
+| **NLE Timeline Interchange** | `Implemented` | Export to Adobe Premiere Pro (`.xml`), Final Cut Pro (`.fcpxml`), and DaVinci Resolve (`.edl`). |
+| **Autonomous Web Evidence Capture** | `Experimental` | Headless Chromium scraper (`fast_web_capture.mjs`) for live GitHub/financial page capture. |
+| **Green-Screenless Depth Matting** | `Experimental` | Foreground subject segmentation (`depth_matting.py`); requires optional local depth weights. |
+| **MediaPipe Face Safe-Zone Centering** | `Experimental` | 2D face tracking coordinate estimation for vertical 9:16 platform safe zones. |
+| **Direct Social OAuth Dispatch** | `Planned` | Automated 1-click publishing gateway to YouTube/TikTok/Instagram (requires user credentials). |
+
 ### 1. Multi-Agent AI Director Swarm
 Instead of relying on a single brittle prompt, AI Director employs a collaborative council of specialized LLM agents (DeepSeek Chat / OpenRouter):
 - **B-Roll Planner**: Analyzes narrative semantic beats and dispatches precision keyword queries to Pexels and high-definition asset libraries.
@@ -216,7 +235,7 @@ graph TB
         JOBS_API["Job Dispatch & Telemetry<br/>(apps/api/routers/jobs.py)"]
         VIDEOS_API["Video Management Router<br/>(apps/api/routers/videos.py)"]
         STORAGE_API["S3/R2 Presigned URLs<br/>(apps/api/routers/storage.py)"]
-        
+
         API --> AUTH
         API --> COPILOT_API
         API --> JOBS_API
@@ -231,14 +250,14 @@ graph TB
 
     subgraph "Distributed Worker Engine (Celery)"
         WORKER["apps/worker/tasks/video_pipeline.py"]
-        
+
         subgraph "Acoustic & Vision Pre-Processing"
             INGEST["Ingest & Audio Extraction"]
             WHISPER["Faster-Whisper STT<br/>(Word Timestamps)"]
             VAD["Silence & Breath Detector<br/>(FFmpeg silencedetect)"]
             VISION["Visual Analyzer<br/>(OpenCV + MediaPipe)"]
         end
-        
+
         subgraph "AI Director Cognitive Swarm"
             DEEPSEEK["DeepSeek Reasoning Core<br/>(OpenRouter API)"]
             BROLL_PL["B-Roll Planner"]

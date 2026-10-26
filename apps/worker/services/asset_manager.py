@@ -1,6 +1,7 @@
 import os
 import time
 import uuid
+import socket
 import requests
 import json
 import shutil
@@ -15,24 +16,30 @@ except ImportError:
     except Exception:
         settings = None
 
+from services.network_retry import bounded_network_retry, NetworkRetryExhaustedError
+
+
 def _wait_for_internet_retry(func):
-    def wrapper(*args, **kwargs):
-        attempt = 1
-        while True:
-            try:
-                return func(*args, **kwargs)
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-                print(f"[!] Network connection lost. Waiting 10s for internet to return (Attempt {attempt})...")
-                time.sleep(10)
-                attempt += 1
-            except requests.exceptions.HTTPError as e:
-                if e.response is not None and e.response.status_code in [429, 500, 502, 503, 504]:
-                    print(f"[!] API rate limit or server error ({e.response.status_code}). Retrying in 10s (Attempt {attempt})...")
-                    time.sleep(10)
-                    attempt += 1
-                else:
-                    raise
-    return wrapper
+    """Bounded retry decorator for asset fetching (up to 5 attempts with backoff and jitter)."""
+    def _is_retryable_http_error(exc: Exception) -> bool:
+        if isinstance(exc, requests.exceptions.HTTPError):
+            return exc.response is not None and exc.response.status_code in [429, 500, 502, 503, 504]
+        return True
+
+    return bounded_network_retry(
+        max_retries=5,
+        base_delay=1.0,
+        max_delay=30.0,
+        backoff_factor=2.0,
+        jitter=True,
+        retryable_exceptions=(
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.HTTPError,
+            socket.error,
+        ),
+        retry_condition=_is_retryable_http_error,
+    )(func)
 
 @_wait_for_internet_retry
 def fetch_broll_assets(

@@ -4,9 +4,12 @@ import json
 import time
 import asyncio
 import subprocess
+import shutil
 from dotenv import load_dotenv
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(ROOT_DIR, ".env"))
+
 # Ensure sufficient disk space for Remotion and FFmpeg temp files
 os.environ["TMPDIR"] = os.path.join(ROOT_DIR, "media_temp/tmp")
 os.environ["TEMP"] = os.environ["TMPDIR"]
@@ -20,6 +23,7 @@ from services.compositor import render_video_pipeline
 from services.transcriber import transcribe_and_compress
 from services.subtitle_generator import generate_ass_subtitles
 from services.sfx_manager import fetch_sfx
+from services.asset_manager import fetch_broll_assets
 
 # High-retention finance script for 1-minute YouTube Short
 SCRIPT_TEXT = """Ninety-two percent of professional Wall Street fund managers fail to beat one simple index fund.
@@ -48,7 +52,7 @@ async def generate_speech(audio_mp3: str, audio_wav: str):
         "-ac", "1", "-ar", "16000",
         audio_wav
     ], capture_output=True, check=True)
-    
+
     # Get exact duration
     dur_proc = subprocess.run([
         "ffprobe", "-v", "error", "-show_entries", "format=duration",
@@ -105,6 +109,12 @@ def main():
     # Step 1: Voiceover
     duration = asyncio.run(generate_speech(audio_mp3, audio_wav))
 
+    # Seed ticker background if available
+    test_bg = os.path.join(ROOT_DIR, "media_temp/test_assets/broll_test_finance.mp4")
+    if os.path.exists(test_bg) and (not os.path.exists(ticker_bg) or os.path.getsize(ticker_bg) < 1000):
+        print(f"      Seeding dynamic trading background canvas: {test_bg}")
+        shutil.copy(test_bg, ticker_bg)
+
     # Step 2: Base video
     create_base_canvas(duration, audio_wav, raw_video, ticker_bg)
 
@@ -113,30 +123,7 @@ def main():
     bracketed_transcript, timestamp_map = transcribe_and_compress(audio_wav)
     print(f"      Extracted {len(timestamp_map)} word-accurate chunks.")
 
-    # Step 4: Subtitles
-    print("[4/6] ⚡ Generating viral ASS subtitles with yellow word highlight...")
-    generate_ass_subtitles(
-        timestamp_map=timestamp_map,
-        output_ass_path=ass_subs,
-        font_size=60,
-        primary_color="&H00FFFFFF",
-        highlight_color="&H0000FFFF"
-    )
-
-    # Step 5: B-roll map & edits
-    print("[5/6] 🎬 Assembling edit decision list (B-rolls + Remotion Motion Graphics + SFX)...")
-    broll_map = {
-        "broll_wallstreet": f"{TEMP_DIR}/assets/broll_wallstreet.mp4",
-        "broll_cash_count": f"{TEMP_DIR}/assets/broll_cash_count.mp4",
-        "broll_supercomputers": f"{TEMP_DIR}/assets/broll_supercomputers.mp4",
-        "broll_analysts": f"{TEMP_DIR}/assets/broll_analysts.mp4",
-        "broll_crash": f"{TEMP_DIR}/assets/broll_crash.mp4",
-        "broll_cash": f"{TEMP_DIR}/assets/broll_cash.mp4",
-        "broll_magnifying_glass": f"{TEMP_DIR}/assets/broll_magnifying_glass.mp4",
-        "broll_skyline": f"{TEMP_DIR}/assets/broll_skyline.mp4",
-        "broll_phone_investing": f"{TEMP_DIR}/assets/broll_phone_investing.mp4",
-    }
-
+    # Define edit decision list (B-rolls, Motion Graphics, Audio/SFX)
     edits = [
         # --- BEAT 1: HOOK - INVESTIGATION EVIDENCE (0.0s - 5.2s) ---
         # "92% of professional Wall Street fund managers fail to beat one simple index fund."
@@ -178,6 +165,7 @@ def main():
         {
             "action": "b_roll",
             "trigger_id": "broll_wallstreet",
+            "search_query": "wall street stock exchange buildings new york",
             "broll_path": f"{TEMP_DIR}/assets/broll_wallstreet.mp4",
             "transition": "fade",
             "start": 5.2,
@@ -196,6 +184,7 @@ def main():
         {
             "action": "b_roll",
             "trigger_id": "broll_cash_count",
+            "search_query": "counting dollar bills money cash",
             "broll_path": f"{TEMP_DIR}/assets/broll_cash_count.mp4",
             "transition": "fade",
             "start": 7.6,
@@ -214,6 +203,7 @@ def main():
         {
             "action": "b_roll",
             "trigger_id": "broll_supercomputers",
+            "search_query": "server room data center technology supercomputer",
             "broll_path": f"{TEMP_DIR}/assets/broll_supercomputers.mp4",
             "transition": "fade",
             "start": 9.8,
@@ -232,6 +222,7 @@ def main():
         {
             "action": "b_roll",
             "trigger_id": "broll_analysts",
+            "search_query": "financial analysts investment meeting",
             "broll_path": f"{TEMP_DIR}/assets/broll_analysts.mp4",
             "transition": "fade",
             "start": 12.0,
@@ -283,6 +274,7 @@ def main():
         {
             "action": "b_roll",
             "trigger_id": "broll_crash",
+            "search_query": "stock market crash red candle financial chart",
             "broll_path": f"{TEMP_DIR}/assets/broll_crash.mp4",
             "transition": "fade",
             "start": 21.5,
@@ -354,6 +346,7 @@ def main():
         {
             "action": "b_roll",
             "trigger_id": "broll_cash",
+            "search_query": "falling dollars money wealth cash",
             "broll_path": f"{TEMP_DIR}/assets/broll_cash.mp4",
             "transition": "fade",
             "start": 39.5,
@@ -480,6 +473,34 @@ def main():
         }
     ]
 
+    # Step 4: Subtitles (anchored below motion graphics when active, centered on B-roll)
+    print("[4/6] ⚡ Generating viral ASS subtitles (anchored below motion graphics when active)...")
+    generate_ass_subtitles(
+        timestamp_map=timestamp_map,
+        output_ass_path=ass_subs,
+        edits=edits,
+        font_size=60,
+        primary_color="&H00FFFFFF",
+        highlight_color="&H0000FFFF",
+        is_faceless=True
+    )
+
+    # Step 5: B-roll downloads via Pexels API
+    print("[5/6] 🎬 Fetching contextual 9:16 B-rolls from Pexels API...")
+    broll_map = fetch_broll_assets(
+        edits=edits,
+        assets_dir=f"{TEMP_DIR}/assets",
+        aspect_ratio="9:16",
+        cache_dir=os.path.join(ROOT_DIR, "media_temp/broll_cache")
+    )
+    print(f"      Downloaded/cached {len(broll_map)} vertical B-roll assets.")
+    for edit in edits:
+        if edit.get("action") == "b_roll":
+            tid = edit.get("trigger_id")
+            if tid and tid in broll_map:
+                edit["broll_path"] = broll_map[tid]
+                print(f"      [B-ROLL] Bound '{tid}' -> {broll_map[tid]}")
+
     # Step 6: Render final composited MP4
     print("[6/6] 🚀 Rendering complete video pipeline (FFmpeg + Remotion + ASS Karaoke)...")
     start_time = time.time()
@@ -498,8 +519,14 @@ def main():
         }
     )
     elapsed = time.time() - start_time
+
+    # Also copy to youtube_finance_faceless_short.mp4
+    short_path = os.path.join(ROOT_DIR, "youtube_finance_faceless_short.mp4")
+    shutil.copy(rendered_path, short_path)
+
     print(f"\n✨ SUCCESS! Video rendered in {elapsed:.1f} seconds.")
     print(f"📁 Output Video Location: {os.path.abspath(rendered_path)}")
+    print(f"📁 Short Video Location:  {os.path.abspath(short_path)}")
     print(f"📊 File Size: {os.path.getsize(rendered_path) / 1024 / 1024:.2f} MB")
 
 if __name__ == "__main__":

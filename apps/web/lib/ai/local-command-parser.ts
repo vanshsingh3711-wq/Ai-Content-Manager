@@ -875,16 +875,26 @@ export function parseLocalCommand(prompt: string, context: EditorContext): Local
         // badge, graphic, card, or specific motion graphic template
         const combinedPromptText = `${elementType} ${explicitText || ""}`.trim().toLowerCase();
         const targetSearch = (explicitText || elementType).toLowerCase().trim();
-        const matchedConfig = GRAPHIC_CONFIGS.find(
-          (c) =>
-            c.compositionId === combinedPromptText ||
-            c.compositionId === targetSearch ||
-            c.compositionId.replace(/-/g, "_") === combinedPromptText.replace(/-/g, "_") ||
-            c.triggers.some((t) => combinedPromptText === t || combinedPromptText.includes(t)) ||
-            (explicitText && (c.compositionId === explicitText || c.triggers.some((t) => explicitText === t || explicitText.includes(t)))) ||
-            (elementType !== "graphic" && (c.compositionId === elementType || elementType.includes(c.compositionId) || c.triggers.some((t) => elementType === t || elementType.includes(t)))) ||
-            (targetSearch !== "graphic" && c.triggers.some((t) => targetSearch === t || (t.length > 3 && targetSearch.includes(t))))
-        );
+        const matchedConfig =
+          (explicitText &&
+            GRAPHIC_CONFIGS.find(
+              (c) =>
+                c.compositionId === explicitText ||
+                c.compositionId.replace(/-/g, "_") === explicitText.replace(/-/g, "_") ||
+                c.triggers.some((t) => t === explicitText)
+            )) ||
+          GRAPHIC_CONFIGS.find(
+            (c) =>
+              c.compositionId === combinedPromptText ||
+              c.compositionId === targetSearch ||
+              c.compositionId.replace(/-/g, "_") === combinedPromptText.replace(/-/g, "_") ||
+              c.compositionId.replace(/-/g, "_") === targetSearch.replace(/-/g, "_") ||
+              c.triggers.some((t) => combinedPromptText === t || targetSearch === t) ||
+              (explicitText && c.triggers.some((t) => explicitText === t || (t.length > 3 && explicitText.includes(t)))) ||
+              (elementType !== "graphic" && (c.compositionId === elementType || c.triggers.some((t) => elementType === t || (t.length > 3 && elementType.includes(t))))) ||
+              (targetSearch !== "graphic" && c.triggers.some((t) => targetSearch === t || (t.length > 3 && new RegExp(`\\b${t}\\b`, "i").test(targetSearch)))) ||
+              c.triggers.some((t) => t.length > 4 && new RegExp(`\\b${t}\\b`, "i").test(combinedPromptText))
+          );
 
         const compositionId = matchedConfig ? matchedConfig.compositionId : "pop_up_badge";
         const props = matchedConfig
