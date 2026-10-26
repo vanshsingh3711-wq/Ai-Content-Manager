@@ -13,6 +13,7 @@ def get_utc_now() -> datetime:
 class SocialPlatform(str, enum.Enum):
     YOUTUBE = "youtube"
     INSTAGRAM = "instagram"
+    TIKTOK = "tiktok"
     LINKEDIN = "linkedin"
 
 
@@ -86,16 +87,16 @@ class SocialAccount(SQLModel, table=True):
     )
     platform: SocialPlatform = Field(
         sa_column=Column(Enum(SocialPlatform), nullable=False),
-        description="Social platform type (youtube, instagram, linkedin)",
+        description="Social platform type (youtube, instagram, tiktok, linkedin)",
     )
     access_token: str = Field(
         sa_column=Column(Text, nullable=False),
-        description="OAuth2 Access Token",
+        description="Encrypted OAuth2 Access Token",
     )
     refresh_token: Optional[str] = Field(
         default=None,
         sa_column=Column(Text, nullable=True),
-        description="OAuth2 Refresh Token for long-lived access",
+        description="Encrypted OAuth2 Refresh Token for long-lived access",
     )
     token_expires_at: Optional[datetime] = Field(
         default=None,
@@ -107,9 +108,64 @@ class SocialAccount(SQLModel, table=True):
         sa_column=Column(String(255), nullable=True),
         description="External account / channel identifier on the platform",
     )
+    account_name: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String(255), nullable=True),
+        description="Display name / Channel title / Handle",
+    )
+    account_avatar: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Profile picture or channel avatar URL",
+    )
+    scopes: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Space-delimited list of authorized scopes",
+    )
+    is_active: bool = Field(
+        default=True,
+        description="Whether this integration connection is actively enabled",
+    )
+    created_at: datetime = Field(
+        default_factory=get_utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=get_utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
     # Relationships
     user: Optional[User] = Relationship(back_populates="social_accounts")
+
+    def set_tokens(self, plain_access: str, plain_refresh: Optional[str] = None) -> None:
+        """Encrypts and sets tokens using the security encryption layer."""
+        from services.security import encrypt_token
+        self.access_token = encrypt_token(plain_access) or ""
+        if plain_refresh is not None:
+            self.refresh_token = encrypt_token(plain_refresh)
+        self.updated_at = get_utc_now()
+
+    def get_decrypted_access_token(self) -> str:
+        """Decrypts and returns the active access token."""
+        from services.security import decrypt_token
+        return decrypt_token(self.access_token) or ""
+
+    def get_decrypted_refresh_token(self) -> Optional[str]:
+        """Decrypts and returns the refresh token if present."""
+        if not self.refresh_token:
+            return None
+        from services.security import decrypt_token
+        return decrypt_token(self.refresh_token)
+
+    def is_token_expired(self) -> bool:
+        """Checks if the access token has passed its expiration timestamp."""
+        if not self.token_expires_at:
+            return False
+        now = get_utc_now()
+        # Treat as expired 60 seconds early to avoid race conditions
+        return self.token_expires_at <= now
 
 
 class VideoJob(SQLModel, table=True):

@@ -8,19 +8,32 @@ from typing import List, Tuple
 from .schemas import SubjectEvent, BoundingBox
 
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "pose_landmarker_lite.task")
+LOCAL_FALLBACK_PATH = os.path.join(os.path.dirname(__file__), "pose_landmarker_lite.task")
+
+
+def get_pose_model_path() -> str:
+    """Resolves and provisions the MediaPipe pose landmarker model via model_registry."""
+    try:
+        from services.model_registry import get_model_path, ensure_model_provisioned
+        p = get_model_path("pose_landmarker")
+        if not p.exists() or p.stat().st_size < 4 * 1024 * 1024:
+            return str(ensure_model_provisioned("pose_landmarker"))
+        return str(p)
+    except Exception:
+        if not os.path.exists(LOCAL_FALLBACK_PATH):
+            print("[*] Downloading Mediapipe Pose model to fallback path...")
+            urllib.request.urlretrieve(MODEL_URL, LOCAL_FALLBACK_PATH)
+        return LOCAL_FALLBACK_PATH
+
 
 def detect_subjects(extracted_frames: List[Tuple[float, str]]) -> List[SubjectEvent]:
     """
     Detects the primary subject (person) in frames using Mediapipe Pose Tasks API.
     """
-    if not os.path.exists(MODEL_PATH):
-        print("[*] Downloading Mediapipe Pose model...")
-        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-
+    model_path = get_pose_model_path()
     subjects = []
     
-    base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
+    base_options = python.BaseOptions(model_asset_path=model_path)
     options = vision.PoseLandmarkerOptions(
         base_options=base_options,
         output_segmentation_masks=False,

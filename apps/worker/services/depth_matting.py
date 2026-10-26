@@ -54,7 +54,11 @@ def get_model_path() -> Path:
     env_path = os.environ.get("RVM_MODEL_PATH")
     if env_path:
         return Path(env_path).resolve()
-    return DEFAULT_MODEL_PATH
+    try:
+        from services.model_registry import get_model_path as registry_path
+        return registry_path("rvm_mobilenetv3")
+    except Exception:
+        return DEFAULT_MODEL_PATH
 
 
 def is_depth_matting_available() -> bool:
@@ -72,8 +76,15 @@ def is_depth_matting_available() -> bool:
 def ensure_model_downloaded(target_path: Optional[Path] = None, timeout: int = 180) -> Path:
     """
     Ensure the RVM mobilenetv3 ONNX model is downloaded and cached.
-    Downloads from GitHub releases if missing or incomplete.
+    Leverages central model_registry for atomic verified downloads.
     """
+    if target_path is None:
+        try:
+            from services.model_registry import ensure_model_provisioned
+            return ensure_model_provisioned("rvm_mobilenetv3", timeout=timeout)
+        except Exception as e:
+            _log("WARN", f"model_registry delegate fallback: {e}")
+
     out_path = Path(target_path) if target_path else get_model_path()
     if out_path.exists() and out_path.stat().st_size > 10 * 1024 * 1024:
         return out_path
