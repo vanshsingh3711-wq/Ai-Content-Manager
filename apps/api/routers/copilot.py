@@ -1186,14 +1186,14 @@ async def process_copilot_prompt(request: EditorCopilotRequest) -> EditPlanPropo
                 }
                 ai_model = request.options.ai_model if request.options else "DeepSeek V3"
                 proposal: Optional[CopilotIntentProposal] = reason_copilot_intent(
-                    prompt=clean_prompt,
+                    prompt=norm_prompt,
                     context=llm_context,
                     ai_model_pref=ai_model
                 )
 
                 if proposal:
-                    start_time = proposal.start_time if has_explicit_time else extracted_start
-                    end_time = proposal.end_time if has_explicit_time else extracted_end
+                    start_time = extracted_start if has_explicit_time else proposal.start_time
+                    end_time = extracted_end if has_explicit_time else proposal.end_time
 
                     if proposal.intent == "clarification_needed":
                         summary = proposal.clarification_prompt or proposal.summary

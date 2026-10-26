@@ -168,7 +168,7 @@ def reason_copilot_intent(
 
     deepseek_key = getattr(settings, "DEEPSEEK_API_KEY", None) or os.getenv("DEEPSEEK_API_KEY")
 
-    if deepseek_key:
+    if deepseek_key and not deepseek_key.startswith("test_") and not deepseek_key.startswith("mock_"):
         try:
             client = OpenAI(
                 api_key=deepseek_key,
@@ -261,6 +261,8 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
     start_time = round(playhead, 2)
     end_time = min(duration, round(start_time + 3.5, 2))
     from_to = re.search(r"\b(?:from|between)\s+([0-9:.]+(?:s|sec|seconds)?)\s*(?:to|and)\s+([0-9:.]+(?:s|sec|seconds)?)\b", lower)
+    at_for = re.search(r"\bat\s+([0-9:.]+(?:s|sec|seconds)?)\s*(?:for|duration)\s+([0-9:.]+(?:s|sec|seconds)?)\b", lower)
+    at_point = re.search(r"\bat\s+([0-9:.]+(?:s|sec|seconds)?)\b", lower)
     if from_to:
         try:
             t1 = _parse_time_token(from_to.group(1))
@@ -269,6 +271,21 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
                 start_time = round(t1, 2)
                 effective_duration = max(duration, t2)
                 end_time = min(effective_duration, round(t2, 2))
+        except Exception:
+            pass
+    elif at_for:
+        try:
+            t1 = _parse_time_token(at_for.group(1))
+            d = _parse_time_token(at_for.group(2))
+            start_time = round(t1, 2)
+            end_time = min(duration, round(t1 + d, 2))
+        except Exception:
+            pass
+    elif at_point:
+        try:
+            t1 = _parse_time_token(at_point.group(1))
+            start_time = round(t1, 2)
+            end_time = min(duration, round(t1 + 3.5, 2))
         except Exception:
             pass
     else:
@@ -283,6 +300,25 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
                     end_time = min(effective_duration, round(t2, 2))
             except Exception:
                 pass
+
+    # Metric Reveal / KPI (e.g. "add animated metric counter", "metric reveal", "kpi counter")
+    if re.search(r"\b(?:metric|kpi)\b", lower) and re.search(r"\b(?:counter|reveal|card|graphic|motion)\b", lower):
+        return CopilotIntentProposal(
+            intent="add_graphic",
+            confidence=0.95,
+            start_time=start_time,
+            end_time=end_time,
+            action_type="graphic",
+            summary=f"Metric reveal card from {start_time:.1f}s to {end_time:.1f}s",
+            graphic_template="metric_reveal",
+            graphic_props={
+                "label": "KEY METRIC",
+                "metric": "+140%",
+                "delta": "Target Exceeded",
+                "personality": "energetic",
+            },
+            suggested_actions=["Adjust metric values", "Change metric style"],
+        )
 
     # Animated Title / Hero Reveal (e.g., "Add a blue animated title saying 'The Solution' from 01:23 to 01:26")
     if (
@@ -323,7 +359,11 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
         re.search(r"\b(?:counter|counting|subscribers?|followers?|views?)\b", lower)
         and re.search(r"\b(?:animat\w*|motion|card|graphic|kpi|ticker)\b", lower)
     ) or re.search(r"\b(?:animated\s+counter|subscriber\s+counter|follower\s+counter)\b", lower):
-        count_match = re.search(r"\b(?:to|counting\s+to|reach(?:ing)?\s+to|at)?\s*([0-9]+(?:\.[0-9]+)?)\s*([kmb])?\b", lower)
+        count_match = re.search(r"(?:counting\s+to|reach(?:ing)?\s+to|target\s+of)\s+([0-9]+(?:\.[0-9]+)?)\s*([kmb])?\b", lower)
+        if not count_match:
+            count_match = re.search(r"\b([0-9]+(?:\.[0-9]+)?)\s*([kmb])\b", lower)
+        if not count_match:
+            count_match = re.search(r"\bto\s+([0-9]+(?:\.[0-9]+)?)(?!\s*[:0-9])\s*([kmb])?\b", lower)
         to_val = 50000
         suffix = "k"
         if count_match:
@@ -349,7 +389,7 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
             start_time=start_time,
             end_time=end_time,
             action_type="graphic",
-            summary=f"Animated subscriber counter from {start_time:.1f}s to {end_time:.1f}s counting to {count_match.group(0).strip() if count_match else to_val}",
+            summary=f"Animated subscriber counter from {start_time:.1f}s to {end_time:.1f}s counting to {to_val}",
             graphic_template="animated_counter",
             graphic_props={
                 "from": 0,
@@ -380,8 +420,8 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
         )
 
     # App Screen Upload
-    if re.search(r"\b(?:upload|app|screen\s+upload|software|dashboard)\b", lower):
-        if re.search(r"\b(?:graphic|graphics|motion|animat\w*|card|ui)\b", lower):
+    if re.search(r"\b(?:upload\w*|screen\s*upload|software|dashboard)\b", lower):
+        if re.search(r"\b(?:graphic|graphics|motion|animat\w*|card|ui|screen)\b", lower):
             return CopilotIntentProposal(
                 intent="add_graphic",
                 confidence=0.92,
@@ -393,7 +433,7 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
                 graphic_props={
                     "title": "VIDEO UPLOAD",
                     "appName": "Video Studio App",
-                    "fileName": "production_export.mp4",
+                    "fileName": "upload_video.mp4",
                     "progress": 100,
                     "status": "Upload Complete",
                 },
@@ -411,20 +451,33 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
                 suggested_actions=["Add stock video footage", "Add animated app upload graphic"],
             )
 
+    # Chart / Graph
+    if re.search(r"\b(?:rising\s+graphs?|growth\s+charts?|trend\s*lines?|charts?|data\s+points?)\b", lower):
+        return CopilotIntentProposal(
+            intent="add_graphic",
+            confidence=0.90,
+            start_time=start_time,
+            end_time=end_time,
+            action_type="graphic",
+            summary=f"Growth chart reveal from {start_time:.1f}s to {end_time:.1f}s",
+            graphic_template="chart_reveal",
+            graphic_props={"title": "GROWTH TREND", "dataPoint1": "Stage 1: Baseline", "dataPoint2": "+85%"},
+        )
+
     # B-Roll / Stock Footage / Coding / Technology
     if (
-        re.search(r"\b(?:b-?roll|broll|footage|stock\s*(?:video|footage)?|cutaway)\b", lower)
+        re.search(r"\b(?:b-?roll|broll|footage|stock\s*(?:video|footage)?|cutaway|video|clip)\b", lower)
         or re.search(r"\b(?:laptop\s*coding|coding|programming|developer|technology|typing|working|nature|city|drone\s*shot)\b", lower)
     ):
         clean_query = re.sub(
-            r"\b(?:add|relevant|insert|put|overlay|b-?roll|broll|footage|video|clip|showing|of|i want|want|a screen in which|a screen showing|screen showing|screen|user is|on screen|from|between|at|to|and|keep|my|our|the|narration|audible|audio|clear|uninterrupted)\b",
+            r"\b(?:add|relevant|insert|put|overlay|b-?roll|broll|footage|video|clip|showing|of|i want|want|here|a person is watching|person watching|watching|a screen in which|a screen showing|screen showing|screen|user is|on screen|from|between|at|to|and|keep|my|our|the|narration|audible|audio|clear|uninterrupted)\b",
             "",
             prompt,
             flags=re.I
         ).strip()
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
         if not clean_query or len(clean_query) < 3:
-            clean_query = "laptop coding developer" if "coding" in lower else "cinematic technology footage"
+            clean_query = "person watching video" if "person" in lower or "watching" in lower else ("laptop coding developer" if "coding" in lower else "cinematic technology footage")
 
         return CopilotIntentProposal(
             intent="add_broll",
@@ -435,19 +488,6 @@ def _semantic_heuristic_fallback(prompt: str, playhead: float, duration: float) 
             summary=f"Add B-roll footage of {clean_query} from {start_time:.1f}s to {end_time:.1f}s with speech audio preserved",
             search_query=clean_query,
             suggested_actions=["Add stock video footage", "Adjust B-roll timing"],
-        )
-
-    # Chart / Graph
-    if re.search(r"\b(?:rising\s+graphs?|growth\s+charts?|charts?|data\s+points?)\b", lower) and not re.search(r"\bmotion\s+graphics?\b", lower):
-        return CopilotIntentProposal(
-            intent="add_graphic",
-            confidence=0.90,
-            start_time=start_time,
-            end_time=end_time,
-            action_type="graphic",
-            summary=f"Growth chart reveal from {start_time:.1f}s to {end_time:.1f}s",
-            graphic_template="chart_reveal",
-            graphic_props={"title": "GROWTH TREND", "dataPoint1": "Stage 1", "dataPoint2": "+85%"},
         )
 
     # Generic Motion Graphics request without specific subtype
