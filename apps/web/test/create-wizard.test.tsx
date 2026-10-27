@@ -194,6 +194,62 @@ describe("Phase 4: Create Flow Wizard", () => {
       fireEvent.click(backBtn);
       expect(handleBack).toHaveBeenCalledTimes(1);
     });
+
+    it("blocks launching and displays high-visibility alert when upload mode has no file", () => {
+      const handleLaunch = vi.fn();
+      const handleBack = vi.fn();
+
+      render(
+        <ReviewSummary
+          title="Talking Head Demo"
+          creationPath="upload"
+          aspectRatio="9:16"
+          videoStyle="cinematic"
+          captionPreset="modern_clean"
+          estimatedSeconds={30}
+          wordCount={50}
+          aiModulesCount={3}
+          isGenerating={false}
+          selectedFile={null}
+          onLaunch={handleLaunch}
+          onBack={handleBack}
+        />
+      );
+
+      expect(screen.getByText(/Critical: No Video Footage Attached/i)).toBeInTheDocument();
+      const launchBtn = screen.getByRole("button", { name: /footage required/i });
+      expect(launchBtn).toBeDisabled();
+      fireEvent.click(launchBtn);
+      expect(handleLaunch).not.toHaveBeenCalled();
+    });
+
+    it("displays footage details and enables launch when valid video file is provided", () => {
+      const handleLaunch = vi.fn();
+      const mockFile = new File(["dummy_content"], "test_recording.mp4", { type: "video/mp4" });
+
+      render(
+        <ReviewSummary
+          title="Talking Head Demo"
+          creationPath="upload"
+          aspectRatio="9:16"
+          videoStyle="cinematic"
+          captionPreset="modern_clean"
+          estimatedSeconds={30}
+          wordCount={50}
+          aiModulesCount={3}
+          isGenerating={false}
+          selectedFile={mockFile}
+          onLaunch={handleLaunch}
+          onBack={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText(/Footage Attached: test_recording.mp4/i)).toBeInTheDocument();
+      const launchBtn = screen.getByRole("button", { name: /launch video production/i });
+      expect(launchBtn).not.toBeDisabled();
+      fireEvent.click(launchBtn);
+      expect(handleLaunch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("CreateWizardPage Integration", () => {
@@ -223,6 +279,30 @@ describe("Phase 4: Create Flow Wizard", () => {
       );
       expect(screen.getAllByText(/Step 3 of 3/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText("Review Video Configuration")).toBeInTheDocument();
+    });
+
+    it("prevents advancing to Step 3 in upload mode if no video file was selected", () => {
+      render(
+        <ToastProvider>
+          <CreateWizardPage />
+        </ToastProvider>
+      );
+
+      // Select Upload & Enhance Footage path (automatically advances to Step 2)
+      fireEvent.click(screen.getByText("Upload & Enhance Footage"));
+
+      // We should be in Step 2
+      expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
+      expect(screen.getByText(/Drag and drop your raw video footage here/i)).toBeInTheDocument();
+
+      // The "Continue to Review" button must be disabled because selectedFile is null
+      const continueBtn = screen.getByRole("button", { name: /continue to review/i });
+      expect(continueBtn).toBeDisabled();
+
+      // Warning text should be visible
+      expect(
+        screen.getByText(/Please upload your speaking footage/i)
+      ).toBeInTheDocument();
     });
   });
 });

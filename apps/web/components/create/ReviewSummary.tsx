@@ -12,6 +12,8 @@ import {
   ArrowRight,
   ArrowLeft,
   Zap,
+  AlertTriangle,
+  FileVideo,
 } from "lucide-react";
 import { Card, Badge, Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -26,6 +28,7 @@ export interface ReviewSummaryProps {
   wordCount: number;
   aiModulesCount: number;
   isGenerating: boolean;
+  selectedFile?: File | null;
   onLaunch: () => void;
   onBack: () => void;
   className?: string;
@@ -41,11 +44,13 @@ export function ReviewSummary({
   wordCount,
   aiModulesCount,
   isGenerating,
+  selectedFile,
   onLaunch,
   onBack,
   className,
 }: ReviewSummaryProps) {
   const estimatedCost = (estimatedSeconds * 0.0035 + 0.05).toFixed(2);
+  const isMissingUpload = creationPath === "upload" && !selectedFile;
 
   return (
     <Card glow="violet" className={cn("p-6 space-y-6 max-w-2xl mx-auto", className)}>
@@ -149,6 +154,51 @@ export function ReviewSummary({
         </div>
       </div>
 
+      {/* Source Footage Status / Validation Warning */}
+      {creationPath === "upload" && (
+        <div
+          className={cn(
+            "p-3.5 rounded-xl border flex items-center justify-between text-xs transition-all",
+            selectedFile
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+              : "bg-rose-500/15 border-rose-500/40 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+          )}
+        >
+          <div className="flex items-center gap-2.5">
+            {selectedFile ? (
+              <FileVideo className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <div>
+              <div className="font-semibold">
+                {selectedFile
+                  ? `Footage Attached: ${selectedFile.name}`
+                  : "Critical: No Video Footage Attached"}
+              </div>
+              <div className="text-[11px] opacity-80">
+                {selectedFile
+                  ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB • Validated for Talking Head pipeline`
+                  : "Talking Head video requires speaking footage. Go back to Step 2 to select your file."}
+              </div>
+            </div>
+          </div>
+          {selectedFile ? (
+            <Badge variant="verified">Ready</Badge>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onBack}
+              className="text-xs border-rose-500/40 text-rose-300 hover:bg-rose-500/20"
+            >
+              Upload Now
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Action Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
         <Button
@@ -167,11 +217,12 @@ export function ReviewSummary({
           variant="primary"
           size="lg"
           onClick={onLaunch}
+          disabled={isGenerating || isMissingUpload}
           isLoading={isGenerating}
           loadingText="Dispatching Pipeline..."
           rightIcon={<Zap className="w-4 h-4 text-cyan-300 fill-cyan-300" />}
         >
-          Launch Video Production
+          {isMissingUpload ? "Footage Required" : "Launch Video Production"}
         </Button>
       </div>
     </Card>

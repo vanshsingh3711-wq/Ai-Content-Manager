@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { useTimelineStore } from "../lib/stores/useTimelineStore";
 import { TimelineProject, VideoClip, BRollClip } from "../lib/timeline-types";
 import { PlayerMonitor } from "../components/editor/PlayerMonitor";
@@ -290,5 +290,44 @@ describe("Phase 7: Production Hardening, Acceptance Test F & Proxy Scrubbing", (
 
     expect(videoElem).toBeDefined();
     expect(videoElem?.getAttribute("src")).toBe("https://cdn.example.com/standard_1080p.mp4");
+  });
+
+  it("PlayerMonitor displays graceful media error fallback overlay when video encounters load error", () => {
+    const projectWithFailingVideo: TimelineProject = {
+      ...baseProject,
+      tracks: {
+        ...baseProject.tracks,
+        videoTrack: [
+          {
+            id: "clip-fail-1",
+            sourceUrl: "https://cdn.example.com/missing_stream.mp4",
+            name: "Failing Stream Clip",
+            start: 0,
+            end: 10.0,
+            sourceStart: 0,
+            sourceEnd: 10.0,
+            speed: 1,
+            volume: 100,
+            zoomFactor: 1.0,
+          },
+        ],
+      },
+    };
+
+    useTimelineStore.getState().initProject(projectWithFailingVideo);
+    useTimelineStore.getState().setPlayheadTime(1.0);
+
+    const { container } = render(<PlayerMonitor />);
+    const videoElem = container.querySelector("video");
+    expect(videoElem).not.toBeNull();
+
+    // Trigger video error event
+    fireEvent.error(videoElem!);
+
+    // Graceful fallback overlay should be rendered
+    const fallbackOverlay = screen.getByTestId("player-media-error-fallback");
+    expect(fallbackOverlay).toBeInTheDocument();
+    expect(screen.getByText("Video Stream Unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry stream/i })).toBeInTheDocument();
   });
 });

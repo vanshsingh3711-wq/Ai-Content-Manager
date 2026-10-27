@@ -6,6 +6,8 @@ import traceback
 import uuid
 import json
 import time
+import socket
+import requests
 import concurrent.futures
 from typing import Optional, Any
 from celery import Task
@@ -53,6 +55,32 @@ from services.publisher import upload_rendered_video_to_storage, publish_to_yout
 from worker_logger import log_header, log_info, log_warning, log_error, log_summary, PipelineStep
 
 settings = get_worker_settings()
+
+DETERMINISTIC_EXCEPTIONS = (
+    FileNotFoundError,
+    ValueError,
+    KeyError,
+    IndexError,
+    TypeError,
+    PermissionError,
+    NotADirectoryError,
+)
+TRANSIENT_EXCEPTIONS = (
+    requests.exceptions.RequestException,
+    ConnectionError,
+    TimeoutError,
+    socket.gaierror,
+    socket.timeout,
+    socket.herror,
+)
+
+
+def is_retryable_exception(exc: Exception) -> bool:
+    """Returns True only for transient network/broker errors; False for deterministic bugs/file errors."""
+    if isinstance(exc, DETERMINISTIC_EXCEPTIONS):
+        return False
+    return isinstance(exc, TRANSIENT_EXCEPTIONS)
+
 
 @celery_app.task(bind=True, name="tasks.process_video_pipeline", max_retries=2)
 def process_video_pipeline(self: Task, job_id: str) -> dict:
@@ -623,7 +651,13 @@ def process_video_pipeline(self: Task, job_id: str) -> dict:
         err_stack = traceback.format_exc()
         log_error(f"Pipeline failure for Job {job_id}:\n{err_stack}")
         set_job_status_failed(job_uuid, err_stack)
-        raise self.retry(exc=exc, countdown=10)
+        
+        # Circuit breaker: only retry transient network/timeout exceptions
+        current_retries = getattr(getattr(self, "request", None), "retries", 0)
+        if is_retryable_exception(exc) and current_retries < 2 and hasattr(self, "retry"):
+            log_warning(f"Retrying transient failure for Job {job_id} (attempt {current_retries + 1}/2)...")
+            raise self.retry(exc=exc, countdown=15)
+        raise exc
 
 
 @celery_app.task(bind=True, name="tasks.render_timeline_pipeline")
@@ -969,6 +1003,10 @@ def render_timeline_pipeline(self: Any, *args, **kwargs) -> dict:
             stage="error",
             message=f"Render pipeline failure: {exc}",
         )
-        if self and hasattr(self, "retry"):
-            raise self.retry(exc=exc, countdown=10)
-        raise
+        
+        # Circuit breaker: only retry transient network/timeout exceptions
+        current_retries = getattr(getattr(self, "request", None), "retries", 0)
+        if is_retryable_exception(exc) and current_retries < 2 and hasattr(self, "retry"):
+            log_warning(f"Retrying transient render failure for Job {job_id} (attempt {current_retries + 1}/2)...")
+            raise self.retry(exc=exc, countdown=15)
+        raise exc

@@ -37,10 +37,12 @@ def get_s3_client():
 
 
 def sanitize_filename(filename: str) -> str:
-    """Removes special characters and whitespace from filename."""
-    name, ext = os.path.splitext(filename)
+    """Removes path separators, special characters, and whitespace from filename."""
+    base = os.path.basename(filename.replace("\\", "/"))
+    name, ext = os.path.splitext(base)
     clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name)
-    return f"{clean_name[:40]}{ext.lower()}"
+    clean_ext = re.sub(r"[^a-zA-Z0-9.]", "", ext).lower()
+    return f"{clean_name[:40]}{clean_ext}"
 
 
 def generate_presigned_upload_url(
@@ -54,8 +56,9 @@ def generate_presigned_upload_url(
     If R2 credentials are not configured, returns a local mock/dev upload URL.
     """
     clean_name = sanitize_filename(filename)
+    clean_user = re.sub(r"[^a-zA-Z0-9_\-]", "_", user_id or "default_user")
     file_id = str(uuid.uuid4())
-    file_key = f"raw-uploads/{user_id}/{file_id}-{clean_name}"
+    file_key = f"raw-uploads/{clean_user}/{file_id}-{clean_name}"
     
     s3_client = get_s3_client()
     bucket_name = settings.R2_BUCKET_NAME or "ai-video-manager-uploads"

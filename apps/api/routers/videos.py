@@ -7,7 +7,7 @@ from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select, desc, func
 
 from config import get_settings
@@ -32,6 +32,38 @@ class CreateVideoJobRequest(BaseModel):
     clerk_id: Optional[str] = Field("user_default", description="Clerk user ID")
     email: Optional[str] = Field("user@example.com", description="User email")
     settings: Optional[dict] = Field(default=None, description="Video style, aspect ratio, and editing preferences")
+
+    @model_validator(mode="after")
+    def validate_job_contract(self):
+        # 1. Talking Head videos MUST have a valid source URL
+        if self.video_type == VideoType.TALKING_HEAD:
+            clean_url = (self.source_url or "").strip()
+            if not clean_url:
+                raise ValueError("Talking head videos require a valid, non-empty source_url for footage.")
+            allowed_schemes = ("http://", "https://", "s3://", "r2://")
+            if not any(clean_url.startswith(scheme) for scheme in allowed_schemes):
+                raise ValueError(f"Invalid source_url protocol. Allowed schemes: {allowed_schemes}")
+
+        # 2. Faceless videos require a script or topic
+        elif self.video_type == VideoType.FACELESS_SHORT:
+            settings_dict = self.settings or {}
+            script_text = (
+                settings_dict.get("script_text")
+                or settings_dict.get("script")
+                or settings_dict.get("topic")
+                or ""
+            )
+            if not isinstance(script_text, str) or not script_text.strip():
+                raise ValueError("Faceless short videos require 'script_text' in job settings.")
+
+        # 3. Guard against SSRF / local path injection in source_url
+        if self.source_url:
+            clean_url = self.source_url.strip()
+            disallowed_schemes = ("file://", "gopher://", "ftp://", "javascript:")
+            if any(clean_url.lower().startswith(d) for d in disallowed_schemes):
+                raise ValueError("Disallowed URI protocol in source_url.")
+
+        return self
 
 
 class VideoJobResponse(BaseModel):
@@ -133,7 +165,10 @@ def create_video_job(
     # Auto-dispatch to Celery worker if enabled
     if settings.AUTO_DISPATCH_JOBS:
         print(f"[API: VIDEOS] ⚡ Auto-dispatching job {job.id} to Celery queue '{settings.CELERY_TASK_DEFAULT_QUEUE}'...")
-        dispatch_job_to_celery(job.id)
+        try:
+            dispatch_job_to_celery(job.id)
+        except Exception as dispatch_err:
+            print(f"[API: VIDEOS] ⚠️ Celery dispatch deferred for Job {job.id}: {dispatch_err}")
 
     # Sign the urls before returning
     job.source_url = get_presigned_url_from_full_url(job.source_url)

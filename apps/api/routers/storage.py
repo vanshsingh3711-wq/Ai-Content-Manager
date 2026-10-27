@@ -61,13 +61,29 @@ def get_presigned_url(payload: PresignedUrlRequest):
     return result
 
 
+def resolve_safe_local_path(key: str) -> str:
+    """
+    Safely resolves a storage key into an absolute path within MEDIA_TEMP_DIR.
+    Prevents path traversal attacks (e.g. '../').
+    """
+    # Normalize slashes and strip leading separators
+    clean_key = os.path.normpath(key.replace("\\", "/")).lstrip("/").lstrip(".")
+    resolved_path = os.path.abspath(os.path.join(MEDIA_TEMP_DIR, clean_key))
+    if not (resolved_path == MEDIA_TEMP_DIR or resolved_path.startswith(MEDIA_TEMP_DIR + os.sep)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid storage key: directory traversal is prohibited.",
+        )
+    return resolved_path
+
+
 @router.put("/dev-upload")
 async def dev_upload_endpoint(request: Request, key: str = Query(..., description="File storage key")):
     """
     Local mock upload endpoint. Stores the uploaded file in media_temp so it can be streamed locally.
     """
     body = await request.body()
-    local_file_path = os.path.join(MEDIA_TEMP_DIR, key.replace("/", os.sep))
+    local_file_path = resolve_safe_local_path(key)
     os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
 
     with open(local_file_path, "wb") as f:
@@ -109,7 +125,7 @@ async def proxy_upload_endpoint(request: Request, key: str = Query(..., descript
             pass
 
     # Local fallback in media_temp
-    local_file_path = os.path.join(MEDIA_TEMP_DIR, key.replace("/", os.sep))
+    local_file_path = resolve_safe_local_path(key)
     os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
     with open(local_file_path, "wb") as f:
         f.write(body)
@@ -127,7 +143,7 @@ def dev_download_endpoint(key: str = Query(..., description="File storage key"))
     """
     Streams and downloads the local media file directly in the browser.
     """
-    local_file_path = os.path.join(MEDIA_TEMP_DIR, key.replace("/", os.sep))
+    local_file_path = resolve_safe_local_path(key)
     
     if os.path.exists(local_file_path) and os.path.getsize(local_file_path) > 0:
         return FileResponse(

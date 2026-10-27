@@ -261,7 +261,14 @@ def dispatch_job(
             detail=f"Cannot dispatch job in state '{job.status}'. Only QUEUED or FAILED jobs can be dispatched.",
         )
 
-    task_id = dispatch_job_to_celery(job.id)
+    try:
+        task_id = dispatch_job_to_celery(job.id)
+    except Exception as exc:
+        print(f"[API: JOBS] ❌ Failed to dispatch job {job.id} to Celery: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Task queue broker is temporarily unavailable. Job remains in status '{job.status}'. Error: {str(exc)}",
+        )
 
     return {
         "status": "dispatched",

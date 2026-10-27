@@ -48,22 +48,31 @@ def stage_raw_video(job_source_url: str, raw_video_path: str, temp_dir: str):
     # 3. HTTP Streaming Download
     if not staged and (job_source_url.startswith("http://") or job_source_url.startswith("https://")):
         log_info(f"Streaming video bytes from HTTP endpoint...")
-        attempt = 1
-        while True:
+        max_attempts = 4
+        backoff_delays = [2, 4, 8, 16]
+        for attempt in range(1, max_attempts + 1):
             try:
                 res = requests.get(job_source_url, timeout=30, stream=True)
                 if res.status_code == 200:
                     with open(raw_video_path, "wb") as f:
                         for chunk in res.iter_content(chunk_size=16384):
                             f.write(chunk)
-                    if os.path.getsize(raw_video_path) > 1024:
+                    if os.path.exists(raw_video_path) and os.path.getsize(raw_video_path) > 1024:
                         staged = True
                         log_success(f"Downloaded video stream: {os.path.getsize(raw_video_path)} bytes")
+                        break
+                    else:
+                        log_warning(f"Downloaded stream was empty or truncated (attempt {attempt}/{max_attempts})")
+                else:
+                    log_warning(f"HTTP streaming responded with status {res.status_code} (attempt {attempt}/{max_attempts})")
                 break
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, socket.error) as e:
-                log_warning(f"Network error downloading video: Waiting 10s for internet to return (Attempt {attempt})...")
-                time.sleep(10)
-                attempt += 1
+                if attempt < max_attempts:
+                    delay = backoff_delays[attempt - 1]
+                    log_warning(f"Network error downloading video: {e}. Retrying in {delay}s (Attempt {attempt}/{max_attempts})...")
+                    time.sleep(delay)
+                else:
+                    log_error(f"Network error downloading video: Exhausted all {max_attempts} attempts. Last error: {e}")
 
     # 4. Failure validation
     if not staged:

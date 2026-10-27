@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   FileVideo,
   X,
 } from "lucide-react";
@@ -137,58 +138,115 @@ export default function CreateWizardPage() {
     }
   };
 
+  // Step validation helper
+  const validateStep = (step: WizardStep): { valid: boolean; reason?: string } => {
+    if (step === 2) return { valid: true };
+    if (step === 3) {
+      if (creationPath === "upload" && !selectedFile) {
+        return {
+          valid: false,
+          reason: "Please upload your speaking footage (.mp4, .mov, etc.) before continuing.",
+        };
+      }
+      if ((creationPath === "faceless" || creationPath === "template") && (!script.trim() || wordCount < 3)) {
+        return {
+          valid: false,
+          reason: "Please provide a script with at least 3 words for AI directing.",
+        };
+      }
+      if (creationPath === "url") {
+        if (!urlInput.trim()) {
+          return {
+            valid: false,
+            reason: "Please enter a valid article URL to extract content.",
+          };
+        }
+        if (!script.trim()) {
+          return {
+            valid: false,
+            reason: "Please extract or summarize article content before proceeding.",
+          };
+        }
+      }
+    }
+    return { valid: true };
+  };
+
+  const step2Validation = validateStep(3);
+
   // Launch Production
   const handleLaunchProduction = async () => {
+    // Prevent launching if required inputs are missing
+    if (creationPath === "upload" && !selectedFile) {
+      error("Missing Video Footage", "Please return to Step 2 and upload your speaking video file.");
+      return;
+    }
+
+    if ((creationPath === "faceless" || creationPath === "template") && (!script.trim() || wordCount < 3)) {
+      error("Incomplete Script", "A script of at least 3 words is required to generate this video.");
+      return;
+    }
+
     setIsGenerating(true);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     try {
-      let sourceUrl = "https://storage.googleapis.com/sample_videos/talking_head.mp4";
+      let sourceUrl = "";
 
       // If user provided a raw file, request presigned upload
       if (selectedFile) {
+        const presignRes = await fetch(
+          `${apiUrl}/api/v1/storage/presigned-url`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: selectedFile.name,
+              content_type: selectedFile.type || "video/mp4",
+              file_size_bytes: selectedFile.size,
+              user_id: "default_user",
+            }),
+          }
+        );
+
+        if (!presignRes.ok) {
+          throw new Error("Could not acquire storage upload authorization. Please check server connection.");
+        }
+
+        const { upload_url, source_url, file_key } = await presignRes.json();
+        sourceUrl = source_url;
+
+        // Upload file to S3/R2 direct or backend proxy
+        let uploadSuccess = false;
         try {
-          const presignRes = await fetch(
-            `${apiUrl}/api/v1/storage/presigned-url`,
+          const directRes = await fetch(upload_url, {
+            method: "PUT",
+            headers: { "Content-Type": selectedFile.type || "video/mp4" },
+            body: selectedFile,
+          });
+          uploadSuccess = directRes.ok;
+        } catch {
+          uploadSuccess = false;
+        }
+
+        if (!uploadSuccess) {
+          const proxyRes = await fetch(
+            `${apiUrl}/api/v1/storage/proxy-upload?key=${encodeURIComponent(file_key)}`,
             {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                filename: selectedFile.name,
-                content_type: selectedFile.type || "video/mp4",
-                file_size_bytes: selectedFile.size,
-                user_id: "default_user",
-              }),
-            }
-          );
-
-          if (presignRes.ok) {
-            const { upload_url, source_url, file_key } =
-              await presignRes.json();
-            sourceUrl = source_url;
-
-            // Upload file
-            await fetch(upload_url, {
               method: "PUT",
               headers: { "Content-Type": selectedFile.type || "video/mp4" },
               body: selectedFile,
-            }).catch(() => {
-              // Fallback to proxy
-              return fetch(
-                `${apiUrl}/api/v1/storage/proxy-upload?key=${encodeURIComponent(
-                  file_key
-                )}`,
-                {
-                  method: "PUT",
-                  headers: { "Content-Type": selectedFile.type || "video/mp4" },
-                  body: selectedFile,
-                }
-              );
-            });
+            }
+          );
+          if (!proxyRes.ok) {
+            throw new Error("Failed to upload video footage to storage server.");
           }
-        } catch (uploadErr) {
-          console.warn("Storage upload failed, proceeding with pipeline mock", uploadErr);
         }
+      }
+
+      // If upload path was chosen, sourceUrl must be present
+      if (creationPath === "upload" && !sourceUrl) {
+        throw new Error("No valid source video URL was generated. Please re-upload your footage.");
       }
 
       // Register Video Job in PostgreSQL
@@ -214,19 +272,20 @@ export default function CreateWizardPage() {
       });
 
       if (!jobRes.ok) {
-        throw new Error("Job dispatch failed");
+        let errMessage = "Job dispatch failed";
+        try {
+          const errData = await jobRes.json();
+          errMessage = errData.detail || errData.message || errMessage;
+        } catch {}
+        throw new Error(errMessage);
       }
 
       success("Video Production Dispatched!", `"${title}" is rendering in the pipeline.`);
       setTimeout(() => {
         router.push("/dashboard/queue");
       }, 1000);
-    } catch (err) {
-      // In offline/mock mode, trigger success and redirect
-      success("Video Production Queued", `"${title}" has been registered in the pipeline.`);
-      setTimeout(() => {
-        router.push("/dashboard/queue");
-      }, 1000);
+    } catch (err: any) {
+      error("Production Dispatch Failed", err?.message || "Failed to dispatch video to pipeline.");
     } finally {
       setIsGenerating(false);
     }
@@ -262,14 +321,25 @@ export default function CreateWizardPage() {
             <button
               key={s.step}
               onClick={() => {
-                if (s.step < currentStep) setCurrentStep(s.step as WizardStep);
+                if (s.step < currentStep) {
+                  setCurrentStep(s.step as WizardStep);
+                } else if (s.step === 3 && currentStep === 2) {
+                  if (step2Validation.valid) {
+                    setCurrentStep(3);
+                  } else {
+                    error("Step Incomplete", step2Validation.reason || "Please complete required inputs.");
+                  }
+                }
               }}
-              disabled={s.step > currentStep}
+              disabled={
+                s.step > currentStep &&
+                (s.step !== 3 || currentStep !== 2 || !step2Validation.valid)
+              }
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all select-none",
                 currentStep === s.step
                   ? "bg-violet-600 text-white shadow-[0_0_12px_rgba(124,58,237,0.4)]"
-                  : currentStep > s.step
+                  : currentStep > s.step || (s.step === 3 && currentStep === 2 && step2Validation.valid)
                   ? "bg-white/[0.05] text-white/70 hover:bg-white/[0.1] cursor-pointer"
                   : "bg-white/[0.02] text-white/20 cursor-not-allowed"
               )}
@@ -433,7 +503,7 @@ export default function CreateWizardPage() {
             />
 
             {/* Step Navigation Buttons */}
-            <div className="flex items-center justify-between pt-6 border-t border-white/[0.06]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-6 border-t border-white/[0.06]">
               <Button
                 variant="ghost"
                 size="md"
@@ -443,14 +513,29 @@ export default function CreateWizardPage() {
                 Back to Path
               </Button>
 
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setCurrentStep(3)}
-                rightIcon={<ArrowRight className="w-4 h-4" />}
-              >
-                Continue to Review
-              </Button>
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                {!step2Validation.valid && (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-400 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{step2Validation.reason}</span>
+                  </div>
+                )}
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={!step2Validation.valid}
+                  onClick={() => {
+                    if (step2Validation.valid) {
+                      setCurrentStep(3);
+                    } else {
+                      error("Validation Error", step2Validation.reason || "Please complete required inputs.");
+                    }
+                  }}
+                  rightIcon={<ArrowRight className="w-4 h-4" />}
+                >
+                  Continue to Review
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -483,6 +568,7 @@ export default function CreateWizardPage() {
           wordCount={wordCount}
           aiModulesCount={activeModulesCount}
           isGenerating={isGenerating}
+          selectedFile={selectedFile}
           onLaunch={handleLaunchProduction}
           onBack={() => setCurrentStep(2)}
         />

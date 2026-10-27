@@ -12,6 +12,7 @@ import {
   Diamond,
   Sparkles,
   UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { useTimelineStore } from "@/lib/stores/useTimelineStore";
 import { useShallow } from "zustand/react/shallow";
@@ -73,6 +74,7 @@ export function PlayerMonitor() {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
   // Derive active Audio clip directly
   const activeAudio = (project.tracks.audioTrack || []).find(
@@ -83,6 +85,11 @@ export function PlayerMonitor() {
   const activeVideoClip = project.tracks.videoTrack.find(
     (c) => playheadTime >= c.start && playheadTime < c.end
   );
+
+  // Clear media error whenever the active clip or its source changes
+  useEffect(() => {
+    setMediaError(null);
+  }, [activeVideoClip?.id, activeVideoClip?.proxyUrl, activeVideoClip?.sourceUrl]);
 
   // Derive active B-Roll clip directly
   const activeBroll = project.tracks.brollTrack.find(
@@ -755,6 +762,11 @@ export function PlayerMonitor() {
                     v.currentTime = 0.001;
                   }
                 }}
+                onError={() => {
+                  setMediaError(
+                    "Unable to stream video proxy. The file may be missing, offline, or CORS-restricted."
+                  );
+                }}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -763,6 +775,35 @@ export function PlayerMonitor() {
           <div className="flex flex-col items-center justify-center text-neutral-500 p-6 text-center">
             <RotateCcw className="w-8 h-8 mb-2 animate-spin text-neutral-500" />
             <p className="text-xs">No media at current timestamp</p>
+          </div>
+        )}
+
+        {/* Media Error Fallback Overlay */}
+        {mediaError && activeVideoClip && (
+          <div
+            data-testid="player-media-error-fallback"
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 bg-neutral-950/90 backdrop-blur-md text-center text-white space-y-3"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold text-rose-300">Video Stream Unavailable</h4>
+              <p className="text-xs text-white/60 max-w-xs">{mediaError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMediaError(null);
+                if (videoRef.current) {
+                  videoRef.current.load();
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Retry Stream</span>
+            </button>
           </div>
         )}
 
