@@ -8,10 +8,13 @@
 /* ── Color Tokens ──────────────────────────────────── */
 :root {
   /* Backgrounds */
-  --bg-base:     #060709;
-  --bg-surface:  #0d1017;
-  --bg-elevated: #141821;
-  --bg-overlay:  #1a1f2e;
+  --bg-base:          #060709;
+  --bg-surface:       #0d1017;
+  --bg-surface-hover: #161b26;
+  --bg-surface-active:#1e2535;
+  --bg-elevated:      #141821;
+  --bg-elevated-hover:#1c2331;
+  --bg-overlay:       #1a1f2e;
 
   /* Backward-compatible aliases used by existing Tailwind classes */
   --background:            var(--bg-base);
@@ -29,9 +32,12 @@
   --primary-hover:     #6d28d9;
   --primary-foreground:#ffffff;
   --accent:            #06b6d4;
+  --accent-hover:      #0891b2;
   --accent-foreground: #ffffff;
   --accent-violet:     #7c3aed;
   --accent-cyan:       #06b6d4;
+  --ring-focus:        #06b6d4;
+  --ring-focus-violet: #7c3aed;
 
   /* State */
   --success:            #10b981;
@@ -114,6 +120,62 @@ body {
   font-family: var(--font-sans);
   overflow-x: hidden;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* ── Accessibility & Focus System ───────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ring-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Accessible skip-link for keyboard users */
+.skip-link {
+  position: absolute;
+  top: -120px;
+  left: 16px;
+  z-index: 9999;
+  padding: 10px 18px;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(124, 58, 237, 0.6);
+  transition: top 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 16px;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+/* Respect user preferences for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode enhancements */
+@media (prefers-contrast: more) {
+  :root {
+    --border: rgba(255, 255, 255, 0.25);
+    --border-hover: rgba(255, 255, 255, 0.45);
+    --ring-focus: #ffffff;
+  }
+  .glass-card,
+  .glass-panel {
+    background: #0d1017 !important;
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  }
 }
 
 /* ── Scrollbar ─────────────────────────────────────── */
@@ -481,24 +543,23 @@ body {
 
 /* Fade in up — page/card entrance */
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in-up {
-  animation: fade-in-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fade-in-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* Stagger children — add to parent to animate children sequentially */
 .animate-children > * {
-  opacity: 0;
-  animation: fade-in-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fade-in-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 .animate-children > *:nth-child(1) { animation-delay:   0ms; }
-.animate-children > *:nth-child(2) { animation-delay:  50ms; }
-.animate-children > *:nth-child(3) { animation-delay: 100ms; }
-.animate-children > *:nth-child(4) { animation-delay: 150ms; }
-.animate-children > *:nth-child(5) { animation-delay: 200ms; }
-.animate-children > *:nth-child(6) { animation-delay: 250ms; }
+.animate-children > *:nth-child(2) { animation-delay:  40ms; }
+.animate-children > *:nth-child(3) { animation-delay:  80ms; }
+.animate-children > *:nth-child(4) { animation-delay: 120ms; }
+.animate-children > *:nth-child(5) { animation-delay: 160ms; }
+.animate-children > *:nth-child(6) { animation-delay: 200ms; }
 
 /* Pulse glow — active rendering states */
 @keyframes pulse-glow {
@@ -639,9 +700,63 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════
-   TYPOGRAPHY UTILITIES
+   TYPOGRAPHY UTILITIES (Design System V2)
 ═══════════════════════════════════════════════════════ */
 
+/* Display Headings */
+.text-display {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #f8fafc;
+}
+@media (min-width: 768px) {
+  .text-display {
+    font-size: 2.75rem;
+  }
+}
+
+.text-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: #f8fafc;
+}
+
+.text-heading {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: #f8fafc;
+}
+
+.text-body {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.70);
+}
+
+.text-caption {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.text-micro {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.40);
+}
+
+/* Backward-compatible legacy classes */
 .text-page-title {
   font-size: 2rem;
   font-weight: 600;
@@ -660,23 +775,23 @@ body {
   font-weight: 500;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.40);
 }
 .text-mono-sm {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
-  color: rgba(255, 255, 255, 0.40);
+  color: rgba(255, 255, 255, 0.45);
 }
 
 /* Gradient text */
 .text-gradient-violet {
-  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 50%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .text-gradient-cyan {
-  background: linear-gradient(135deg, #67e8f9 0%, #06b6d4 100%);
+  background: linear-gradient(135deg, #a5f3fc 0%, #22d3ee 50%, #06b6d4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -720,3 +835,51 @@ body {
   outline: 2px solid rgba(124, 58, 237, 0.70);
   outline-offset: 2px;
 }
+
+/* ═══════════════════════════════════════════════════════
+   PREMIUM LUXURY GLASS & AMBIENT GLOW UTILITIES
+═══════════════════════════════════════════════════════ */
+
+.glass-card-premium {
+  background: linear-gradient(
+    135deg,
+    rgba(22, 27, 38, 0.75) 0%,
+    rgba(13, 16, 23, 0.85) 100%
+  );
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 32px -4px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.glass-card-premium:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 12px 40px -4px rgba(0, 0, 0, 0.6), 0 0 24px -4px rgba(124, 58, 237, 0.15);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.ambient-glow-violet {
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.18) 0%, rgba(124, 58, 237, 0) 70%);
+}
+
+.ambient-glow-cyan {
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.18) 0%, rgba(6, 182, 212, 0) 70%);
+}
+
+.ambient-glow-emerald {
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0) 70%);
+}
+
+.ambient-glow-amber {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0) 70%);
+}
+

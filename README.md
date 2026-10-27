@@ -16,7 +16,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-8B5CF6?style=flat-square)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/vanshsingh3711-wq/Ai-Director/ci.yml?style=flat-square&label=CI)](https://github.com/vanshsingh3711-wq/Ai-Director/actions)
 
-[Product Tour](#product-tour) · [How It Works](#how-it-works) · [Tech Stack](#tech-stack) · [Quickstart](#quickstart) · [API Reference](#api-reference) · [Contributing](#contributing)
+[Product Tour](#product-tour) · [How It Works](#how-it-works) · [Design System](#studio-command-center--design-system-v20) · [Tech Stack](#tech-stack) · [Quickstart](#quickstart) · [API Reference](#api-reference) · [Contributing](#contributing)
 
 </div>
 
@@ -35,6 +35,11 @@ There's also a browser-based non-linear editor (NLE) if you want to review or re
 ## Product Tour
 
 <div align="center">
+
+<img src="./docs/assets/dashboard_overview.jpg" alt="AI Director Command Center Dashboard v2.0" width="95%" style="border-radius: 8px;" />
+<p><sub>AI Director Command Center (v2.0) — atmospheric glassmorphic workspace, executive KPI metrics, live 4-stage pipeline monitor, and creation substrates</sub></p>
+
+<br />
 
 <img src="./docs/assets/landing_hero.png" alt="AI Director landing page" width="95%" style="border-radius: 8px;" />
 <p><sub>Landing page — three creation pathways: Audio, Script, and Raw Video</sub></p>
@@ -118,6 +123,7 @@ Input (Audio / Script / Video)
 | Remotion motion graphic overlays | ✅ Implemented | ProRes 4444 transparent MOV composited via FFmpeg |
 | ASS kinetic subtitle generation | ✅ Implemented | Karaoke-style, carry-normalized timestamps |
 | FFmpeg multi-track compositor | ✅ Implemented | Chunked pipeline, SHA-256 segment cache |
+| Studio Command Center Dashboard v2.0 | ✅ Implemented | Atmospheric glassmorphism, executive KPI stats row, 4-stage pipeline monitor & live hardware telemetry |
 | Browser-based NLE (4-track timeline) | ✅ Implemented | React 19, Zustand, ⌘K AI Copilot |
 | NLE export (Premiere XML / FCPXML / EDL) | ✅ Implemented | |
 | Resilient bounded network retries | ✅ Implemented | Exponential backoff, jitter, deadline control |
@@ -128,11 +134,24 @@ Input (Audio / Script / Video)
 
 ---
 
+## Studio Command Center & Design System v2.0
+
+AI Director features a studio-grade dark design system engineered for high-velocity video production:
+
+- **Atmospheric Glassmorphism**: Deep obsidian base (`#060709`) augmented by multi-stop backdrop blur (`20px`), subtle top-rim reflection lighting (`inset 0 1px 0 rgba(255,255,255,0.1)`), and radial neon atmospheric glows.
+- **Executive KPI Metrics Row**: Real-time stats showcasing total video assets, active pipeline rendering jobs, completed ready-to-publish cuts, and autonomous AI reliability with trend tags.
+- **Interactive 4-Stage Pipeline Monitor**: Visual production console featuring a live circular progress gauge (`<ProgressRing>`), connected numbered stage cards (`01 Queued` → `02 Transcribing` → `03 AI Directing` → `04 Rendering`), animated pulse node states, and real-time worker hardware stats (4-thread worker, 2.4x realtime throughput).
+- **Creation Substrates**: Glowing high-contrast launcher tiles for Faceless AI Video generation (`⌘1`), Talking Head footage enhancement with kinetic captions (`⌘2`), Remotion multi-track Studio NLE Editor (`⌘3`), and viral formats (Feynman Shorts, Finance Reels) (`⌘4`).
+- **Cinematic Asset Showcase & Audit Feed**: 9:16 Shorts / 16:9 Cinema preview cards with direct studio launch buttons, real-time audit event timeline, and live Remotion / GPU hardware status bar.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
 | :--- | :--- |
-| **Frontend** | Next.js 16 (App Router), React 19, TailwindCSS v4, Zustand |
+| **Frontend** | Next.js 16 (App Router), React 19, TailwindCSS v4, Framer Motion, Zustand |
+| **Design System** | Luxury Dark Glassmorphism, CSS Tokens, Custom UI Component Kit |
 | **Backend API** | FastAPI 0.115, SQLModel, PostgreSQL (Neon) |
 | **Worker** | Celery 5.4, Redis (Upstash), Python 3.11+ |
 | **AI / ML** | DeepSeek Chat & R1 via OpenRouter, faster-whisper (CTranslate2) |

@@ -1,6 +1,9 @@
 import uuid
+import asyncio
+from datetime import datetime
 from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select, desc
 
@@ -174,6 +177,66 @@ def dispatch_publish_socials_to_celery(
         return sim_id
 
 
+@router.get("/stream")
+async def stream_job_updates():
+    """
+    Streams live updates for video pipeline jobs using Server-Sent Events (SSE).
+    Sends updates whenever job states or logs change, with automatic heartbeat.
+    """
+    async def event_generator():
+        while True:
+            try:
+                # Open a brief session to fetch latest jobs
+                with next(get_session()) as session:
+                    statement = select(VideoJob).order_by(desc(VideoJob.created_at)).limit(30)
+                    jobs = session.exec(statement).all()
+
+                    serialized_jobs = [
+                        {
+                            "id": str(j.id),
+                            "title": j.title,
+                            "status": j.status,
+                            "source_url": get_presigned_url_from_full_url(j.source_url),
+                            "rendered_url": get_presigned_url_from_full_url(j.rendered_url),
+                            "edit_decision_list": j.edit_decision_list,
+                            "error_log": j.error_log,
+                            "settings": j.settings,
+                            "created_at": j.created_at.isoformat() if j.created_at else "",
+                            "updated_at": j.updated_at.isoformat() if j.updated_at else "",
+                        }
+                        for j in jobs
+                    ]
+
+                    active_count = len(
+                        [j for j in serialized_jobs if j["status"] not in [VideoJobStatus.COMPLETED, VideoJobStatus.FAILED]]
+                    )
+
+                    payload = {
+                        "type": "jobs_update",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "jobs": serialized_jobs,
+                        "active_count": active_count,
+                    }
+
+                    yield f"data: {json.dumps(payload)}\n\n"
+            except Exception as e:
+                err_payload = json.dumps({"type": "error", "message": str(e)})
+                yield f"data: {err_payload}\n\n"
+
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
 @router.post("/{job_id}/dispatch", response_model=DispatchJobResponse)
 def dispatch_job(
     job_id: uuid.UUID,
@@ -190,51 +253,6 @@ def dispatch_job(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Video job with ID {job_id} not found",
         )
-    
-@router.post("/feedback")
-def submit_feedback(request: FeedbackRequest):
-    """
-    Submits a style correction for the AI Director to learn from (Phase 5).
-    """
-    try:
-        # Call the feedback script using subprocess
-        # In a real app we'd import it, but it's in a different root package currently.
-        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "worker", "style_learning", "feedback.py"))
-        
-        # We can write a quick wrapper to invoke the function since it doesn't have a direct CLI command for raw data yet,
-        # or we just write directly to the JSON file from the API.
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        feedback_path = os.path.join(base_dir, "data", "styles", "knowledge", "feedback.json")
-        
-        feedbacks = []
-        if os.path.exists(feedback_path):
-            with open(feedback_path, "r") as f:
-                feedbacks = json.load(f)
-                
-        from datetime import datetime
-        new_record = {
-            "timestamp": datetime.now().isoformat(),
-            "niche": request.niche,
-            "original": request.original,
-            "correction": request.correction,
-            "reason": request.reason
-        }
-        
-        feedbacks.append(new_record)
-        
-        with open(feedback_path, "w") as f:
-            json.dump(feedbacks, f, indent=2)
-            
-        # Trigger apply_feedback_to_profile via subprocess
-        niche_count = len([f for f in feedbacks if f.get("niche") == request.niche])
-        # Apply every 5 corrections (simulating the 20+ rule)
-        if niche_count > 0 and niche_count % 5 == 0:
-            import sys
-            subprocess.run([sys.executable, script_path, "apply", "--niche", request.niche], check=True)
-            
-        return {"status": "success", "message": "Feedback recorded."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
     if job.status not in [VideoJobStatus.QUEUED, VideoJobStatus.FAILED]:
         print(f"[API: JOBS] ⚠️ Job {job_id} is in state '{job.status}' (must be QUEUED or FAILED)")
@@ -251,6 +269,45 @@ def submit_feedback(request: FeedbackRequest):
         "queue": settings.CELERY_TASK_DEFAULT_QUEUE,
         "message": f"Task enqueued with ID: {task_id}",
     }
+
+
+@router.post("/feedback")
+def submit_feedback(request: FeedbackRequest):
+    """
+    Submits a style correction for the AI Director to learn from.
+    """
+    try:
+        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "worker", "style_learning", "feedback.py"))
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        feedback_path = os.path.join(base_dir, "data", "styles", "knowledge", "feedback.json")
+        
+        feedbacks = []
+        if os.path.exists(feedback_path):
+            with open(feedback_path, "r") as f:
+                feedbacks = json.load(f)
+                
+        new_record = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "niche": request.niche,
+            "original": request.original,
+            "correction": request.correction,
+            "reason": request.reason
+        }
+        
+        feedbacks.append(new_record)
+        
+        os.makedirs(os.path.dirname(feedback_path), exist_ok=True)
+        with open(feedback_path, "w") as f:
+            json.dump(feedbacks, f, indent=2)
+            
+        niche_count = len([f for f in feedbacks if f.get("niche") == request.niche])
+        if niche_count > 0 and niche_count % 5 == 0 and os.path.exists(script_path):
+            import sys
+            subprocess.run([sys.executable, script_path, "apply", "--niche", request.niche], check=True)
+            
+        return {"status": "success", "message": "Feedback recorded."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{job_id}/retry", response_model=DispatchJobResponse)
