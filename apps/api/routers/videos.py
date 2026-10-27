@@ -163,8 +163,10 @@ def create_video_job(
     print(f"[API: VIDEOS] ✅ Registered VideoJob {job.id} with status QUEUED")
 
     # Auto-dispatch to Celery worker if enabled
-    if settings.AUTO_DISPATCH_JOBS:
-        print(f"[API: VIDEOS] ⚡ Auto-dispatching job {job.id} to Celery queue '{settings.CELERY_TASK_DEFAULT_QUEUE}'...")
+    auto_dispatch = getattr(settings, "AUTO_DISPATCH_JOBS", True)
+    queue_name = getattr(settings, "CELERY_TASK_DEFAULT_QUEUE", "video_processing_queue")
+    if auto_dispatch:
+        print(f"[API: VIDEOS] ⚡ Auto-dispatching job {job.id} to Celery queue '{queue_name}'...")
         try:
             dispatch_job_to_celery(job.id)
         except Exception as dispatch_err:

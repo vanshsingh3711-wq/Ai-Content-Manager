@@ -20,6 +20,7 @@ class WorkerSettings(BaseSettings):
     # Broker & Backend
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_TASK_DEFAULT_QUEUE: str = "video_processing_queue"
+    AUTO_DISPATCH_JOBS: bool = False
     
     # Database
     DATABASE_URL: str = f"sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'api', 'dev.db'))}"
